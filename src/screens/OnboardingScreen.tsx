@@ -1,293 +1,242 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Animated,
-  KeyboardAvoidingView,
-  Platform,
-  Dimensions,
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  ScrollView, Animated, KeyboardAvoidingView, Platform, FlatList, Dimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
-import { EXAM_TYPES, ExamType } from '../data/examPresets';
+import { EXAM_TYPES, ExamType, AVATARS } from '../data/examPresets';
 import { StorageService } from '../utils/storage';
 import { useHaptics } from '../hooks/useHaptics';
 
 const { width: W } = Dimensions.get('window');
+const AVATAR_CELL = 72;
 
-const AVATARS = [
-  '🎯','🔥','⚡','🧠','🏆',
-  '🚀','💎','🦁','⚔️','🐉',
-  '🌟','💫','🦋','🌙','☄️',
-  '💡','🔬','⚗️','📚','🎮',
-];
+const STEPS = ['Avatar', 'Name', 'Exams'];
 
-const STEP_LABELS = ['Avatar', 'Name', 'Email', 'Exam'];
-const TOTAL_STEPS = 4;
-
-interface Props {
-  onComplete: () => void;
-}
+interface Props { onComplete: () => void }
 
 export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
-  const [step, setStep]               = useState(0);
-  const [avatar, setAvatar]           = useState('🎯');
-  const [name, setName]               = useState('');
-  const [email, setEmail]             = useState('');
-  const [selectedExam, setSelectedExam] = useState<ExamType | null>(null);
-  const [nameError, setNameError]     = useState('');
-  const [emailError, setEmailError]   = useState('');
+  const [step, setStep]         = useState(0);
+  const [avatar, setAvatar]     = useState(AVATARS[0]);
+  const [name, setName]         = useState('');
+  const [nameError, setNameError] = useState('');
+  const [selectedExams, setSelectedExams] = useState<Set<ExamType>>(new Set());
 
-  // Slide transition
-  const slideAnim  = useRef(new Animated.Value(0)).current;
-  const fadeAnim   = useRef(new Animated.Value(1)).current;
-
-  // Avatar
-  const avatarScale    = useRef(new Animated.Value(1)).current;
-  const avatarGlow     = useRef(new Animated.Value(0)).current;
-  const avatarPulse    = useRef(new Animated.Value(1)).current;
-
-  // Progress bar
+  const fadeAnim  = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const avatarBounce = useRef(new Animated.Value(1)).current;
+  const avatarGlow   = useRef(new Animated.Value(0)).current;
+  const avatarPulse  = useRef(new Animated.Value(1)).current;
 
   const { buttonPress } = useHaptics();
 
   useEffect(() => {
-    // Pulse the big avatar preview
     Animated.loop(Animated.sequence([
-      Animated.timing(avatarPulse, { toValue: 1.06, duration: 900, useNativeDriver: true }),
-      Animated.timing(avatarPulse, { toValue: 1.0,  duration: 900, useNativeDriver: true }),
+      Animated.timing(avatarPulse, { toValue: 1.06, duration: 950, useNativeDriver: true }),
+      Animated.timing(avatarPulse, { toValue: 1.0,  duration: 950, useNativeDriver: true }),
     ])).start();
   }, []);
 
   useEffect(() => {
     Animated.timing(progressAnim, {
-      toValue: step / (TOTAL_STEPS - 1),
+      toValue: step / (STEPS.length - 1),
       duration: 350,
       useNativeDriver: false,
     }).start();
   }, [step]);
 
   const transitionTo = (next: number) => {
-    const direction = next > step ? 1 : -1;
+    const dir = next > step ? 1 : -1;
     Animated.parallel([
-      Animated.timing(fadeAnim,  { toValue: 0, duration: 180, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: direction * -30, duration: 180, useNativeDriver: true }),
+      Animated.timing(fadeAnim,  { toValue: 0, duration: 160, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: dir * -28, duration: 160, useNativeDriver: true }),
     ]).start(() => {
-      slideAnim.setValue(direction * 30);
+      slideAnim.setValue(dir * 28);
       setStep(next);
       Animated.parallel([
-        Animated.timing(fadeAnim,  { toValue: 1, duration: 260, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: 0, duration: 260, useNativeDriver: true }),
+        Animated.timing(fadeAnim,  { toValue: 1, duration: 240, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 0, duration: 240, useNativeDriver: true }),
       ]).start();
     });
   };
 
-  const onAvatarPick = (emoji: string) => {
+  const onPickAvatar = (emoji: string) => {
     setAvatar(emoji);
     buttonPress();
     Animated.sequence([
-      Animated.spring(avatarScale, { toValue: 1.25, tension: 200, friction: 5, useNativeDriver: true }),
-      Animated.spring(avatarScale, { toValue: 1.0,  tension: 200, friction: 5, useNativeDriver: true }),
+      Animated.spring(avatarBounce, { toValue: 1.3, tension: 220, friction: 5, useNativeDriver: true }),
+      Animated.spring(avatarBounce, { toValue: 1.0, tension: 220, friction: 5, useNativeDriver: true }),
     ]).start();
     Animated.sequence([
-      Animated.timing(avatarGlow, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.timing(avatarGlow, { toValue: 0, duration: 400, useNativeDriver: true }),
+      Animated.timing(avatarGlow, { toValue: 1, duration: 180, useNativeDriver: true }),
+      Animated.timing(avatarGlow, { toValue: 0, duration: 500, useNativeDriver: true }),
     ]).start();
+  };
+
+  const toggleExam = (id: ExamType) => {
+    buttonPress();
+    setSelectedExams(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const canProceed = () => {
+    if (step === 1) return name.trim().length >= 2;
+    if (step === 2) return selectedExams.size > 0;
+    return true;
   };
 
   const handleNext = () => {
     buttonPress();
-    if (step === 1) {
-      if (name.trim().length < 2) { setNameError('Need at least 2 characters.'); return; }
-      setNameError('');
-    }
-    if (step === 2) {
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        setEmailError('Enter a valid email address.'); return;
-      }
-      setEmailError('');
-    }
-    if (step === TOTAL_STEPS - 1) { handleFinish(); return; }
+    if (step === 1 && name.trim().length < 2) { setNameError('Need at least 2 characters.'); return; }
+    setNameError('');
+    if (step === STEPS.length - 1) { handleFinish(); return; }
     transitionTo(step + 1);
   };
 
   const handleFinish = async () => {
-    if (!selectedExam) return;
-    await StorageService.saveUser({
+    if (selectedExams.size === 0) return;
+    const user = {
       name: name.trim(),
-      email: email.trim(),
-      examType: selectedExam,
+      email: '',
+      examTypes: Array.from(selectedExams),
       avatar,
       createdAt: new Date().toISOString(),
-    });
+    };
+    await StorageService.saveUser(user);
     const state = await StorageService.getAppState();
-    await StorageService.saveAppState({
-      ...state,
-      user: { name: name.trim(), email: email.trim(), examType: selectedExam, avatar, createdAt: new Date().toISOString() },
-    });
+    await StorageService.saveAppState({ ...state, user });
     onComplete();
   };
 
-  const canProceed = () => {
-    if (step === TOTAL_STEPS - 1) return selectedExam !== null;
-    return true;
-  };
-
-  // ── Step renderers ────────────────────────────────────
-
+  // ── Renderers ──────────────────────────────────────────
   const renderAvatarStep = () => (
-    <View style={stepStyles.container}>
-      <Text style={stepStyles.stepNum}>01</Text>
-      <Text style={stepStyles.title}>Pick your identity</Text>
-      <Text style={stepStyles.sub}>This is who you are on TINT. Choose wisely.</Text>
+    <View style={stepS.container}>
+      <Text style={stepS.stepNum}>01</Text>
+      <Text style={stepS.title}>Who are you?</Text>
+      <Text style={stepS.sub}>Pick your identity — this is how you appear on TINT.</Text>
 
-      {/* Big avatar preview */}
-      <View style={avatarStyles.previewWrapper}>
-        <Animated.View style={[avatarStyles.glowRing, {
-          opacity:   avatarGlow.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0.9] }),
-          transform: [{ scale: avatarGlow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] }) }],
+      {/* Big preview */}
+      <View style={avatarS.previewArea}>
+        <Animated.View style={[avatarS.glowRing, {
+          opacity:   avatarGlow.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.85] }),
+          transform: [{ scale: avatarGlow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.3] }) }],
         }]} />
-        <Animated.View style={[avatarStyles.preview, {
-          transform: [{ scale: Animated.multiply(avatarScale, avatarPulse) }],
+        <Animated.View style={[avatarS.previewCircle, {
+          transform: [{ scale: Animated.multiply(avatarBounce, avatarPulse) }],
         }]}>
-          <Text style={avatarStyles.previewEmoji}>{avatar}</Text>
+          <Text style={avatarS.previewEmoji}>{avatar}</Text>
         </Animated.View>
       </View>
 
-      {/* Grid */}
-      <View style={avatarStyles.grid}>
-        {AVATARS.map((emoji) => {
-          const isSelected = avatar === emoji;
+      {/* Horizontal sliding carousel */}
+      <FlatList
+        data={AVATARS}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={e => e}
+        contentContainerStyle={avatarS.carousel}
+        renderItem={({ item }) => {
+          const selected = avatar === item;
           return (
             <TouchableOpacity
-              key={emoji}
-              style={[avatarStyles.cell, isSelected && avatarStyles.cellSelected]}
-              onPress={() => onAvatarPick(emoji)}
+              style={[avatarS.cell, selected && avatarS.cellActive]}
+              onPress={() => onPickAvatar(item)}
               activeOpacity={0.7}
             >
-              {isSelected && (
+              {selected && (
                 <LinearGradient
                   colors={[Colors.primary + '55', Colors.primary + '22']}
                   style={[StyleSheet.absoluteFill, { borderRadius: BorderRadius.md }]}
                 />
               )}
-              <Text style={avatarStyles.cellEmoji}>{emoji}</Text>
+              <Text style={avatarS.cellEmoji}>{item}</Text>
             </TouchableOpacity>
           );
-        })}
-      </View>
-
-      <Text style={avatarStyles.hint}>You can change this anytime later</Text>
+        }}
+      />
+      <Text style={avatarS.hint}>Slide to see more • You can change this anytime</Text>
     </View>
   );
 
   const renderNameStep = () => (
-    <View style={stepStyles.container}>
-      <Text style={stepStyles.stepNum}>02</Text>
-      <View style={stepStyles.avatarChip}>
-        <Text style={{ fontSize: 28 }}>{avatar}</Text>
+    <View style={stepS.container}>
+      <Text style={stepS.stepNum}>02</Text>
+      <View style={stepS.avatarChip}>
+        <Text style={{ fontSize: 32 }}>{avatar}</Text>
       </View>
-      <Text style={stepStyles.title}>What's your name?</Text>
-      <Text style={stepStyles.sub}>We'll use this to make your experience personal.</Text>
+      <Text style={stepS.title}>What's your name?</Text>
+      <Text style={stepS.sub}>We'll keep it personal from here on.</Text>
       <TextInput
-        style={[stepStyles.input, nameError ? stepStyles.inputError : null]}
+        style={[stepS.input, nameError ? stepS.inputErr : null]}
         value={name}
         onChangeText={t => { setName(t); setNameError(''); }}
         placeholder="Your name..."
         placeholderTextColor={Colors.textMuted}
         autoFocus
         autoCapitalize="words"
-        returnKeyType="next"
+        returnKeyType="done"
         onSubmitEditing={handleNext}
       />
-      {nameError ? <Text style={stepStyles.error}>{nameError}</Text> : null}
+      {nameError ? <Text style={stepS.error}>{nameError}</Text> : null}
     </View>
   );
 
-  const renderEmailStep = () => (
-    <View style={stepStyles.container}>
-      <Text style={stepStyles.stepNum}>03</Text>
-      <View style={stepStyles.avatarChip}>
-        <Text style={{ fontSize: 28 }}>{avatar}</Text>
-      </View>
-      <Text style={stepStyles.title}>Hey {name || 'there'} 👋</Text>
-      <Text style={stepStyles.sub}>
-        Add your email to back up your streaks and data.{'\n'}
-        Totally optional — skip if you prefer.
+  const renderExamsStep = () => (
+    <View style={[stepS.container, { flex: 1 }]}>
+      <Text style={stepS.stepNum}>03</Text>
+      <Text style={stepS.title}>Which exams are you targeting?</Text>
+      <Text style={stepS.sub}>
+        Select all that apply — we'll build a combined daily plan tailored to your goals.
       </Text>
-      <TextInput
-        style={[stepStyles.input, emailError ? stepStyles.inputError : null]}
-        value={email}
-        onChangeText={t => { setEmail(t); setEmailError(''); }}
-        placeholder="your@email.com  (optional)"
-        placeholderTextColor={Colors.textMuted}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoFocus
-        returnKeyType="next"
-        onSubmitEditing={handleNext}
-      />
-      {emailError ? <Text style={stepStyles.error}>{emailError}</Text> : null}
-    </View>
-  );
 
-  const renderExamStep = () => (
-    <View style={[stepStyles.container, { flex: 1 }]}>
-      <Text style={stepStyles.stepNum}>04</Text>
-      <Text style={stepStyles.title}>What's the goal?</Text>
-      <Text style={stepStyles.sub}>
-        We'll preload a daily task list tuned to your exam.
-      </Text>
-      <ScrollView style={{ flex: 1, marginTop: Spacing.sm }} showsVerticalScrollIndicator={false}>
+      <View style={examS.grid}>
         {EXAM_TYPES.map(exam => {
-          const isSelected = selectedExam === exam.id;
+          const checked = selectedExams.has(exam.id);
           return (
             <TouchableOpacity
               key={exam.id}
-              style={[examStyles.card, isSelected && examStyles.cardSelected]}
-              onPress={() => { setSelectedExam(exam.id); buttonPress(); }}
+              style={[examS.card, checked && { borderColor: exam.color, backgroundColor: exam.color + '14' }]}
+              onPress={() => toggleExam(exam.id)}
               activeOpacity={0.75}
             >
-              {isSelected && (
-                <LinearGradient
-                  colors={[Colors.primary + '22', 'transparent']}
-                  style={[StyleSheet.absoluteFill, { borderRadius: BorderRadius.md }]}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                />
-              )}
-              <Text style={examStyles.emoji}>{exam.emoji}</Text>
-              <View style={examStyles.info}>
-                <Text style={[examStyles.label, isSelected && { color: Colors.primaryLight }]}>
-                  {exam.label}
-                </Text>
-                <Text style={examStyles.desc}>{exam.description}</Text>
-              </View>
-              <View style={[examStyles.radio, isSelected && examStyles.radioSelected]}>
-                {isSelected && <View style={examStyles.radioDot} />}
+              <Text style={examS.emoji}>{exam.emoji}</Text>
+              <Text style={[examS.label, checked && { color: exam.color }]}>{exam.label}</Text>
+              <Text style={examS.desc}>{exam.description}</Text>
+
+              {/* Checkbox */}
+              <View style={[examS.checkbox, checked && { backgroundColor: exam.color, borderColor: exam.color }]}>
+                {checked && <Text style={examS.checkmark}>✓</Text>}
               </View>
             </TouchableOpacity>
           );
         })}
-        <View style={{ height: 24 }} />
-      </ScrollView>
+      </View>
+
+      {selectedExams.size > 1 && (
+        <View style={examS.comboNote}>
+          <Text style={examS.comboText}>
+            🧩 Combined plan: {selectedExams.size} exams detected — we'll merge tasks intelligently.
+          </Text>
+        </View>
+      )}
     </View>
   );
 
-  const STEP_CONTENT = [renderAvatarStep, renderNameStep, renderEmailStep, renderExamStep];
+  const CONTENT = [renderAvatarStep, renderNameStep, renderExamsStep];
+
+  const ctaLabel = step === 0 ? `Lock in as ${avatar}  →` : step === 2 ? 'Start grinding →' : 'Continue →';
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.container}>
         <StatusBar style="light" />
-        <LinearGradient colors={['#050010', '#0A0018', '#080810']} style={StyleSheet.absoluteFill} />
-
-        {/* Background orb */}
+        <LinearGradient colors={['#040010', '#09001A', '#07070E']} style={StyleSheet.absoluteFill} />
         <View style={styles.bgOrb} />
 
         {/* Header */}
@@ -298,32 +247,27 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
             }]} />
           </View>
           <View style={styles.stepDots}>
-            {STEP_LABELS.map((label, i) => (
+            {STEPS.map((label, i) => (
               <View key={i} style={styles.dotWrapper}>
                 <View style={[styles.dot, i <= step && styles.dotActive, i === step && styles.dotCurrent]} />
-                <Text style={[styles.dotLabel, i <= step && { color: Colors.primaryLight }]}>
-                  {label}
-                </Text>
+                <Text style={[styles.dotLabel, i <= step && { color: Colors.primaryLight }]}>{label}</Text>
               </View>
             ))}
           </View>
         </View>
 
         {/* Content */}
-        <Animated.View style={[styles.contentArea, {
+        <Animated.View style={[styles.content, {
           opacity:   fadeAnim,
           transform: [{ translateX: slideAnim }],
         }]}>
-          {STEP_CONTENT[step]()}
+          {CONTENT[step]()}
         </Animated.View>
 
         {/* Footer */}
         <View style={styles.footer}>
           {step > 0 && (
-            <TouchableOpacity
-              style={styles.backBtn}
-              onPress={() => { buttonPress(); transitionTo(step - 1); }}
-            >
+            <TouchableOpacity style={styles.backBtn} onPress={() => { buttonPress(); transitionTo(step - 1); }}>
               <Text style={styles.backText}>← Back</Text>
             </TouchableOpacity>
           )}
@@ -336,13 +280,10 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
             <LinearGradient
               colors={canProceed() ? ['#A78BFA', '#7C3AED'] : [Colors.surfaceElevated, Colors.surfaceElevated]}
               style={styles.nextGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             >
               <Text style={[styles.nextText, !canProceed() && { color: Colors.textMuted }]}>
-                {step === 0 ? `Lock in as ${avatar}  →`
-                 : step === TOTAL_STEPS - 1 ? 'Start grinding →'
-                 : 'Continue →'}
+                {ctaLabel}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -352,279 +293,72 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
   );
 };
 
-// ── Shared step styles ────────────────────────────────
-const stepStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: Spacing.sm,
-  },
-  stepNum: {
-    fontSize: 72,
-    fontWeight: '900',
-    color: Colors.primary + '18',
-    letterSpacing: -3,
-    marginBottom: -Spacing.xl,
-    lineHeight: 80,
-  },
-  avatarChip: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.surfaceElevated,
-    borderWidth: 1.5,
-    borderColor: Colors.primary + '55',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-    letterSpacing: -0.5,
-  },
-  sub: {
-    fontSize: 15,
-    color: Colors.textSecondary,
-    lineHeight: 22,
-    marginBottom: Spacing.sm,
-  },
-  input: {
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 16,
-    color: Colors.textPrimary,
-    fontSize: 17,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    fontWeight: '500',
-  },
-  inputError: {
-    borderColor: Colors.danger + '88',
-  },
-  error: {
-    fontSize: 13,
-    color: Colors.danger,
-    marginTop: -4,
-  },
+// ── Step shared styles ────────────────────────────────
+const stepS = StyleSheet.create({
+  container: { flex: 1, justifyContent: 'center', gap: Spacing.sm },
+  stepNum: { fontSize: 72, fontWeight: '900', color: Colors.primary + '18', letterSpacing: -3, marginBottom: -Spacing.xl, lineHeight: 80 },
+  avatarChip: { width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.surfaceElevated, borderWidth: 2, borderColor: Colors.primary + '55', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  title: { fontSize: 30, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
+  sub: { fontSize: 14, color: Colors.textSecondary, lineHeight: 21, marginBottom: Spacing.sm },
+  input: { backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md, paddingHorizontal: Spacing.md, paddingVertical: 16, color: Colors.textPrimary, fontSize: 17, borderWidth: 1.5, borderColor: Colors.border, fontWeight: '500' },
+  inputErr: { borderColor: Colors.danger + '88' },
+  error: { fontSize: 13, color: Colors.danger, marginTop: -4 },
 });
 
-// ── Avatar styles ────────────────────────────────────
-const avatarStyles = StyleSheet.create({
-  previewWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 110,
-    marginVertical: Spacing.md,
-  },
-  glowRing: {
-    position: 'absolute',
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: Colors.primary,
-  },
-  preview: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: Colors.surfaceElevated,
-    borderWidth: 2,
-    borderColor: Colors.primary + '66',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  previewEmoji: {
-    fontSize: 50,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    justifyContent: 'center',
-  },
-  cell: {
-    width: (W - Spacing.xl * 2 - 8 * 4) / 5,
-    height: (W - Spacing.xl * 2 - 8 * 4) / 5,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.surfaceElevated,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  cellSelected: {
-    borderColor: Colors.primary,
-  },
-  cellEmoji: {
-    fontSize: 26,
-  },
-  hint: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    marginTop: Spacing.sm,
-    letterSpacing: 0.5,
-  },
+// ── Avatar styles ─────────────────────────────────────
+const avatarS = StyleSheet.create({
+  previewArea: { alignItems: 'center', justifyContent: 'center', height: 120, marginVertical: Spacing.sm },
+  glowRing: { position: 'absolute', width: 116, height: 116, borderRadius: 58, backgroundColor: Colors.primary },
+  previewCircle: { width: 92, height: 92, borderRadius: 46, backgroundColor: Colors.surfaceElevated, borderWidth: 2, borderColor: Colors.primary + '66', alignItems: 'center', justifyContent: 'center' },
+  previewEmoji: { fontSize: 52 },
+  carousel: { paddingHorizontal: Spacing.xl, gap: 10, paddingVertical: 4 },
+  cell: { width: AVATAR_CELL, height: AVATAR_CELL, borderRadius: BorderRadius.md, backgroundColor: Colors.surfaceElevated, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  cellActive: { borderColor: Colors.primary },
+  cellEmoji: { fontSize: 30 },
+  hint: { fontSize: 12, color: Colors.textMuted, textAlign: 'center', letterSpacing: 0.4 },
 });
 
-// ── Exam card styles ─────────────────────────────────
-const examStyles = StyleSheet.create({
+// ── Exam card styles ──────────────────────────────────
+const examS = StyleSheet.create({
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: (W - Spacing.xl * 2 - 10) / 2,
     backgroundColor: Colors.surfaceElevated,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    gap: Spacing.md,
-    overflow: 'hidden',
-  },
-  cardSelected: {
-    borderColor: Colors.primary,
-  },
-  emoji: {
-    fontSize: 28,
-    width: 36,
-    textAlign: 'center',
-  },
-  info: {
-    flex: 1,
-    gap: 3,
-  },
-  label: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  desc: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
     borderWidth: 2,
     borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    position: 'relative',
   },
-  radioSelected: {
-    borderColor: Colors.primary,
-  },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.primary,
-  },
+  emoji: { fontSize: 28 },
+  label: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
+  desc: { fontSize: 11, color: Colors.textSecondary, lineHeight: 16 },
+  checkbox: { position: 'absolute', top: 10, right: 10, width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
+  checkmark: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  comboNote: { backgroundColor: Colors.primary + '18', borderRadius: BorderRadius.md, padding: Spacing.sm, borderWidth: 1, borderColor: Colors.primary + '33' },
+  comboText: { fontSize: 13, color: Colors.primaryLight, lineHeight: 20 },
 });
 
-// ── Screen styles ────────────────────────────────────
+// ── Screen styles ─────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#050010',
-  },
-  bgOrb: {
-    position: 'absolute',
-    width: 360,
-    height: 360,
-    borderRadius: 180,
-    top: -100,
-    right: -100,
-    backgroundColor: Colors.primary,
-    opacity: 0.07,
-  },
-  header: {
-    paddingTop: 58,
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.md,
-    gap: Spacing.sm,
-  },
-  progressTrack: {
-    height: 3,
-    backgroundColor: Colors.border,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.primary,
-    borderRadius: 2,
-  },
-  stepDots: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dotWrapper: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.border,
-  },
-  dotActive: {
-    backgroundColor: Colors.primary + '88',
-  },
-  dotCurrent: {
-    backgroundColor: Colors.primary,
-    width: 14,
-  },
-  dotLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: Colors.textMuted,
-    letterSpacing: 0.5,
-  },
-  contentArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.sm,
-  },
-  footer: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Platform.OS === 'web' ? 32 : 44,
-    paddingTop: Spacing.md,
-    gap: Spacing.sm,
-    alignItems: 'center',
-  },
-  backBtn: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-  },
-  backText: {
-    fontSize: 15,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  nextBtn: {
-    flex: 1,
-    borderRadius: BorderRadius.md,
-    overflow: 'hidden',
-  },
-  nextBtnDisabled: {
-    opacity: 0.45,
-  },
-  nextGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nextText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#fff',
-    letterSpacing: 0.2,
-  },
+  container: { flex: 1, backgroundColor: '#040010' },
+  bgOrb: { position: 'absolute', width: 350, height: 350, borderRadius: 175, top: -100, right: -100, backgroundColor: Colors.primary, opacity: 0.07 },
+  header: { paddingTop: 58, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.md, gap: Spacing.sm },
+  progressTrack: { height: 3, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 2 },
+  stepDots: { flexDirection: 'row', justifyContent: 'space-around' },
+  dotWrapper: { alignItems: 'center', gap: 4 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.border },
+  dotActive: { backgroundColor: Colors.primary + '88' },
+  dotCurrent: { backgroundColor: Colors.primary, width: 16 },
+  dotLabel: { fontSize: 10, fontWeight: '600', color: Colors.textMuted, letterSpacing: 0.5 },
+  content: { flex: 1, paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm },
+  footer: { flexDirection: 'row', paddingHorizontal: Spacing.xl, paddingBottom: Platform.OS === 'web' ? 32 : 44, paddingTop: Spacing.md, gap: Spacing.sm, alignItems: 'center' },
+  backBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.md },
+  backText: { fontSize: 15, color: Colors.textSecondary, fontWeight: '500' },
+  nextBtn: { flex: 1, borderRadius: BorderRadius.md, overflow: 'hidden' },
+  nextBtnDisabled: { opacity: 0.45 },
+  nextGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  nextText: { fontSize: 17, fontWeight: '700', color: '#fff', letterSpacing: 0.2 },
 });

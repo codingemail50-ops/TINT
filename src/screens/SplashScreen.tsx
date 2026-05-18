@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing } from '../constants/theme';
@@ -8,66 +8,73 @@ import { MOTIVATIONAL_QUOTES } from '../data/examPresets';
 
 const { width: W, height: H } = Dimensions.get('window');
 
-// Ray directions outward from center
+// Heavy poster-style font — Impact on web, bold system on native
+const DISPLAY_FONT = Platform.OS === 'web'
+  ? 'Impact, "Arial Narrow Bold", "Arial Black", sans-serif'
+  : undefined;
+
+// The 4 letters of TINT and the words they expand into
+const EXPANSIONS = [
+  { letter: 'T', word: 'HERE' },
+  { letter: 'I', word: 'S'    },
+  { letter: 'N', word: 'O'    },
+  { letter: 'T', word: 'OMORROW' },
+];
+
+// 8 ray directions (outward to corners + edges)
 const RAY_ANGLES = [-135, -90, -45, 180, 0, 135, 90, 45];
 
-interface Props {
-  onFinish: (hasUser: boolean) => void;
-}
+interface Props { onFinish: (hasUser: boolean) => void }
 
 export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
-  const [quote] = useState(
-    () => MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]
-  );
+  const [quote] = useState(() => MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
 
-  // Phase 1 — TINT horizontal entrance
-  const tintOpacity = useRef(new Animated.Value(0)).current;
-  const tintY       = useRef(new Animated.Value(-30)).current;
+  // ── Phase 1: "TINT" horizontal ──────────────────────
+  const tintOpacity  = useRef(new Animated.Value(0)).current;
+  const tintY        = useRef(new Animated.Value(-40)).current;
+  const letterScales = useRef(EXPANSIONS.map(() => new Animated.Value(1))).current;
 
-  // Individual letter scales for pulse
-  const letterScales = useRef(['T','I','N','T'].map(() => new Animated.Value(1))).current;
+  // ── Phase 2: Rays burst from center ─────────────────
+  const rayLen = useRef(RAY_ANGLES.map(() => new Animated.Value(0))).current;
+  const rayOp  = useRef(RAY_ANGLES.map(() => new Animated.Value(0))).current;
 
-  // Phase 2 — rays
-  const rayLengths = useRef(RAY_ANGLES.map(() => new Animated.Value(0))).current;
-  const rayOpacity = useRef(RAY_ANGLES.map(() => new Animated.Value(0))).current;
+  // ── Phase 3: TINT crossfades to THERE IS NO TOMORROW
+  const tintGroupOp = useRef(new Animated.Value(1)).current; // multiplied with tintOpacity
+  // Each expanded row slides in from left
+  const rowOp = useRef(EXPANSIONS.map(() => new Animated.Value(0))).current;
+  const rowX  = useRef(EXPANSIONS.map(() => new Animated.Value(-28))).current;
 
-  // Phase 3 — TINT fades out, word rows fade in
-  const tintFade    = useRef(new Animated.Value(1)).current;
+  // ── Quote + loading ──────────────────────────────────
+  const quoteOp    = useRef(new Animated.Value(0)).current;
+  const quoteY     = useRef(new Animated.Value(16)).current;
+  const loadWidth  = useRef(new Animated.Value(0)).current;
 
-  // Four word rows slide in from left
-  const rowsOpacity = useRef([0,1,2,3].map(() => new Animated.Value(0))).current;
-  const rowsX       = useRef([0,1,2,3].map(() => new Animated.Value(-20))).current;
+  // ── Background ───────────────────────────────────────
+  const orbOp    = useRef(new Animated.Value(0)).current;
+  const orb1Sc   = useRef(new Animated.Value(0.7)).current;
+  const orb2Sc   = useRef(new Animated.Value(0.9)).current;
 
-  // Quote + loading
-  const quoteOpacity = useRef(new Animated.Value(0)).current;
-  const quoteY       = useRef(new Animated.Value(14)).current;
-  const loadingWidth = useRef(new Animated.Value(0)).current;
-
-  // Orbs + particles
-  const orbOpacity = useRef(new Animated.Value(0)).current;
-  const orb1Scale  = useRef(new Animated.Value(0.7)).current;
-  const orb2Scale  = useRef(new Animated.Value(0.9)).current;
-  const particles  = useRef(
-    [...Array(16)].map((_, i) => ({
-      x:   new Animated.Value((i * 67 + 20) % (W - 20)),
-      y:   new Animated.Value(H + 10),
+  const particles = useRef(
+    [...Array(20)].map((_, i) => ({
+      x:   new Animated.Value((i * 71 + 15) % (W - 10)),
+      y:   new Animated.Value(H + 20),
       op:  new Animated.Value(0),
       sz:  2 + (i % 4),
-      col: i % 3 === 0 ? Colors.primary : i % 3 === 1 ? Colors.accent : Colors.primaryLight,
+      col: i % 3 === 0 ? Colors.primary : i % 3 === 1 ? Colors.accent : '#A78BFA',
     }))
   ).current;
 
   useEffect(() => {
-    // Particles rising
+    // Particles rise loop
     particles.forEach((p, i) => {
       const rise = () => {
-        p.y.setValue(H + 10 + Math.random() * 80);
+        p.y.setValue(H + 20 + Math.random() * 60);
         p.op.setValue(0);
         Animated.sequence([
-          Animated.delay(i * 200 + Math.random() * 300),
+          Animated.delay(i * 180 + Math.random() * 300),
           Animated.parallel([
-            Animated.timing(p.op, { toValue: 0.55, duration: 600, useNativeDriver: true }),
-            Animated.timing(p.y,  { toValue: -40,  duration: 3200 + Math.random() * 2000, useNativeDriver: true }),
+            Animated.timing(p.op, { toValue: 0.6, duration: 700, useNativeDriver: true }),
+            Animated.timing(p.y,  { toValue: -40, duration: 3200 + Math.random() * 2000, useNativeDriver: true }),
           ]),
           Animated.timing(p.op, { toValue: 0, duration: 400, useNativeDriver: true }),
         ]).start(({ finished }) => { if (finished) rise(); });
@@ -76,74 +83,74 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
     });
 
     // Orbs
-    Animated.timing(orbOpacity, { toValue: 1, duration: 1200, useNativeDriver: true }).start();
+    Animated.timing(orbOp, { toValue: 1, duration: 1200, useNativeDriver: true }).start();
     Animated.loop(Animated.sequence([
-      Animated.timing(orb1Scale, { toValue: 1.15, duration: 3000, useNativeDriver: true }),
-      Animated.timing(orb1Scale, { toValue: 0.7,  duration: 3000, useNativeDriver: true }),
+      Animated.timing(orb1Sc, { toValue: 1.18, duration: 3200, useNativeDriver: true }),
+      Animated.timing(orb1Sc, { toValue: 0.7,  duration: 3200, useNativeDriver: true }),
     ])).start();
     Animated.loop(Animated.sequence([
-      Animated.timing(orb2Scale, { toValue: 1.2,  duration: 3600, useNativeDriver: true }),
-      Animated.timing(orb2Scale, { toValue: 0.9,  duration: 3600, useNativeDriver: true }),
+      Animated.timing(orb2Sc, { toValue: 1.25, duration: 3800, useNativeDriver: true }),
+      Animated.timing(orb2Sc, { toValue: 0.9,  duration: 3800, useNativeDriver: true }),
     ])).start();
 
-    // Loading bar
-    Animated.timing(loadingWidth, { toValue: 1, duration: 5200, useNativeDriver: false }).start();
+    // Loading bar runs across total duration ~5.5s
+    Animated.timing(loadWidth, { toValue: 1, duration: 5500, useNativeDriver: false }).start();
 
-    // ── Main sequence ─────────────────────────────────
+    // ── Main animation sequence ──────────────────────────
     Animated.sequence([
 
-      // 1. TINT slides up and fades in
-      Animated.delay(350),
+      // 1. TINT slides up into view
+      Animated.delay(300),
       Animated.parallel([
-        Animated.timing(tintOpacity, { toValue: 1, duration: 450, useNativeDriver: true }),
-        Animated.timing(tintY,       { toValue: 0, duration: 450, useNativeDriver: true }),
+        Animated.timing(tintOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(tintY,       { toValue: 0, duration: 400, useNativeDriver: true }),
       ]),
 
-      // 2. Letters pulse one by one
-      Animated.delay(250),
-      Animated.stagger(70, letterScales.map(s =>
+      // 2. Each letter pulses outward in sequence
+      Animated.delay(200),
+      Animated.stagger(80, letterScales.map(s =>
         Animated.sequence([
-          Animated.timing(s, { toValue: 1.2,  duration: 140, useNativeDriver: true }),
-          Animated.timing(s, { toValue: 1.0,  duration: 140, useNativeDriver: true }),
+          Animated.timing(s, { toValue: 1.22, duration: 130, useNativeDriver: true }),
+          Animated.timing(s, { toValue: 1.0,  duration: 130, useNativeDriver: true }),
         ])
       )),
 
-      // 3. Rays burst outward
+      // 3. Rays burst to all corners
       Animated.parallel([
         ...RAY_ANGLES.map((_, i) =>
           Animated.sequence([
-            Animated.delay(i * 25),
-            Animated.timing(rayLengths[i], { toValue: 1, duration: 280, useNativeDriver: false }),
+            Animated.delay(i * 22),
+            Animated.timing(rayLen[i], { toValue: 1, duration: 320, useNativeDriver: false }),
           ])
         ),
         ...RAY_ANGLES.map((_, i) =>
           Animated.sequence([
-            Animated.delay(i * 25),
-            Animated.timing(rayOpacity[i], { toValue: 0.6, duration: 120, useNativeDriver: true }),
-            Animated.timing(rayOpacity[i], { toValue: 0,   duration: 220, useNativeDriver: true }),
+            Animated.delay(i * 22),
+            Animated.timing(rayOp[i], { toValue: 0.65, duration: 120, useNativeDriver: true }),
+            Animated.timing(rayOp[i], { toValue: 0,    duration: 280, useNativeDriver: true }),
           ])
         ),
       ]),
 
-      // 4. TINT fades out, word rows stagger in
+      // 4. TINT fades out, expanded rows slide in staggered
       Animated.parallel([
-        Animated.timing(tintFade, { toValue: 0, duration: 300, useNativeDriver: true }),
+        Animated.timing(tintGroupOp, { toValue: 0, duration: 300, useNativeDriver: true }),
         Animated.sequence([
-          Animated.delay(100),
-          Animated.stagger(110, [0,1,2,3].map(i =>
+          Animated.delay(80),
+          Animated.stagger(100, EXPANSIONS.map((_, i) =>
             Animated.parallel([
-              Animated.timing(rowsOpacity[i], { toValue: 1, duration: 350, useNativeDriver: true }),
-              Animated.timing(rowsX[i],       { toValue: 0, duration: 350, useNativeDriver: true }),
+              Animated.timing(rowOp[i], { toValue: 1, duration: 320, useNativeDriver: true }),
+              Animated.timing(rowX[i],  { toValue: 0, duration: 320, useNativeDriver: true }),
             ])
           )),
         ]),
       ]),
 
-      // 5. Quote
-      Animated.delay(200),
+      // 5. Quote appears
+      Animated.delay(250),
       Animated.parallel([
-        Animated.timing(quoteOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
-        Animated.timing(quoteY,       { toValue: 0, duration: 500, useNativeDriver: true }),
+        Animated.timing(quoteOp, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(quoteY,  { toValue: 0, duration: 500, useNativeDriver: true }),
       ]),
 
       Animated.delay(1600),
@@ -154,43 +161,33 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
     });
   }, []);
 
-  const ROWS = [
-    { letter: 'T', word: 'HERE' },
-    { letter: 'I', word: 'S'    },
-    { letter: 'N', word: 'O'    },
-    { letter: 'T', word: 'OMORROW' },
-  ];
-
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <LinearGradient
-        colors={['#050010', '#0A0018', '#08080F']}
-        locations={[0, 0.5, 1]}
-        style={StyleSheet.absoluteFill}
-      />
+      <LinearGradient colors={['#040010', '#09001A', '#07070E']} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
 
       {/* Orbs */}
-      <Animated.View style={[styles.orb, styles.orbTL, { opacity: orbOpacity, transform: [{ scale: orb1Scale }] }]} />
-      <Animated.View style={[styles.orb, styles.orbBR, { opacity: orbOpacity, transform: [{ scale: orb2Scale }] }]} />
+      <Animated.View style={[styles.orb, { top: -120, left: -100, backgroundColor: '#6D28D9', opacity: orbOp, transform: [{ scale: orb1Sc }] }]} />
+      <Animated.View style={[styles.orb, { bottom: -90, right: -90, backgroundColor: '#B45309', opacity: orbOp, transform: [{ scale: orb2Sc }] }]} />
 
       {/* Particles */}
       {particles.map((p, i) => (
-        <Animated.View key={i} style={[styles.particle, {
+        <Animated.View key={i} style={{
+          position: 'absolute', bottom: 0,
           left: p.x as any, width: p.sz, height: p.sz,
           borderRadius: p.sz / 2, backgroundColor: p.col,
           opacity: p.op, transform: [{ translateY: p.y }],
-        }]} />
+        }} />
       ))}
 
       <View style={styles.content}>
 
-        {/* ── Phase 1: TINT horizontal ── */}
+        {/* ── PHASE 1: TINT horizontal ── */}
         <Animated.View style={[styles.tintRow, {
-          opacity: Animated.multiply(tintOpacity, tintFade),
+          opacity:   Animated.multiply(tintOpacity, tintGroupOp),
           transform: [{ translateY: tintY }],
         }]}>
-          {['T','I','N','T'].map((letter, i) => (
+          {EXPANSIONS.map(({ letter }, i) => (
             <Animated.Text key={i} style={[styles.tintLetter, {
               transform: [{ scale: letterScales[i] }],
             }]}>
@@ -199,29 +196,29 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
           ))}
         </Animated.View>
 
-        {/* Rays — centered behind TINT */}
+        {/* Rays from center */}
         <View style={styles.rayOrigin} pointerEvents="none">
           {RAY_ANGLES.map((angle, i) => (
             <Animated.View key={i} style={[styles.ray, {
-              opacity: rayOpacity[i],
-              width: rayLengths[i].interpolate({ inputRange: [0, 1], outputRange: [0, 100] }),
+              opacity: rayOp[i],
+              width: rayLen[i].interpolate({ inputRange: [0, 1], outputRange: [0, 110] }),
               transform: [{ rotate: `${angle}deg` }],
             }]} />
           ))}
         </View>
 
-        {/* ── Phase 2: Expanded word rows ── */}
-        <View style={styles.wordBlock}>
-          {ROWS.map((row, i) => (
-            <Animated.View key={i} style={[styles.wordRow, {
-              opacity:   rowsOpacity[i],
-              transform: [{ translateX: rowsX[i] }],
+        {/* ── PHASE 2: Expanded rows ── */}
+        <View style={styles.expandedBlock}>
+          {EXPANSIONS.map(({ letter, word }, i) => (
+            <Animated.View key={i} style={[styles.expandedRow, {
+              opacity:   rowOp[i],
+              transform: [{ translateX: rowX[i] }],
             }]}>
-              {/* Big golden letter */}
-              <Text style={styles.wordLetter}>{row.letter}</Text>
-              {/* Rest of word + underline */}
-              <View style={styles.wordRestCol}>
-                <Text style={styles.wordRest}>{row.word}</Text>
+              {/* First letter — big gold */}
+              <Text style={styles.expandedLetter}>{letter}</Text>
+              {/* Rest of word */}
+              <View style={styles.expandedWordCol}>
+                <Text style={styles.expandedWord}>{word}</Text>
                 <View style={styles.underline} />
               </View>
             </Animated.View>
@@ -229,8 +226,8 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
         </View>
 
         {/* Quote */}
-        <Animated.View style={[styles.quoteWrapper, {
-          opacity:   quoteOpacity,
+        <Animated.View style={[styles.quoteBox, {
+          opacity:   quoteOp,
           transform: [{ translateY: quoteY }],
         }]}>
           <View style={styles.quoteLine} />
@@ -242,9 +239,9 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
       </View>
 
       {/* Loading bar */}
-      <View style={styles.loadingTrack}>
-        <Animated.View style={[styles.loadingFill, {
-          width: loadingWidth.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+      <View style={styles.loadTrack}>
+        <Animated.View style={[styles.loadFill, {
+          width: loadWidth.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
         }]} />
       </View>
     </View>
@@ -252,19 +249,20 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#050010' },
+  container: { flex: 1, backgroundColor: '#040010' },
 
-  orb: { position: 'absolute', borderRadius: 9999 },
-  orbTL: { width: 400, height: 400, top: -140, left: -120, backgroundColor: '#7C3AED', opacity: 0.11 },
-  orbBR: { width: 340, height: 340, bottom: -100, right: -80, backgroundColor: '#F59E0B', opacity: 0.08 },
-
-  particle: { position: 'absolute', bottom: 0 },
+  orb: {
+    position: 'absolute',
+    width: 380, height: 380,
+    borderRadius: 190,
+    opacity: 0.12,
+  },
 
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 36,
+    gap: 32,
     paddingHorizontal: Spacing.xl,
   },
 
@@ -272,92 +270,100 @@ const styles = StyleSheet.create({
   tintRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
     position: 'absolute',
   },
   tintLetter: {
-    fontSize: 80,
+    fontSize: 88,
     fontWeight: '900',
+    fontFamily: DISPLAY_FONT,
     color: '#F5C518',
-    letterSpacing: -1,
-    textShadowColor: '#F5C518',
+    letterSpacing: -2,
+    textShadowColor: '#F5C51888',
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 24,
+    textShadowRadius: 28,
   },
 
   // Rays
   rayOrigin: {
     position: 'absolute',
-    width: 2,
-    height: 2,
+    width: 2, height: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ray: {
     position: 'absolute',
     height: 2,
+    left: 0, top: 0,
     backgroundColor: '#F5C518',
     borderRadius: 2,
-    left: 0,
-    top: 0,
     transformOrigin: '0% 50%',
   },
 
-  // Phase 2 — word rows
-  wordBlock: {
+  // Phase 2 — expanded rows
+  expandedBlock: {
     alignItems: 'flex-start',
     gap: 2,
   },
-  wordRow: {
+  expandedRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 0,
+    gap: 2,
   },
-  wordLetter: {
-    fontSize: 72,
+  expandedLetter: {
+    fontSize: 74,
     fontWeight: '900',
+    fontFamily: DISPLAY_FONT,
     color: '#F5C518',
     letterSpacing: -1,
-    lineHeight: 80,
-    width: 54,
+    lineHeight: 82,
+    width: 52,
     textAlign: 'center',
-    textShadowColor: '#F5C518',
+    textShadowColor: '#F5C51866',
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 16,
+    textShadowRadius: 14,
   },
-  wordRestCol: {
+  expandedWordCol: {
     paddingBottom: 8,
-    marginLeft: 4,
+    marginLeft: 2,
   },
-  wordRest: {
-    fontSize: 40,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-    letterSpacing: 2,
-    lineHeight: 46,
+  expandedWord: {
+    fontSize: 42,
+    fontWeight: '900',
+    fontFamily: DISPLAY_FONT,
+    color: '#F0F0FF',
+    letterSpacing: 1,
+    lineHeight: 48,
   },
   underline: {
-    height: 2.5,
-    backgroundColor: Colors.textPrimary,
+    height: 3,
+    backgroundColor: '#F0F0FF',
     borderRadius: 2,
     marginTop: 1,
   },
 
   // Quote
-  quoteWrapper: { alignItems: 'center', gap: 10, paddingHorizontal: Spacing.xl },
-  quoteLine:    { width: 44, height: 1, backgroundColor: Colors.primary + '66' },
-  quoteText:    { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22, fontStyle: 'italic' },
-  quoteAuthor:  { fontSize: 11, fontWeight: '600', color: Colors.textMuted, letterSpacing: 1.5, textTransform: 'uppercase' },
+  quoteBox: { alignItems: 'center', gap: 10, paddingHorizontal: Spacing.xl },
+  quoteLine: { width: 44, height: 1, backgroundColor: Colors.primary + '66' },
+  quoteText: {
+    fontSize: 14, color: Colors.textSecondary,
+    textAlign: 'center', lineHeight: 22, fontStyle: 'italic',
+  },
+  quoteAuthor: {
+    fontSize: 11, fontWeight: '600',
+    color: Colors.textMuted, letterSpacing: 1.5, textTransform: 'uppercase',
+  },
 
   // Loading bar
-  loadingTrack: {
+  loadTrack: {
     position: 'absolute', bottom: 48,
     left: Spacing.xl, right: Spacing.xl,
-    height: 3, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden',
+    height: 3, backgroundColor: Colors.border,
+    borderRadius: 2, overflow: 'hidden',
   },
-  loadingFill: {
+  loadFill: {
     height: '100%', backgroundColor: Colors.primary, borderRadius: 2,
     shadowColor: Colors.primary, shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8, shadowRadius: 6,
+    shadowOpacity: 0.9, shadowRadius: 6,
   },
 });
