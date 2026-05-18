@@ -1,23 +1,35 @@
-import * as Haptics from 'expo-haptics';
+import { Platform } from 'react-native';
+
+const noop = async () => {};
 
 export const useHaptics = () => {
-  const taskComplete = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  if (Platform.OS === 'web') {
+    return { taskComplete: noop, taskUncomplete: noop, allComplete: noop, buttonPress: noop };
+  }
+
+  // Dynamically import so web bundle never tries to execute native haptics
+  const run = async (fn: () => Promise<void>) => {
+    try { await fn(); } catch {}
   };
 
-  const taskUncomplete = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  return {
+    taskComplete: () => run(async () => {
+      const H = await import('expo-haptics');
+      await H.notificationAsync(H.NotificationFeedbackType.Success);
+    }),
+    taskUncomplete: () => run(async () => {
+      const H = await import('expo-haptics');
+      await H.impactAsync(H.ImpactFeedbackStyle.Light);
+    }),
+    allComplete: () => run(async () => {
+      const H = await import('expo-haptics');
+      await H.notificationAsync(H.NotificationFeedbackType.Success);
+      setTimeout(() => H.impactAsync(H.ImpactFeedbackStyle.Heavy), 150);
+      setTimeout(() => H.impactAsync(H.ImpactFeedbackStyle.Heavy), 300);
+    }),
+    buttonPress: () => run(async () => {
+      const H = await import('expo-haptics');
+      await H.impactAsync(H.ImpactFeedbackStyle.Medium);
+    }),
   };
-
-  const allComplete = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 150);
-    setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 300);
-  };
-
-  const buttonPress = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  };
-
-  return { taskComplete, taskUncomplete, allComplete, buttonPress };
 };

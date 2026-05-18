@@ -9,9 +9,9 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
-  StatusBar,
   Dimensions,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { EXAM_TYPES, ExamType } from '../data/examPresets';
@@ -194,7 +194,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" />
+        <StatusBar style="light" />
         <LinearGradient colors={['#0A0015', '#080810']} style={StyleSheet.absoluteFill} />
 
         {/* Header */}

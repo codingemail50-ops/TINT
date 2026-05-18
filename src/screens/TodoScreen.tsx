@@ -8,10 +8,9 @@ import {
   TextInput,
   Animated,
   Modal,
-  StatusBar,
   Dimensions,
-  Alert,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { Task, EXAM_PRESETS, ExamType } from '../data/examPresets';
@@ -154,7 +153,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar style="light" />
       <LinearGradient colors={['#0A0015', '#080810']} style={StyleSheet.absoluteFill} />
 
       {/* Header */}

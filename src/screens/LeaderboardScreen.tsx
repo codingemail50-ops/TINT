@@ -5,8 +5,8 @@ import {
   StyleSheet,
   ScrollView,
   Animated,
-  StatusBar,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { MOCK_LEADERBOARD, LeaderboardEntry } from '../data/leaderboard';
@@ -54,7 +54,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar style="light" />
       <LinearGradient colors={['#0A0015', '#080810']} style={StyleSheet.absoluteFill} />
 
       <ScrollView

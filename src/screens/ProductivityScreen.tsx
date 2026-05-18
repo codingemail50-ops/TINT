@@ -6,8 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Animated,
-  StatusBar,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { AppState } from '../utils/storage';
@@ -56,7 +56,7 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar style="light" />
       <LinearGradient colors={['#0A0015', '#080810']} style={StyleSheet.absoluteFill} />
 
       <ScrollView

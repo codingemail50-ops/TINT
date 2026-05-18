@@ -5,8 +5,8 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
-  StatusBar,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Typography, Spacing } from '../constants/theme';
 import { StorageService } from '../utils/storage';
@@ -74,7 +74,7 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar style="light" />
       <LinearGradient
         colors={['#0A0015', '#0F0020', '#080810']}
         locations={[0, 0.5, 1]}
