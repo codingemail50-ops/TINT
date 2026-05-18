@@ -5,6 +5,7 @@ export interface UserProfile {
   name: string;
   email: string;
   examType: string;
+  avatar: string;
   createdAt: string;
 }
 

@@ -32,7 +32,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState }) => {
       ? Math.round(appState.history.reduce((s, h) => s + h.consistency, 0) / appState.history.length)
       : 0,
     tasksCompleted: appState.totalTasksCompleted,
-    avatar: '⭐',
+    avatar: user?.avatar ?? '⭐',
     examType: user?.examType ?? 'CUSTOM',
     isCurrentUser: true,
   };
