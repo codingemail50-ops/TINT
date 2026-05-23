@@ -145,39 +145,40 @@ body{font-family:'Inter',sans-serif;overflow:hidden;}
 .task-card{transition:transform 0.15s ease,box-shadow 0.15s ease;}
 .task-card:hover{transform:scale(0.99);}
 
-/* ── Fire flame — multi-tongue ── */
-@keyframes fireMain{
-  0%  {transform:scaleY(1)    scaleX(1)    rotate(-1deg);}
-  20% {transform:scaleY(1.07) scaleX(0.96) rotate(1.2deg);}
-  40% {transform:scaleY(0.94) scaleX(1.04) rotate(-2deg);}
-  60% {transform:scaleY(1.09) scaleX(0.95) rotate(1.5deg);}
-  80% {transform:scaleY(0.96) scaleX(1.03) rotate(-0.8deg);}
-  100%{transform:scaleY(1)    scaleX(1)    rotate(-1deg);}
+/* ── Flame — clean teardrop ── */
+@keyframes flameBody{
+  0%,100%{transform:scaleY(1)    rotate(0deg);}
+  25%    {transform:scaleY(1.04) rotate(1.5deg);}
+  50%    {transform:scaleY(0.97) rotate(-1deg);}
+  75%    {transform:scaleY(1.03) rotate(0.8deg);}
 }
-@keyframes tongueLeft{
-  0%,100%{transform:scaleY(1)   rotate(-2deg) translateX(0);}
-  35%    {transform:scaleY(1.14) rotate(-5deg) translateX(-1px);}
-  65%    {transform:scaleY(0.88) rotate(2deg)  translateX(1px);}
+@keyframes flameCore{
+  0%,100%{opacity:0.65;transform:scaleY(1);}
+  40%    {opacity:0.95;transform:scaleY(1.07);}
 }
-@keyframes tongueRight{
-  0%,100%{transform:scaleY(1)   rotate(2deg)  translateX(0);}
-  30%    {transform:scaleY(0.9)  rotate(5deg)  translateX(1px);}
-  65%    {transform:scaleY(1.12) rotate(-2deg) translateX(-1px);}
+@keyframes flameTip{
+  0%,100%{opacity:0.5; transform:scaleY(1)    translateY(0);}
+  50%    {opacity:0.92;transform:scaleY(1.38) translateY(-2px);}
 }
-@keyframes tongueTop{
-  0%,100%{transform:scaleY(1)   scaleX(1);}
-  45%    {transform:scaleY(1.18) scaleX(0.9);}
-  70%    {transform:scaleY(0.85) scaleX(1.08);}
+@keyframes flameBase{
+  0%,100%{transform:scaleX(1);   opacity:0.35;}
+  50%    {transform:scaleX(1.18);opacity:0.52;}
 }
-@keyframes innerGlow{
-  0%,100%{opacity:0.4;}
-  50%    {opacity:0.65;}
+.flame-body{animation:flameBody 0.85s ease-in-out infinite;transform-origin:50% 90%;}
+.flame-core{animation:flameCore 0.7s  ease-in-out infinite 0.12s;transform-origin:50% 85%;}
+.flame-tip {animation:flameTip  0.6s  ease-in-out infinite 0.22s;transform-origin:50% 100%;}
+.flame-base{animation:flameBase 1.1s  ease-in-out infinite;transform-origin:50% 100%;}
+
+/* ── Water fill ── */
+@keyframes waterRise{
+  0%,100%{transform:translateY(0)    scaleX(1);}
+  33%    {transform:translateY(-3px) scaleX(1.03);}
+  66%    {transform:translateY(-1px) scaleX(0.98);}
 }
-.flame-main{animation:fireMain 0.75s ease-in-out infinite;transform-origin:50% 90%;}
-.flame-tl  {animation:tongueLeft  0.65s ease-in-out infinite;transform-origin:40% 80%;}
-.flame-tr  {animation:tongueRight 0.7s  ease-in-out infinite 0.1s;transform-origin:60% 80%;}
-.flame-top {animation:tongueTop   0.6s  ease-in-out infinite 0.2s;transform-origin:50% 70%;}
-.flame-glow{animation:innerGlow   0.9s  ease-in-out infinite;}
+
+/* ── WeekBar scroll ── */
+.weekbar-scroll::-webkit-scrollbar{display:none;}
+.weekbar-scroll{-ms-overflow-style:none;scrollbar-width:none;}
 
 @keyframes shake{
   0%,100%{transform:translateX(0);}
@@ -261,65 +262,41 @@ function Confetti({x,y}){
   );
 }
 
-// ── FLAME ICON — multi-tongue fire ───────────────────────────────────────────
+// ── FLAME ICON — smooth teardrop ─────────────────────────────────────────────
 function FlameIcon({streak,size=28}){
   const fs=flameStyle(streak);
-  const id=`fg${streak}`;
-  const id2=`fg2${streak}`;
-  const id3=`fg3${streak}`;
+  const id=`nfg${streak}`;
+  const id2=`nfg2${streak}`;
   return(
-    <svg width={size} height={size*1.35} viewBox="0 0 32 44"
-      style={{filter:`drop-shadow(0 0 5px ${fs.glow}) drop-shadow(0 0 16px ${fs.glow})`}}>
+    <svg width={size} height={size*1.2} viewBox="0 0 32 38"
+      style={{filter:`drop-shadow(0 0 5px ${fs.glow}) drop-shadow(0 0 18px ${fs.glow})`}}>
       <defs>
-        <linearGradient id={id} x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0%" stopColor={fs.c1}/>
-          <stop offset="50%" stopColor={fs.c2}/>
-          <stop offset="100%" stopColor="#FFF9C4"/>
-        </linearGradient>
-        <linearGradient id={id2} x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0%" stopColor={fs.c1} stopOpacity="0.9"/>
-          <stop offset="100%" stopColor={fs.c2}/>
-        </linearGradient>
-        <linearGradient id={id3} x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0%" stopColor={fs.c1} stopOpacity="0.7"/>
-          <stop offset="100%" stopColor={fs.c2} stopOpacity="0.5"/>
-        </linearGradient>
+        <radialGradient id={id} cx="40%" cy="65%" r="65%">
+          <stop offset="0%"   stopColor="rgba(255,255,255,0.95)"/>
+          <stop offset="25%"  stopColor={fs.c2}/>
+          <stop offset="75%"  stopColor={fs.c1}/>
+          <stop offset="100%" stopColor={fs.c1} stopOpacity="0.7"/>
+        </radialGradient>
+        <radialGradient id={id2} cx="48%" cy="58%" r="52%">
+          <stop offset="0%"   stopColor="rgba(255,255,255,0.9)"/>
+          <stop offset="60%"  stopColor={fs.c2} stopOpacity="0.75"/>
+          <stop offset="100%" stopColor={fs.c2} stopOpacity="0.1"/>
+        </radialGradient>
       </defs>
-      {/* Left tongue */}
-      <g className="flame-tl">
-        <path d="M10 12 C7 17 6 22 8 28 C9 31 11 33 14 34 C10 31 8 26 10 21 C11 17 13 14 10 12Z"
-          fill={`url(#${id2})`} opacity="0.8"/>
+      <g className="flame-base">
+        <ellipse cx="16" cy="35.5" rx="8.5" ry="2.8" fill={fs.c1} opacity="0.45"/>
       </g>
-      {/* Right tongue */}
-      <g className="flame-tr">
-        <path d="M22 12 C25 17 26 22 24 28 C23 31 21 33 18 34 C22 31 24 26 22 21 C21 17 19 14 22 12Z"
-          fill={`url(#${id2})`} opacity="0.8"/>
+      <g className="flame-body">
+        <path d="M16,4 C21,10 27,18 27,26 C27,33 22,38 16,38 C10,38 5,33 5,26 C5,18 11,10 16,4Z"
+          fill={`url(#${id})`}/>
       </g>
-      {/* Top center spike */}
-      <g className="flame-top">
-        <path d="M16 2 C14 7 11 12 12 18 C13 22 15 24 16 25 C17 24 19 22 20 18 C21 12 18 7 16 2Z"
-          fill={`url(#${id2})`} opacity="0.7"/>
+      <g className="flame-core">
+        <path d="M16,14 C19,18 21,24 21,29 C21,33 18.5,36 16,36 C13.5,36 11,33 11,29 C11,24 13,18 16,14Z"
+          fill={`url(#${id2})`}/>
       </g>
-      {/* Main body */}
-      <g className="flame-main">
-        <path d="M16 6 C20 11 27 17 27 25 C27 33 22 40 16 42 C10 40 5 33 5 25 C5 17 12 11 16 6Z"
-          fill={`url(#${id})`} opacity="0.95"/>
-      </g>
-      {/* Inner bright core */}
-      <g className="flame-glow">
-        <path d="M16 18 C17.5 21 19.5 25 19.5 29 C19.5 32 18 34.5 16 36 C14 34.5 12.5 32 12.5 29 C12.5 25 14.5 21 16 18Z"
-          fill="rgba(255,255,255,0.5)"/>
-        <ellipse cx="16" cy="36" rx="4.5" ry="3" fill="rgba(255,255,255,0.2)"/>
-      </g>
-      {/* Top-left mini spike */}
-      <g className="flame-tl">
-        <path d="M11 5 C9 9 8 13 10 16 C11.5 14 12 10 11 5Z"
-          fill={`url(#${id3})`} opacity="0.55"/>
-      </g>
-      {/* Top-right mini spike */}
-      <g className="flame-tr">
-        <path d="M21 6 C23 10 24 14 22 17 C20.5 15 20 11 21 6Z"
-          fill={`url(#${id3})`} opacity="0.5"/>
+      <g className="flame-tip">
+        <path d="M16,2 C17,5 17.5,9 16,12 C14.5,9 15,5 16,2Z"
+          fill="rgba(255,255,255,0.78)"/>
       </g>
     </svg>
   );
@@ -563,16 +540,23 @@ function OnboardingScreen({onDone}){
   );
 }
 
-// ── WEEK BAR ──────────────────────────────────────────────────────────────────
-function WeekBar({history}){
+// ── WEEK BAR — sliding multi-week ────────────────────────────────────────────
+function WeekBar({history,selectedDate,onSelectDate}){
   const today=new Date();
   const todayStr=today.toISOString().slice(0,10);
-  const dow=today.getDay();
+  const DAY_COLORS=["#C084FC","#60A5FA","#34D399","#4ADE80","#FBBF24","#FB923C","#F87171"];
   const labels=["M","T","W","T","F","S","S"];
-  const weekDays=Array.from({length:7},(_,i)=>{
-    const d=new Date(today);
-    d.setDate(today.getDate()+i-((dow+6)%7));
-    return d;
+  const scrollRef=useRef(null);
+  const dow=today.getDay();
+  const mondayOff=(dow+6)%7;
+  const currentMonday=new Date(today);
+  currentMonday.setDate(today.getDate()-mondayOff);
+  const weeks=Array.from({length:5},(_,wi)=>{
+    const wm=new Date(currentMonday);
+    wm.setDate(currentMonday.getDate()-(4-wi)*7);
+    return Array.from({length:7},(_,di)=>{
+      const d=new Date(wm);d.setDate(wm.getDate()+di);return d;
+    });
   });
   const statusColor={green:"#22C55E",yellow:"#FBBF24",red:"#EF4444",none:"rgba(255,255,255,0.1)"};
   const getStatus=d=>{
@@ -583,29 +567,60 @@ function WeekBar({history}){
     if((snap.pct||0)>=50) return "yellow";
     return "red";
   };
+  useEffect(()=>{
+    if(scrollRef.current){
+      const el=scrollRef.current;
+      el.scrollLeft=el.scrollWidth-el.clientWidth;
+    }
+  },[]);
   return(
-    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 4px 6px"}}>
-      {weekDays.map((d,i)=>{
-        const ds=d.toISOString().slice(0,10);
-        const isToday=ds===todayStr;
-        const isFuture=d>today&&ds!==todayStr;
-        const st=isFuture?"none":getStatus(d);
-        return(
-          <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"5px",flex:1}}>
-            <span style={{color:isToday?"#818CF8":"rgba(255,255,255,0.45)",
-              fontSize:"10px",fontWeight:isToday?700:500,letterSpacing:"0.04em"}}>{labels[i]}</span>
-            <div style={{
-              width:"9px",height:"9px",borderRadius:"50%",
-              background:isFuture?"rgba(255,255,255,0.07)":statusColor[st],
-              outline:isToday?"2px solid rgba(129,140,248,0.7)":"none",
-              outlineOffset:"2px",
-              boxShadow:!isFuture&&st==="green"?"0 0 7px rgba(34,197,94,0.7)":
-                        !isFuture&&st==="yellow"?"0 0 7px rgba(251,191,36,0.6)":"none",
-              transition:"all 0.3s",
-            }}/>
+    <div style={{margin:"6px -4px 0",overflow:"hidden"}}>
+      <div ref={scrollRef} className="weekbar-scroll" style={{
+        display:"flex",overflowX:"auto",
+        scrollSnapType:"x mandatory",
+        WebkitOverflowScrolling:"touch",
+      }}>
+        {weeks.map((week,wi)=>(
+          <div key={wi} style={{
+            minWidth:"100%",display:"flex",
+            padding:"4px 4px 6px",scrollSnapAlign:"start",
+          }}>
+            {week.map((d,di)=>{
+              const ds=d.toISOString().slice(0,10);
+              const isToday=ds===todayStr;
+              const isFuture=d>today&&ds!==todayStr;
+              const isSel=ds===selectedDate;
+              const st=isFuture?"none":getStatus(d);
+              return(
+                <div key={di}
+                  onClick={()=>!isFuture&&onSelectDate(isSel&&!isToday?todayStr:ds)}
+                  style={{flex:1,display:"flex",flexDirection:"column",
+                    alignItems:"center",gap:"3px",cursor:isFuture?"default":"pointer",padding:"3px 0"}}>
+                  <span style={{
+                    color:DAY_COLORS[di],fontSize:"10px",
+                    fontWeight:isToday||isSel?800:600,
+                    letterSpacing:"0.04em",opacity:isFuture?0.3:1,
+                  }}>{labels[di]}</span>
+                  <div style={{
+                    width:"8px",height:"8px",borderRadius:"50%",
+                    background:isFuture?"rgba(255,255,255,0.07)":statusColor[st],
+                    outline:isSel?"2px solid rgba(255,255,255,0.75)":
+                            isToday?"2px solid rgba(129,140,248,0.75)":"none",
+                    outlineOffset:"2px",
+                    boxShadow:!isFuture&&st==="green"?"0 0 7px rgba(34,197,94,0.7)":
+                              !isFuture&&st==="yellow"?"0 0 7px rgba(251,191,36,0.6)":"none",
+                    transition:"all 0.25s",
+                  }}/>
+                  <span style={{
+                    color:isSel?"rgba(255,255,255,0.9)":isToday?"rgba(129,140,248,0.85)":"rgba(255,255,255,0.2)",
+                    fontSize:"8px",fontWeight:isToday||isSel?700:400,
+                  }}>{d.getDate()}</span>
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 }
@@ -663,16 +678,18 @@ function AllDonePopup({streak,userName,onClose}){
 }
 
 // ── EDIT PROFILE SHEET ────────────────────────────────────────────────────────
-function EditProfileSheet({name,avatar,onSave,onClose}){
+function EditProfileSheet({name,avatar,exams,onSave,onClose}){
   const [n,setN]=useState(name);
   const [a,setA]=useState(avatar);
+  const [selExams,setSelExams]=useState(exams||[]);
+  const toggleExam=ex=>setSelExams(p=>p.includes(ex)?p.filter(x=>x!==ex):[...p,ex]);
   return(
     <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.7)",
       display:"flex",alignItems:"flex-end",justifyContent:"center"}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
       <div style={{background:"#0F172A",borderRadius:"24px 24px 0 0",width:"100%",
         maxWidth:"500px",padding:"24px 20px 44px",border:"1px solid rgba(255,255,255,0.08)",
-        animation:"fadeInUp 0.3s ease forwards"}}>
+        animation:"fadeInUp 0.3s ease forwards",maxHeight:"80vh",overflowY:"auto"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}}>
           <h3 style={{color:"#F1F5F9",fontSize:"17px",fontWeight:700,fontFamily:"'Syne',sans-serif"}}>Edit Profile</h3>
           <button onClick={onClose} style={{background:"rgba(255,255,255,0.07)",border:"none",
@@ -694,7 +711,24 @@ function EditProfileSheet({name,avatar,onSave,onClose}){
               transition:"all 0.15s ease",transform:a===av?"scale(1.1)":"scale(1)"}}>{av}</button>
           ))}
         </div>
-        <button onClick={()=>{if(n.trim())onSave(n.trim(),a);}} style={{width:"100%",
+        <p style={{color:"rgba(255,255,255,0.5)",fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>Exams</p>
+        <div style={{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"22px"}}>
+          {EXAMS.map(ex=>{
+            const sel=selExams.includes(ex);
+            return(
+              <button key={ex} onClick={()=>toggleExam(ex)} style={{
+                padding:"10px 20px",borderRadius:"12px",
+                background:sel?"rgba(99,102,241,0.25)":"rgba(255,255,255,0.05)",
+                border:"1.5px solid "+(sel?"rgba(99,102,241,0.6)":"rgba(255,255,255,0.12)"),
+                color:sel?"#C7D2FE":"rgba(255,255,255,0.55)",
+                fontSize:"13px",fontWeight:700,cursor:"pointer",
+                fontFamily:"'Syne',sans-serif",letterSpacing:"0.05em",
+                transform:sel?"scale(1.05)":"scale(1)",transition:"all 0.18s ease",
+                boxShadow:sel?"0 0 16px rgba(99,102,241,0.35)":"none"}}>{ex}</button>
+            );
+          })}
+        </div>
+        <button onClick={()=>{if(n.trim())onSave(n.trim(),a,selExams.length?selExams:exams);}} style={{width:"100%",
           background:"linear-gradient(135deg,rgba(99,102,241,0.6),rgba(139,92,246,0.5))",
           border:"1px solid rgba(99,102,241,0.5)",borderRadius:"14px",padding:"14px",
           color:"#E0E7FF",fontSize:"14px",fontWeight:800,fontFamily:"'Syne',sans-serif",
@@ -717,6 +751,7 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
   const flameTapTimer=useRef(null);
 
   const todayStr=new Date().toISOString().slice(0,10);
+  const [selectedDate,setSelectedDate]=useState(todayStr);
   const [allDoneShownDate,setAllDoneShownDate]=useState(()=>load("tint_alldone_date",""));
 
   const done=tasks.filter(t=>t.status==="done").length;
@@ -771,37 +806,33 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
       <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
         {/* HEADER */}
         <div style={{background:"linear-gradient(180deg,#0D1321 0%,#080C14 100%)",
-          padding:"24px 20px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-            <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
-              <div style={{position:"relative"}}>
-                <div style={{width:"38px",height:"38px",borderRadius:"12px",fontSize:"20px",
-                  background:"rgba(99,102,241,0.15)",border:"1.5px solid rgba(99,102,241,0.3)",
-                  display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                  {userAvatar}
-                </div>
-                <button onClick={onEditProfile} style={{position:"absolute",bottom:"-4px",right:"-4px",
-                  width:"16px",height:"16px",borderRadius:"50%",
-                  background:"rgba(99,102,241,0.9)",border:"1.5px solid #080C14",
-                  color:"#fff",fontSize:"9px",cursor:"pointer",
-                  display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>✎</button>
-              </div>
-              <div>
-                <p style={{color:"rgba(255,255,255,0.55)",fontSize:"11px",fontWeight:500,lineHeight:1.2}}>
-                  Hey, {userName} 👋
-                </p>
-                <p style={{color:"rgba(255,255,255,0.35)",fontSize:"11px"}}>{today}</p>
-              </div>
+          padding:"20px 20px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"2px"}}>
+            <div style={{flex:1}}>
+              <h1 style={{color:"#F1F5F9",fontSize:"26px",fontWeight:800,
+                fontFamily:"'Syne',sans-serif",lineHeight:1.1,userSelect:"none"}}>
+                Today's Tasks
+              </h1>
+              <p style={{color:"rgba(255,255,255,0.5)",fontSize:"14px",marginTop:"4px",fontWeight:500}}>
+                {today}
+              </p>
             </div>
-            {/* Flame — tap 5x for dev mode */}
-            <button onClick={handleFlameTap} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"3px",
-              background:"rgba(0,0,0,0)",border:"none",cursor:"pointer",padding:"4px 8px"}}>
-              <FlameIcon streak={streak} size={34}/>
-              <span style={{color:fs.c2,fontSize:"11px",fontWeight:700,
-                textShadow:`0 0 8px ${fs.glow}`}}>{streak}d</span>
-            </button>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"6px"}}>
+              <button onClick={handleFlameTap} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"2px",
+                background:"transparent",border:"none",cursor:"pointer",padding:"2px 6px"}}>
+                <FlameIcon streak={streak} size={32}/>
+                <span style={{color:fs.c2,fontSize:"10px",fontWeight:700,
+                  textShadow:`0 0 8px ${fs.glow}`}}>{streak}d</span>
+              </button>
+              <button onClick={onEditProfile} style={{display:"flex",alignItems:"center",gap:"4px",
+                background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",
+                borderRadius:"8px",padding:"4px 9px",color:"rgba(255,255,255,0.55)",
+                fontSize:"13px",cursor:"pointer",lineHeight:1}}>
+                {userAvatar}<span style={{fontSize:"10px"}}>✎</span>
+              </button>
+            </div>
           </div>
-          <WeekBar history={history}/>
+          <WeekBar history={history} selectedDate={selectedDate} onSelectDate={setSelectedDate}/>
           {/* Progress bar */}
           <div style={{marginTop:"8px",marginBottom:"12px"}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:"6px"}}>
@@ -821,7 +852,6 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
               {l:"Done",  v:done,       c:"#4ADE80",bg:"rgba(34,197,94,0.1)"},
               {l:"Left",  v:total-done, c:"#818CF8",bg:"rgba(99,102,241,0.1)"},
               {l:"Streak",v:streak+"d", c:fs.c2,    bg:"rgba(0,0,0,0.2)"},
-              {l:"Rank",  v:"#"+rank,   c:isCarrot?"#4ADE80":"#F87171",bg:isCarrot?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)"},
             ].map(s=>(
               <div key={s.l} style={{flex:1,textAlign:"center",background:s.bg,borderRadius:"10px",padding:"8px 4px"}}>
                 <p style={{color:s.c,fontSize:"15px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{s.v}</p>
@@ -829,34 +859,72 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
                   textTransform:"uppercase",letterSpacing:"0.05em"}}>{s.l}</p>
               </div>
             ))}
+            {/* Water-fill % card */}
+            <div style={{flex:1,textAlign:"center",background:"rgba(0,0,0,0.25)",borderRadius:"10px",
+              padding:"8px 4px",position:"relative",overflow:"hidden",minHeight:"52px"}}>
+              <div style={{
+                position:"absolute",bottom:0,left:0,right:0,
+                height:pct+"%",
+                background:pct===100?"rgba(34,197,94,0.28)":"rgba(99,102,241,0.22)",
+                transition:"height 0.9s cubic-bezier(0.4,0,0.2,1)",
+                borderRadius:pct>95?"10px":"0 0 10px 10px",
+                animation:"waterRise 2.2s ease-in-out infinite",
+              }}/>
+              <p style={{position:"relative",zIndex:1,color:pct===100?"#4ADE80":"#818CF8",
+                fontSize:"15px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{pct}%</p>
+              <p style={{position:"relative",zIndex:1,color:pct===100?"#4ADE80":"#818CF8",
+                fontSize:"9px",fontWeight:600,opacity:0.7,marginTop:"2px",
+                textTransform:"uppercase",letterSpacing:"0.05em"}}>Today</p>
+            </div>
           </div>
         </div>
 
-        {/* Title + filter */}
-        <div style={{padding:"14px 16px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <h1 style={{color:"#F1F5F9",fontSize:"20px",fontWeight:800,fontFamily:"'Syne',sans-serif",userSelect:"none"}}>
-            Today's Tasks
-          </h1>
+        {/* Past-day banner */}
+        {selectedDate!==todayStr&&(
+          <div style={{margin:"10px 16px 0",padding:"10px 14px",
+            background:"rgba(99,102,241,0.08)",border:"1px solid rgba(99,102,241,0.22)",
+            borderRadius:"12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px"}}>
+            <div style={{minWidth:0}}>
+              <p style={{color:"#A5B4FC",fontSize:"12px",fontWeight:700}}>
+                📅 {new Date(selectedDate+"T00:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
+              </p>
+              {(()=>{const snap=history.find(h=>h.date===selectedDate);
+                return snap
+                  ?<p style={{color:"rgba(255,255,255,0.45)",fontSize:"11px",marginTop:"2px"}}>
+                      {snap.allDone?"✅ All done":snap.pct>=50?`⚡ ${snap.pct}% complete`:"❌ Missed"}
+                    </p>
+                  :<p style={{color:"rgba(255,255,255,0.3)",fontSize:"11px",marginTop:"2px"}}>No data for this day</p>;
+              })()}
+            </div>
+            <button onClick={()=>setSelectedDate(todayStr)} style={{
+              flexShrink:0,background:"rgba(99,102,241,0.2)",border:"1px solid rgba(99,102,241,0.35)",
+              borderRadius:"8px",padding:"5px 10px",color:"#A5B4FC",fontSize:"11px",
+              cursor:"pointer",fontFamily:"Inter,sans-serif",fontWeight:600,whiteSpace:"nowrap"}}>
+              Today →
+            </button>
+          </div>
+        )}
+
+        {/* Filter + Add */}
+        <div style={{padding:"12px 16px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{display:"flex",gap:"6px"}}>
+            {[{f:"all",l:"All"},{f:"todo",l:"To do"},{f:"done",l:"Done"}].map(({f,l})=>(
+              <button key={f} onClick={()=>setFilter(f)} style={{
+                padding:"6px 14px",borderRadius:"100px",border:"none",cursor:"pointer",
+                fontSize:"11px",fontWeight:700,letterSpacing:"0.04em",
+                background:filter===f?"#6366F1":"rgba(255,255,255,0.07)",
+                color:filter===f?"#fff":"rgba(255,255,255,0.55)",
+                boxShadow:filter===f?"0 0 14px rgba(99,102,241,0.4)":"none",
+                transition:"all 0.2s",fontFamily:"Inter,sans-serif"}}>{l}</button>
+            ))}
+          </div>
           <button onClick={()=>setShowAdd(true)} style={{padding:"6px 14px",borderRadius:"100px",
             border:"1px solid rgba(99,102,241,0.35)",cursor:"pointer",
             fontSize:"11px",fontWeight:700,background:"rgba(99,102,241,0.12)",
             color:"#A5B4FC",fontFamily:"Inter,sans-serif"}}>+ Add</button>
         </div>
 
-        {/* Filter tabs */}
-        <div style={{display:"flex",gap:"6px",padding:"10px 16px 4px"}}>
-          {[{f:"all",l:"All"},{f:"todo",l:"To do"},{f:"done",l:"Done"}].map(({f,l})=>(
-            <button key={f} onClick={()=>setFilter(f)} style={{
-              padding:"6px 14px",borderRadius:"100px",border:"none",cursor:"pointer",
-              fontSize:"11px",fontWeight:700,letterSpacing:"0.04em",
-              background:filter===f?"#6366F1":"rgba(255,255,255,0.07)",
-              color:filter===f?"#fff":"rgba(255,255,255,0.55)",
-              boxShadow:filter===f?"0 0 14px rgba(99,102,241,0.4)":"none",
-              transition:"all 0.2s",fontFamily:"Inter,sans-serif"}}>{l}</button>
-          ))}
-        </div>
-
-        <p style={{color:"rgba(255,255,255,0.2)",fontSize:"10px",paddingLeft:"18px",paddingBottom:"4px"}}>
+        <p style={{color:"rgba(255,255,255,0.2)",fontSize:"10px",paddingLeft:"18px",paddingTop:"6px",paddingBottom:"2px"}}>
           Hold a task to remove it
         </p>
 
@@ -1407,9 +1475,10 @@ export default function TINT(){
     setTasks(newTasks);save("tint_onboarded",true);
     setScreen("home");
   };
-  const handleSaveProfile=(name,avatar)=>{
+  const handleSaveProfile=(name,avatar,exams)=>{
     setUserName(name);save("tint_name",name);
     setUserAvatar(avatar);save("tint_avatar",avatar);
+    if(exams&&exams.length){setUserExams(exams);save("tint_exams",exams);}
     setShowEdit(false);
   };
 
@@ -1439,7 +1508,7 @@ export default function TINT(){
         onBack={()=>setScreen("home")}
       />}
       {showEdit&&<EditProfileSheet
-        name={userName} avatar={userAvatar}
+        name={userName} avatar={userAvatar} exams={userExams}
         onSave={handleSaveProfile} onClose={()=>setShowEdit(false)}
       />}
       {showDev&&<DevPanel
