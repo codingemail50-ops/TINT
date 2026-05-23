@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 
-// ── STORAGE ───────────────────────────────────────────────────────────────────
 function load(key, fb) {
   try { const v=localStorage.getItem(key); return v?JSON.parse(v):fb; } catch(e) { return fb; }
 }
@@ -8,7 +7,6 @@ function save(key, v) {
   try { localStorage.setItem(key, JSON.stringify(v)); } catch(e) {}
 }
 
-// ── RANK PROJECTION ───────────────────────────────────────────────────────────
 function projectedRank(streak, missedDays) {
   if (missedDays>=14) return 3500; if (missedDays>=7) return 2500;
   if (missedDays>=5)  return 2000; if (missedDays>=3) return 1500;
@@ -18,17 +16,15 @@ function projectedRank(streak, missedDays) {
   return 300;
 }
 
-// ── FLAME COLOR BY STREAK ─────────────────────────────────────────────────────
 function flameStyle(streak) {
-  if (streak>=30) return {c1:"#22C55E",c2:"#4ADE80",glow:"rgba(34,197,94,0.6)",label:"green"};
-  if (streak>=22) return {c1:"#A855F7",c2:"#C084FC",glow:"rgba(168,85,247,0.6)",label:"purple"};
-  if (streak>=15) return {c1:"#3B82F6",c2:"#60A5FA",glow:"rgba(59,130,246,0.6)",label:"blue"};
-  if (streak>=8)  return {c1:"#EF4444",c2:"#F87171",glow:"rgba(239,68,68,0.6)", label:"red"};
-  if (streak>=4)  return {c1:"#F97316",c2:"#FB923C",glow:"rgba(249,115,22,0.6)",label:"orange"};
-  return           {c1:"#FBBF24",c2:"#FDE68A",glow:"rgba(251,191,36,0.5)", label:"yellow"};
+  if (streak>=30) return {c1:"#22C55E",c2:"#4ADE80",glow:"rgba(34,197,94,0.75)",label:"green"};
+  if (streak>=22) return {c1:"#A855F7",c2:"#C084FC",glow:"rgba(168,85,247,0.75)",label:"purple"};
+  if (streak>=15) return {c1:"#3B82F6",c2:"#60A5FA",glow:"rgba(59,130,246,0.75)",label:"blue"};
+  if (streak>=8)  return {c1:"#EF4444",c2:"#F87171",glow:"rgba(239,68,68,0.75)", label:"red"};
+  if (streak>=4)  return {c1:"#F97316",c2:"#FB923C",glow:"rgba(249,115,22,0.75)",label:"orange"};
+  return           {c1:"#FBBF24",c2:"#FDE68A",glow:"rgba(251,191,36,0.65)", label:"yellow"};
 }
 
-// ── EXAM TASK PRESETS ─────────────────────────────────────────────────────────
 const EXAM_TASKS = {
   UCEED:[
     {emoji:"✏️",title:"Sketching practice",        cat:"drawing", dur:45,repeat:"daily"},
@@ -95,13 +91,11 @@ const LB_DATA = [
   {name:"Meera V.",  streak:5, rank:312,done:52,avatar:"📷"},
 ];
 
-// ── CSS ───────────────────────────────────────────────────────────────────────
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter',sans-serif;}
+body{font-family:'Inter',sans-serif;overflow:hidden;}
 
-/* ── Cover screen ── */
 @keyframes orbDrift{
   0%,100%{transform:translate(0,0);}
   33%{transform:translate(20px,-15px);}
@@ -134,21 +128,15 @@ body{font-family:'Inter',sans-serif;}
 .glow-bar{height:2px;border-radius:2px;
   background:linear-gradient(90deg,transparent,rgba(99,102,241,0.8),rgba(139,92,246,0.6),transparent);}
 
-/* ── Cover: whole TINT block spins + expands into full words ── */
 @keyframes containerSpin{
   from{transform:rotateY(0deg);}
   to  {transform:rotateY(360deg);}
 }
-/* ── Quote ── */
 @keyframes quoteIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
-
-/* ── Dots ── */
 @keyframes dotWave{
   0%,80%,100%{transform:translateY(0);opacity:0.5;}
   40%         {transform:translateY(-9px);opacity:1;}
 }
-
-/* ── General ── */
 @keyframes slideUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
 @keyframes checkBounce{0%{transform:scale(0);}60%{transform:scale(1.3);}80%{transform:scale(0.9);}100%{transform:scale(1);}}
 @keyframes flashRed{0%{opacity:0;}30%{opacity:1;}100%{opacity:0;}}
@@ -157,18 +145,40 @@ body{font-family:'Inter',sans-serif;}
 .task-card{transition:transform 0.15s ease,box-shadow 0.15s ease;}
 .task-card:hover{transform:scale(0.99);}
 
-/* ── Flame flicker ── */
-@keyframes flameFlicker{
-  0%  {transform:scaleY(1)    rotate(-1deg);}
-  20% {transform:scaleY(1.07) rotate(1.5deg);}
-  40% {transform:scaleY(0.94) rotate(-2deg);}
-  60% {transform:scaleY(1.09) rotate(1deg);}
-  80% {transform:scaleY(0.97) rotate(-0.5deg);}
-  100%{transform:scaleY(1)    rotate(-1deg);}
+/* ── Fire flame — multi-tongue ── */
+@keyframes fireMain{
+  0%  {transform:scaleY(1)    scaleX(1)    rotate(-1deg);}
+  20% {transform:scaleY(1.07) scaleX(0.96) rotate(1.2deg);}
+  40% {transform:scaleY(0.94) scaleX(1.04) rotate(-2deg);}
+  60% {transform:scaleY(1.09) scaleX(0.95) rotate(1.5deg);}
+  80% {transform:scaleY(0.96) scaleX(1.03) rotate(-0.8deg);}
+  100%{transform:scaleY(1)    scaleX(1)    rotate(-1deg);}
 }
-.flame-anim{animation:flameFlicker 0.85s ease-in-out infinite;transform-origin:bottom center;}
+@keyframes tongueLeft{
+  0%,100%{transform:scaleY(1)   rotate(-2deg) translateX(0);}
+  35%    {transform:scaleY(1.14) rotate(-5deg) translateX(-1px);}
+  65%    {transform:scaleY(0.88) rotate(2deg)  translateX(1px);}
+}
+@keyframes tongueRight{
+  0%,100%{transform:scaleY(1)   rotate(2deg)  translateX(0);}
+  30%    {transform:scaleY(0.9)  rotate(5deg)  translateX(1px);}
+  65%    {transform:scaleY(1.12) rotate(-2deg) translateX(-1px);}
+}
+@keyframes tongueTop{
+  0%,100%{transform:scaleY(1)   scaleX(1);}
+  45%    {transform:scaleY(1.18) scaleX(0.9);}
+  70%    {transform:scaleY(0.85) scaleX(1.08);}
+}
+@keyframes innerGlow{
+  0%,100%{opacity:0.4;}
+  50%    {opacity:0.65;}
+}
+.flame-main{animation:fireMain 0.75s ease-in-out infinite;transform-origin:50% 90%;}
+.flame-tl  {animation:tongueLeft  0.65s ease-in-out infinite;transform-origin:40% 80%;}
+.flame-tr  {animation:tongueRight 0.7s  ease-in-out infinite 0.1s;transform-origin:60% 80%;}
+.flame-top {animation:tongueTop   0.6s  ease-in-out infinite 0.2s;transform-origin:50% 70%;}
+.flame-glow{animation:innerGlow   0.9s  ease-in-out infinite;}
 
-/* ── Shake (long-press feedback) ── */
 @keyframes shake{
   0%,100%{transform:translateX(0);}
   20%    {transform:translateX(-4px);}
@@ -178,11 +188,31 @@ body{font-family:'Inter',sans-serif;}
 }
 .shaking{animation:shake 0.4s ease both;}
 
-/* ── Consistency graph ── */
 @keyframes revealUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
-
-/* ── Onboarding ── */
 @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(30px);}to{opacity:1;transform:translateY(0);}}
+
+@keyframes floatUp{
+  0%{transform:translateY(0) scale(1);opacity:0.85;}
+  100%{transform:translateY(-110vh) scale(0.2);opacity:0;}
+}
+@keyframes pulseGlow{
+  0%,100%{transform:scale(1);opacity:0.4;}
+  50%{transform:scale(1.2);opacity:0.85;}
+}
+@keyframes flamePop{
+  0%,100%{transform:scale(1);}
+  50%{transform:scale(1.08);}
+}
+@keyframes btnPress{
+  0%{transform:scale(1);}
+  40%{transform:scale(0.94);}
+  100%{transform:scale(1);}
+}
+.btn-pressed{animation:btnPress 0.2s ease forwards;}
+
+.avatar-scroll::-webkit-scrollbar{display:none;}
+.avatar-scroll{-ms-overflow-style:none;scrollbar-width:none;}
 
 ::-webkit-scrollbar{width:3px;}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:4px;}
@@ -198,7 +228,6 @@ function useCSS() {
   },[]);
 }
 
-// ── CONFETTI ──────────────────────────────────────────────────────────────────
 const CC=["#22C55E","#38BDF8","#A78BFA","#FBBF24","#F97316","#EC4899","#84CC16"];
 function Confetti({x,y}){
   const [pieces]=useState(()=>Array.from({length:28},(_,i)=>({
@@ -232,24 +261,66 @@ function Confetti({x,y}){
   );
 }
 
-// ── FLAME ICON ────────────────────────────────────────────────────────────────
+// ── FLAME ICON — multi-tongue fire ───────────────────────────────────────────
 function FlameIcon({streak,size=28}){
   const fs=flameStyle(streak);
-  const uid="fg"+streak;
+  const id=`fg${streak}`;
+  const id2=`fg2${streak}`;
+  const id3=`fg3${streak}`;
   return(
-    <svg width={size} height={size*1.15} viewBox="0 0 24 28"
-      className="flame-anim"
-      style={{filter:`drop-shadow(0 0 7px ${fs.glow})`}}>
+    <svg width={size} height={size*1.35} viewBox="0 0 32 44"
+      style={{filter:`drop-shadow(0 0 5px ${fs.glow}) drop-shadow(0 0 16px ${fs.glow})`}}>
       <defs>
-        <linearGradient id={uid} x1="0" y1="1" x2="0" y2="0">
+        <linearGradient id={id} x1="0" y1="1" x2="0" y2="0">
           <stop offset="0%" stopColor={fs.c1}/>
+          <stop offset="50%" stopColor={fs.c2}/>
+          <stop offset="100%" stopColor="#FFF9C4"/>
+        </linearGradient>
+        <linearGradient id={id2} x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stopColor={fs.c1} stopOpacity="0.9"/>
           <stop offset="100%" stopColor={fs.c2}/>
         </linearGradient>
+        <linearGradient id={id3} x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stopColor={fs.c1} stopOpacity="0.7"/>
+          <stop offset="100%" stopColor={fs.c2} stopOpacity="0.5"/>
+        </linearGradient>
       </defs>
-      <path d="M12 2 C14 5 19 9 19 15.5 C19 20.5 16 25.5 12 27 C8 25.5 5 20.5 5 15.5 C5 9 10 5 12 2Z"
-        fill={`url(#${uid})`} opacity="0.9"/>
-      <path d="M12 10 C13 12 15 15 15 18 C15 20.5 13.5 22.5 12 23.5 C10.5 22.5 9 20.5 9 18 C9 15 11 12 12 10Z"
-        fill="rgba(255,255,255,0.42)"/>
+      {/* Left tongue */}
+      <g className="flame-tl">
+        <path d="M10 12 C7 17 6 22 8 28 C9 31 11 33 14 34 C10 31 8 26 10 21 C11 17 13 14 10 12Z"
+          fill={`url(#${id2})`} opacity="0.8"/>
+      </g>
+      {/* Right tongue */}
+      <g className="flame-tr">
+        <path d="M22 12 C25 17 26 22 24 28 C23 31 21 33 18 34 C22 31 24 26 22 21 C21 17 19 14 22 12Z"
+          fill={`url(#${id2})`} opacity="0.8"/>
+      </g>
+      {/* Top center spike */}
+      <g className="flame-top">
+        <path d="M16 2 C14 7 11 12 12 18 C13 22 15 24 16 25 C17 24 19 22 20 18 C21 12 18 7 16 2Z"
+          fill={`url(#${id2})`} opacity="0.7"/>
+      </g>
+      {/* Main body */}
+      <g className="flame-main">
+        <path d="M16 6 C20 11 27 17 27 25 C27 33 22 40 16 42 C10 40 5 33 5 25 C5 17 12 11 16 6Z"
+          fill={`url(#${id})`} opacity="0.95"/>
+      </g>
+      {/* Inner bright core */}
+      <g className="flame-glow">
+        <path d="M16 18 C17.5 21 19.5 25 19.5 29 C19.5 32 18 34.5 16 36 C14 34.5 12.5 32 12.5 29 C12.5 25 14.5 21 16 18Z"
+          fill="rgba(255,255,255,0.5)"/>
+        <ellipse cx="16" cy="36" rx="4.5" ry="3" fill="rgba(255,255,255,0.2)"/>
+      </g>
+      {/* Top-left mini spike */}
+      <g className="flame-tl">
+        <path d="M11 5 C9 9 8 13 10 16 C11.5 14 12 10 11 5Z"
+          fill={`url(#${id3})`} opacity="0.55"/>
+      </g>
+      {/* Top-right mini spike */}
+      <g className="flame-tr">
+        <path d="M21 6 C23 10 24 14 22 17 C20.5 15 20 11 21 6Z"
+          fill={`url(#${id3})`} opacity="0.5"/>
+      </g>
     </svg>
   );
 }
@@ -262,7 +333,6 @@ const QUOTES=[
   "Every sketch you make is a vote for the designer you are becoming.",
   "Your rank is a reflection of your daily 1%. Start today.",
 ];
-const WORDS=[{l:"T",r:"here"},{l:"I",r:"s"},{l:"N",r:"o"},{l:"T",r:"omorrow"}];
 const STARS=[
   {t:"9%", l:"8%", sz:2,  c:"s1"},{t:"14%",l:"85%",sz:1.5,c:"s2"},
   {t:"70%",l:"92%",sz:2,  c:"s3"},{t:"80%",l:"4%", sz:1.5,c:"s1"},
@@ -271,31 +341,23 @@ const STARS=[
 ];
 
 function CoverScreen({onDone}){
-  // phases: "tint" → "spin" → "done" → "quote"
   const [phase,setPhase]=useState("tint");
   const [quote]=useState(QUOTES[Math.floor(Math.random()*QUOTES.length)]);
-
-  // spin lasts 1.6s; expansion happens during that same window
   useEffect(()=>{
-    const t1=setTimeout(()=>setPhase("spin"), 800);   // start spin + expansion
-    const t2=setTimeout(()=>setPhase("done"), 2500);  // spin done, words fully visible
-    const t3=setTimeout(()=>setPhase("quote"),2900);  // quote + dots — tight after done
+    const t1=setTimeout(()=>setPhase("spin"), 800);
+    const t2=setTimeout(()=>setPhase("done"), 2500);
+    const t3=setTimeout(()=>setPhase("quote"),2900);
     const t4=setTimeout(()=>onDone(),         5400);
     return()=>[t1,t2,t3,t4].forEach(clearTimeout);
   },[]);
-
   const LETTERS=["T","I","N","T"];
   const RESTS  =["here","s","o","omorrow"];
-
-  const spinning = phase==="spin";
-  const settled  = phase==="done"||phase==="quote";
-  const showQ    = phase==="quote";
-
+  const spinning=phase==="spin";
+  const settled =phase==="done"||phase==="quote";
+  const showQ   =phase==="quote";
   return(
-    <div style={{
-      position:"fixed",inset:0,background:"#05070F",display:"flex",
-      flexDirection:"column",alignItems:"center",justifyContent:"center",overflow:"hidden",
-    }}>
+    <div style={{position:"fixed",inset:0,background:"#05070F",display:"flex",
+      flexDirection:"column",alignItems:"center",justifyContent:"center",overflow:"hidden"}}>
       <div className="cover-orb1"/><div className="cover-orb2"/><div className="cover-orb3"/>
       <div className="grid"/><div className="scanlines"/>
       {STARS.map((s,i)=>(
@@ -305,91 +367,50 @@ function CoverScreen({onDone}){
         <circle cx="260" cy="260" r="240" fill="none" stroke="white" strokeWidth="0.3" strokeOpacity="0.06"/>
         <circle cx="260" cy="260" r="195" fill="none" stroke="white" strokeWidth="0.3" strokeOpacity="0.04"/>
       </svg>
-
       <div style={{position:"relative",zIndex:10,textAlign:"center",padding:"0 24px"}}>
-
-        {/* ── Perspective wrapper ── */}
         <div style={{perspective:"900px",perspectiveOrigin:"center center",marginBottom:"22px"}}>
-
-          {/* ── This whole block rotates as one unit ── */}
           <div style={{
-            display:"inline-flex",
-            alignItems:"baseline",
-            // gap grows during spin so words have room as they expand
-            gap: settled?"10px":spinning?"8px":"3px",
+            display:"inline-flex",alignItems:"baseline",
+            gap:settled?"10px":spinning?"8px":"3px",
             transition:"gap 1.6s cubic-bezier(0.4,0,0.2,1)",
-            // spin animation fires when phase = "spin"
-            animation: spinning
-              ?"containerSpin 1.6s cubic-bezier(0.25,0.46,0.45,0.94) forwards"
-              :"none",
+            animation:spinning?"containerSpin 1.6s cubic-bezier(0.25,0.46,0.45,0.94) forwards":"none",
           }}>
             {LETTERS.map((l,i)=>(
               <div key={i} style={{display:"inline-flex",alignItems:"baseline"}}>
-
-                {/* Key letter — large before spin, shrinks during spin via font-size transition */}
-                <span style={{
-                  fontFamily:"'Syne',sans-serif",fontWeight:800,
-                  color:"#fff",display:"inline-block",
-                  // starts at 68px, transitions to 26px when spin begins
-                  fontSize: (spinning||settled)?"26px":"68px",
-                  transition:"font-size 1.5s cubic-bezier(0.4,0,0.2,1)",
-                  lineHeight:1,
-                }}>{l}</span>
-
-                {/* Rest of word — expands outward during spin */}
-                <span style={{
-                  fontFamily:"'Syne',sans-serif",fontWeight:700,
-                  fontSize:"26px",color:"rgba(255,255,255,0.8)",
-                  display:"inline-block",overflow:"hidden",whiteSpace:"nowrap",
-                  // starts expanding as soon as spin begins, staggered per word
-                  maxWidth: (spinning||settled)?"200px":"0px",
-                  opacity:  (spinning||settled)?1:0,
+                <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,color:"#fff",display:"inline-block",
+                  fontSize:(spinning||settled)?"26px":"68px",
+                  transition:"font-size 1.5s cubic-bezier(0.4,0,0.2,1)",lineHeight:1}}>{l}</span>
+                <span style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:"26px",
+                  color:"rgba(255,255,255,0.8)",display:"inline-block",overflow:"hidden",whiteSpace:"nowrap",
+                  maxWidth:(spinning||settled)?"200px":"0px",opacity:(spinning||settled)?1:0,
                   transition:`max-width 1.4s cubic-bezier(0.22,1,0.36,1) ${i*0.1}s,
                               opacity   1.0s ease                         ${0.1+i*0.1}s`,
-                  lineHeight:1,
-                }}>{RESTS[i]}</span>
+                  lineHeight:1}}>{RESTS[i]}</span>
               </div>
             ))}
           </div>
         </div>
-
-        {/* Glow bar */}
         <div style={{display:"flex",justifyContent:"center",marginBottom:"26px"}}>
-          <div className="glow-bar" style={{
-            width:settled?"260px":"70px",
-            transition:"width 0.7s ease 0.4s",
-          }}/>
+          <div className="glow-bar" style={{width:settled?"260px":"70px",transition:"width 0.7s ease 0.4s"}}/>
         </div>
-
-        {/* Quote */}
         <div style={{height:"58px",display:"flex",alignItems:"center",justifyContent:"center"}}>
           {showQ&&(
-            <p style={{
-              color:"rgba(255,255,255,0.38)",fontSize:"13px",fontWeight:400,
+            <p style={{color:"rgba(255,255,255,0.38)",fontSize:"13px",fontWeight:400,
               lineHeight:1.75,maxWidth:"270px",fontStyle:"italic",textAlign:"center",
-              animation:"quoteIn 0.6s ease forwards",fontFamily:"Inter,sans-serif",
-            }}>"{quote}"</p>
+              animation:"quoteIn 0.6s ease forwards",fontFamily:"Inter,sans-serif"}}>"{quote}"</p>
           )}
         </div>
-
-        {/* Dots — purple → indigo → deep blue, increasing size + glow */}
         {showQ&&(
-          <div style={{
-            display:"flex",gap:"10px",justifyContent:"center",alignItems:"center",marginTop:"4px",
-            animation:"quoteIn 0.35s ease forwards", // quick fade-in so they don't lag
-          }}>
+          <div style={{display:"flex",gap:"10px",justifyContent:"center",alignItems:"center",marginTop:"4px",
+            animation:"quoteIn 0.35s ease forwards"}}>
             {[
               {bg:"#A855F7",glow:"rgba(168,85,247,0.7)",size:"7px", delay:"0s"},
               {bg:"#6366F1",glow:"rgba(99,102,241,0.7)", size:"10px",delay:"0.18s"},
               {bg:"#3B5BDB",glow:"rgba(59,91,219,0.8)",  size:"13px",delay:"0.36s"},
             ].map((d,i)=>(
-              <div key={i} style={{
-                width:d.size,height:d.size,borderRadius:"50%",
-                background:d.bg,flexShrink:0,
+              <div key={i} style={{width:d.size,height:d.size,borderRadius:"50%",background:d.bg,flexShrink:0,
                 boxShadow:`0 0 10px ${d.glow},0 0 22px ${d.glow}`,
-                animation:`dotWave 1.3s ease-in-out infinite`,
-                animationDelay:d.delay,
-              }}/>
+                animation:`dotWave 1.3s ease-in-out infinite`,animationDelay:d.delay}}/>
             ))}
           </div>
         )}
@@ -406,136 +427,97 @@ function OnboardingScreen({onDone}){
   const [avatar,setAvatar]=useState("🦁");
   const [email,setEmail]=useState("");
   const [exams,setExams]=useState([]);
-  const [step,setStep]=useState(0); // 0=name+avatar, 1=email+exams
-  const avatarRef=useRef(null);
-
+  const [step,setStep]=useState(0);
+  const [nextPressed,setNextPressed]=useState(false);
   const toggleExam=e=>setExams(p=>p.includes(e)?p.filter(x=>x!==e):[...p,e]);
-
   const buildTasks=()=>{
-    const seen=new Set();
-    const out=[];
+    const seen=new Set();const out=[];
     const selected=exams.length?exams:["UCEED"];
-    for(const ex of selected){
-      for(const t of (EXAM_TASKS[ex]||[])){
-        if(!seen.has(t.title)){
-          seen.add(t.title);
-          out.push({...t,id:Date.now()+Math.random(),status:"upcoming"});
-        }
-      }
-    }
+    for(const ex of selected)
+      for(const t of (EXAM_TASKS[ex]||[]))
+        if(!seen.has(t.title)){seen.add(t.title);out.push({...t,id:Date.now()+Math.random(),status:"upcoming"});}
     return out;
   };
-
   const submit=()=>{
-    if(!name.trim()) return;
-    const tasks=buildTasks();
-    onDone({name:name.trim(),avatar,email:email.trim(),exams,tasks});
+    if(!name.trim()||exams.length===0) return;
+    onDone({name:name.trim(),avatar,email:email.trim(),exams,tasks:buildTasks()});
   };
-
+  const handleNext=()=>{
+    if(!name.trim()) return;
+    setNextPressed(true);
+    setTimeout(()=>{setNextPressed(false);setStep(1);},200);
+  };
   const inp={
     width:"100%",background:"rgba(255,255,255,0.05)",
     border:"1px solid rgba(255,255,255,0.12)",borderRadius:"14px",
     padding:"13px 16px",color:"#F1F5F9",fontSize:"15px",
     fontFamily:"Inter,sans-serif",transition:"border-color 0.2s",
   };
-
+  const canGo=exams.length>0;
   return(
-    <div style={{
-      position:"fixed",inset:0,background:"#05070F",
-      display:"flex",flexDirection:"column",alignItems:"center",
-      justifyContent:"center",overflow:"hidden",padding:"0 0 32px",
-    }}>
-      {/* Background orbs */}
-      <div className="cover-orb1" style={{opacity:0.5}}/>
-      <div className="cover-orb2" style={{opacity:0.4}}/>
+    <div style={{position:"fixed",inset:0,background:"#05070F",display:"flex",
+      flexDirection:"column",alignItems:"center",justifyContent:"center",overflow:"hidden",padding:"0 0 32px"}}>
+      <div className="cover-orb1" style={{opacity:0.5}}/><div className="cover-orb2" style={{opacity:0.4}}/>
       <div className="grid"/>
-
-      <div style={{
-        position:"relative",zIndex:10,width:"100%",maxWidth:"420px",
-        padding:"0 24px",animation:"fadeIn 0.5s ease forwards",
-      }}>
-        {/* Logo */}
+      <div style={{position:"relative",zIndex:10,width:"100%",maxWidth:"420px",
+        padding:"0 24px",animation:"fadeIn 0.5s ease forwards"}}>
         <div style={{textAlign:"center",marginBottom:"28px"}}>
           <div style={{display:"flex",justifyContent:"center",gap:"2px",marginBottom:"8px"}}>
             {["T","I","N","T"].map((l,i)=>(
-              <span key={i} style={{
-                fontFamily:"'Syne',sans-serif",fontWeight:800,
-                fontSize:"32px",color:"#fff",
-                textShadow:"0 0 20px rgba(99,102,241,0.5)",
-              }}>{l}</span>
+              <span key={i} style={{fontFamily:"'Syne',sans-serif",fontWeight:800,
+                fontSize:"32px",color:"#fff",textShadow:"0 0 20px rgba(99,102,241,0.5)"}}>{l}</span>
             ))}
           </div>
-          <p style={{color:"rgba(255,255,255,0.3)",fontSize:"12px",letterSpacing:"0.2em",textTransform:"uppercase"}}>
+          <p style={{color:"rgba(255,255,255,0.45)",fontSize:"12px",letterSpacing:"0.2em",textTransform:"uppercase"}}>
             Let's set you up
           </p>
         </div>
-
         {step===0?(
           <div style={{display:"flex",flexDirection:"column",gap:"18px"}}>
             <div>
-              <p style={{color:"rgba(255,255,255,0.4)",fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>
-                Your name
-              </p>
-              <input
-                value={name} onChange={e=>setName(e.target.value)}
-                placeholder="Enter your name…"
-                style={inp}
-                onKeyDown={e=>e.key==="Enter"&&name.trim()&&setStep(1)}
-              />
+              <p style={{color:"rgba(255,255,255,0.55)",fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>Your name</p>
+              <input value={name} onChange={e=>setName(e.target.value)}
+                placeholder="Enter your name…" style={inp}
+                onKeyDown={e=>e.key==="Enter"&&name.trim()&&handleNext()}/>
             </div>
-
             <div>
-              <p style={{color:"rgba(255,255,255,0.4)",fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>
-                Pick your avatar
-              </p>
-              <div ref={avatarRef} style={{
-                display:"flex",gap:"8px",overflowX:"auto",paddingBottom:"6px",
-                scrollbarWidth:"thin",
-              }}>
+              <p style={{color:"rgba(255,255,255,0.55)",fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>Pick your avatar</p>
+              <div className="avatar-scroll" style={{display:"flex",gap:"8px",overflowX:"auto",paddingBottom:"6px"}}>
                 {AVATARS.map(a=>(
                   <button key={a} onClick={()=>setAvatar(a)} style={{
-                    width:"46px",height:"46px",borderRadius:"14px",flexShrink:0,
-                    fontSize:"22px",cursor:"pointer",
+                    width:"46px",height:"46px",borderRadius:"14px",flexShrink:0,fontSize:"22px",cursor:"pointer",
                     background:avatar===a?"rgba(99,102,241,0.3)":"rgba(255,255,255,0.05)",
                     border:avatar===a?"2px solid rgba(99,102,241,0.7)":"2px solid transparent",
-                    transition:"all 0.15s ease",
-                    transform:avatar===a?"scale(1.1)":"scale(1)",
-                    boxShadow:avatar===a?"0 0 14px rgba(99,102,241,0.4)":"none",
-                  }}>{a}</button>
+                    transition:"all 0.15s ease",transform:avatar===a?"scale(1.1)":"scale(1)",
+                    boxShadow:avatar===a?"0 0 14px rgba(99,102,241,0.4)":"none"}}>{a}</button>
                 ))}
               </div>
             </div>
-
-            <button onClick={()=>name.trim()&&setStep(1)} style={{
+            <button onClick={handleNext} className={nextPressed?"btn-pressed":""} style={{
               width:"100%",
-              background:name.trim()
-                ?"linear-gradient(135deg,rgba(99,102,241,0.5),rgba(139,92,246,0.4))"
-                :"rgba(255,255,255,0.05)",
-              border:"1px solid "+(name.trim()?"rgba(99,102,241,0.5)":"rgba(255,255,255,0.1)"),
+              background:name.trim()?"linear-gradient(135deg,rgba(99,102,241,0.6),rgba(139,92,246,0.5))":"rgba(255,255,255,0.05)",
+              border:"1px solid "+(name.trim()?"rgba(99,102,241,0.6)":"rgba(255,255,255,0.1)"),
               borderRadius:"14px",padding:"14px",
-              color:name.trim()?"#C7D2FE":"rgba(255,255,255,0.2)",
+              color:name.trim()?"#E0E7FF":"rgba(255,255,255,0.25)",
               fontSize:"14px",fontWeight:800,fontFamily:"'Syne',sans-serif",
               letterSpacing:"0.08em",cursor:name.trim()?"pointer":"not-allowed",
               transition:"all 0.2s",
+              boxShadow:name.trim()?"0 4px 20px rgba(99,102,241,0.35)":"none",
             }}>NEXT →</button>
           </div>
         ):(
           <div style={{display:"flex",flexDirection:"column",gap:"18px"}}>
             <div>
-              <p style={{color:"rgba(255,255,255,0.4)",fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>
-                Email (optional)
-              </p>
-              <input
-                type="email" value={email} onChange={e=>setEmail(e.target.value)}
-                placeholder="your@email.com"
-                style={inp}
-              />
+              <p style={{color:"rgba(255,255,255,0.55)",fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"4px"}}>Email</p>
+              <p style={{color:"rgba(99,102,241,0.65)",fontSize:"10px",marginBottom:"8px"}}>Optional — saves your progress across devices</p>
+              <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+                placeholder="your@email.com" style={inp}/>
             </div>
-
             <div>
-              <p style={{color:"rgba(255,255,255,0.4)",fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"10px"}}>
+              <p style={{color:"rgba(255,255,255,0.55)",fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"6px"}}>
                 Exams you're preparing for
               </p>
+              <p style={{color:"rgba(255,120,120,0.7)",fontSize:"10px",marginBottom:"10px"}}>Select at least one to continue</p>
               <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
                 {EXAMS.map(ex=>{
                   const sel=exams.includes(ex);
@@ -543,39 +525,35 @@ function OnboardingScreen({onDone}){
                     <button key={ex} onClick={()=>toggleExam(ex)} style={{
                       padding:"10px 20px",borderRadius:"12px",
                       background:sel?"rgba(99,102,241,0.25)":"rgba(255,255,255,0.05)",
-                      border:"1.5px solid "+(sel?"rgba(99,102,241,0.6)":"rgba(255,255,255,0.1)"),
-                      color:sel?"#A5B4FC":"rgba(255,255,255,0.4)",
+                      border:"1.5px solid "+(sel?"rgba(99,102,241,0.6)":"rgba(255,255,255,0.12)"),
+                      color:sel?"#C7D2FE":"rgba(255,255,255,0.55)",
                       fontSize:"13px",fontWeight:700,cursor:"pointer",
                       fontFamily:"'Syne',sans-serif",letterSpacing:"0.05em",
-                      transform:sel?"scale(1.04)":"scale(1)",
-                      transition:"all 0.18s ease",
-                      boxShadow:sel?"0 0 16px rgba(99,102,241,0.3)":"none",
-                    }}>{ex}</button>
+                      transform:sel?"scale(1.05)":"scale(1)",transition:"all 0.18s ease",
+                      boxShadow:sel?"0 0 16px rgba(99,102,241,0.35)":"none"}}>{ex}</button>
                   );
                 })}
               </div>
               {exams.length>0&&(
-                <p style={{color:"rgba(99,102,241,0.6)",fontSize:"11px",marginTop:"8px"}}>
+                <p style={{color:"rgba(99,102,241,0.65)",fontSize:"11px",marginTop:"8px"}}>
                   Tasks will be loaded for: {exams.join(", ")}
                 </p>
               )}
             </div>
-
             <div style={{display:"flex",gap:"10px"}}>
-              <button onClick={()=>setStep(0)} style={{
-                flex:1,background:"rgba(255,255,255,0.05)",
-                border:"1px solid rgba(255,255,255,0.1)",borderRadius:"14px",
-                padding:"13px",color:"rgba(255,255,255,0.4)",
-                fontSize:"13px",fontWeight:700,cursor:"pointer",
-                fontFamily:"Inter,sans-serif",
-              }}>← Back</button>
-              <button onClick={submit} style={{
-                flex:2,
-                background:"linear-gradient(135deg,rgba(99,102,241,0.5),rgba(139,92,246,0.4))",
-                border:"1px solid rgba(99,102,241,0.5)",borderRadius:"14px",
-                padding:"13px",color:"#C7D2FE",
-                fontSize:"14px",fontWeight:800,
-                fontFamily:"'Syne',sans-serif",letterSpacing:"0.08em",cursor:"pointer",
+              <button onClick={()=>setStep(0)} style={{flex:1,background:"rgba(255,255,255,0.05)",
+                border:"1px solid rgba(255,255,255,0.1)",borderRadius:"14px",padding:"13px",
+                color:"rgba(255,255,255,0.55)",fontSize:"13px",fontWeight:700,cursor:"pointer",
+                fontFamily:"Inter,sans-serif"}}>← Back</button>
+              <button onClick={submit} style={{flex:2,
+                background:canGo?"linear-gradient(135deg,rgba(99,102,241,0.6),rgba(139,92,246,0.5))":"rgba(255,255,255,0.05)",
+                border:"1px solid "+(canGo?"rgba(99,102,241,0.6)":"rgba(255,255,255,0.1)"),
+                borderRadius:"14px",padding:"13px",
+                color:canGo?"#E0E7FF":"rgba(255,255,255,0.25)",
+                fontSize:"14px",fontWeight:800,fontFamily:"'Syne',sans-serif",
+                letterSpacing:"0.08em",cursor:canGo?"pointer":"not-allowed",
+                transition:"all 0.2s",
+                boxShadow:canGo?"0 4px 20px rgba(99,102,241,0.35)":"none",
               }}>LET'S GO →</button>
             </div>
           </div>
@@ -585,24 +563,179 @@ function OnboardingScreen({onDone}){
   );
 }
 
+// ── WEEK BAR ──────────────────────────────────────────────────────────────────
+function WeekBar({history}){
+  const today=new Date();
+  const todayStr=today.toISOString().slice(0,10);
+  const dow=today.getDay();
+  const labels=["M","T","W","T","F","S","S"];
+  const weekDays=Array.from({length:7},(_,i)=>{
+    const d=new Date(today);
+    d.setDate(today.getDate()+i-((dow+6)%7));
+    return d;
+  });
+  const statusColor={green:"#22C55E",yellow:"#FBBF24",red:"#EF4444",none:"rgba(255,255,255,0.1)"};
+  const getStatus=d=>{
+    const ds=d.toISOString().slice(0,10);
+    const snap=history.find(h=>h.date===ds);
+    if(!snap) return "none";
+    if(snap.allDone) return "green";
+    if((snap.pct||0)>=50) return "yellow";
+    return "red";
+  };
+  return(
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 4px 6px"}}>
+      {weekDays.map((d,i)=>{
+        const ds=d.toISOString().slice(0,10);
+        const isToday=ds===todayStr;
+        const isFuture=d>today&&ds!==todayStr;
+        const st=isFuture?"none":getStatus(d);
+        return(
+          <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"5px",flex:1}}>
+            <span style={{color:isToday?"#818CF8":"rgba(255,255,255,0.45)",
+              fontSize:"10px",fontWeight:isToday?700:500,letterSpacing:"0.04em"}}>{labels[i]}</span>
+            <div style={{
+              width:"9px",height:"9px",borderRadius:"50%",
+              background:isFuture?"rgba(255,255,255,0.07)":statusColor[st],
+              outline:isToday?"2px solid rgba(129,140,248,0.7)":"none",
+              outlineOffset:"2px",
+              boxShadow:!isFuture&&st==="green"?"0 0 7px rgba(34,197,94,0.7)":
+                        !isFuture&&st==="yellow"?"0 0 7px rgba(251,191,36,0.6)":"none",
+              transition:"all 0.3s",
+            }}/>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── ALL-DONE POPUP ────────────────────────────────────────────────────────────
+function AllDonePopup({streak,userName,onClose}){
+  const fs=flameStyle(streak);
+  const [particles]=useState(()=>Array.from({length:20},(_,i)=>({
+    id:i,x:Math.random()*100,delay:Math.random()*3,
+    dur:3+Math.random()*4,size:4+Math.random()*7,
+    color:[fs.c1,fs.c2,"#FFF9C4","rgba(255,255,255,0.8)"][i%4],
+  })));
+  const msg=streak>=14
+    ?`${streak} days straight. You're in elite territory, ${userName}.`
+    :streak>=7
+    ?`${streak}-day streak! Momentum compounds.`
+    :streak>=3
+    ?`${streak} days strong. The habit is forming.`
+    :`First day done! Come back tomorrow to start your streak.`;
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(5,7,15,0.97)",
+      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+      animation:"fadeIn 0.4s ease forwards"}}>
+      {particles.map(p=>(
+        <div key={p.id} style={{position:"absolute",left:p.x+"%",bottom:"-20px",
+          width:p.size,height:p.size,borderRadius:"50%",
+          background:p.color,boxShadow:`0 0 8px ${p.color}`,
+          animation:`floatUp ${p.dur}s ease-in ${p.delay}s infinite`,opacity:0.8}}/>
+      ))}
+      <div style={{position:"absolute",width:"400px",height:"400px",borderRadius:"50%",
+        background:`radial-gradient(circle,${fs.glow.replace(/[\d.]+\)$/,"0.18)")},transparent 70%)`,
+        animation:"pulseGlow 2.2s ease-in-out infinite",pointerEvents:"none"}}/>
+      <div style={{position:"relative",textAlign:"center",padding:"0 32px",maxWidth:"360px",width:"100%"}}>
+        <div style={{marginBottom:"20px",animation:"flamePop 1s ease-in-out infinite"}}>
+          <FlameIcon streak={streak} size={90}/>
+        </div>
+        <div style={{display:"inline-flex",alignItems:"center",gap:"8px",
+          background:`${fs.c1}25`,border:`1px solid ${fs.c1}55`,
+          borderRadius:"100px",padding:"8px 22px",marginBottom:"22px"}}>
+          <span style={{color:fs.c2,fontSize:"30px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{streak}</span>
+          <span style={{color:fs.c2,fontSize:"13px",fontWeight:600}}>day streak 🔥</span>
+        </div>
+        <h1 style={{color:"#F1F5F9",fontSize:"26px",fontWeight:800,fontFamily:"'Syne',sans-serif",
+          marginBottom:"12px",textShadow:`0 0 30px ${fs.glow}`}}>All Done for Today!</h1>
+        <p style={{color:"rgba(255,255,255,0.5)",fontSize:"14px",lineHeight:1.75,marginBottom:"32px"}}>{msg}</p>
+        <button onClick={onClose} style={{width:"100%",
+          background:`linear-gradient(135deg,${fs.c1},${fs.c2})`,
+          border:"none",borderRadius:"16px",padding:"16px",
+          color:"#fff",fontSize:"14px",fontWeight:800,
+          fontFamily:"'Syne',sans-serif",letterSpacing:"0.08em",cursor:"pointer",
+          boxShadow:`0 8px 28px ${fs.glow}`}}>SEE YOU TOMORROW →</button>
+      </div>
+    </div>
+  );
+}
+
+// ── EDIT PROFILE SHEET ────────────────────────────────────────────────────────
+function EditProfileSheet({name,avatar,onSave,onClose}){
+  const [n,setN]=useState(name);
+  const [a,setA]=useState(avatar);
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.7)",
+      display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{background:"#0F172A",borderRadius:"24px 24px 0 0",width:"100%",
+        maxWidth:"500px",padding:"24px 20px 44px",border:"1px solid rgba(255,255,255,0.08)",
+        animation:"fadeInUp 0.3s ease forwards"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}}>
+          <h3 style={{color:"#F1F5F9",fontSize:"17px",fontWeight:700,fontFamily:"'Syne',sans-serif"}}>Edit Profile</h3>
+          <button onClick={onClose} style={{background:"rgba(255,255,255,0.07)",border:"none",
+            borderRadius:"50%",width:"30px",height:"30px",color:"#94A3B8",cursor:"pointer",fontSize:"18px"}}>×</button>
+        </div>
+        <p style={{color:"rgba(255,255,255,0.5)",fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>Name</p>
+        <input value={n} onChange={e=>setN(e.target.value)}
+          style={{width:"100%",background:"rgba(255,255,255,0.05)",
+            border:"1px solid rgba(255,255,255,0.12)",borderRadius:"12px",
+            padding:"12px 14px",color:"#F1F5F9",fontSize:"14px",
+            fontFamily:"Inter,sans-serif",marginBottom:"18px"}}/>
+        <p style={{color:"rgba(255,255,255,0.5)",fontSize:"11px",letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>Avatar</p>
+        <div className="avatar-scroll" style={{display:"flex",gap:"8px",overflowX:"auto",paddingBottom:"8px",marginBottom:"20px"}}>
+          {AVATARS.map(av=>(
+            <button key={av} onClick={()=>setA(av)} style={{
+              width:"46px",height:"46px",borderRadius:"14px",flexShrink:0,fontSize:"22px",cursor:"pointer",
+              background:a===av?"rgba(99,102,241,0.3)":"rgba(255,255,255,0.05)",
+              border:a===av?"2px solid rgba(99,102,241,0.7)":"2px solid transparent",
+              transition:"all 0.15s ease",transform:a===av?"scale(1.1)":"scale(1)"}}>{av}</button>
+          ))}
+        </div>
+        <button onClick={()=>{if(n.trim())onSave(n.trim(),a);}} style={{width:"100%",
+          background:"linear-gradient(135deg,rgba(99,102,241,0.6),rgba(139,92,246,0.5))",
+          border:"1px solid rgba(99,102,241,0.5)",borderRadius:"14px",padding:"14px",
+          color:"#E0E7FF",fontSize:"14px",fontWeight:800,fontFamily:"'Syne',sans-serif",
+          letterSpacing:"0.08em",cursor:"pointer"}}>SAVE CHANGES</button>
+      </div>
+    </div>
+  );
+}
+
 // ── HOME SCREEN ───────────────────────────────────────────────────────────────
-function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,onProgress,onLeaderboard}){
+function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,history,
+  onProgress,onLeaderboard,onEditProfile,onOpenDev}){
   const [confettis,setConfettis]=useState([]);
   const [redFlash,setRedFlash]=useState(false);
   const [filter,setFilter]=useState("all");
   const [showAdd,setShowAdd]=useState(false);
   const [deletingId,setDeletingId]=useState(null);
+  const [showAllDone,setShowAllDone]=useState(false);
+  const [flameTaps,setFlameTaps]=useState(0);
+  const flameTapTimer=useRef(null);
+
+  const todayStr=new Date().toISOString().slice(0,10);
+  const [allDoneShownDate,setAllDoneShownDate]=useState(()=>load("tint_alldone_date",""));
 
   const done=tasks.filter(t=>t.status==="done").length;
   const total=tasks.length;
   const pct=total>0?Math.round((done/total)*100):0;
   const fs=flameStyle(streak);
 
+  // Only show all-done popup once per day
+  useEffect(()=>{
+    if(done===total&&total>0&&allDoneShownDate!==todayStr){
+      setAllDoneShownDate(todayStr);
+      save("tint_alldone_date",todayStr);
+      setTimeout(()=>setShowAllDone(true),600);
+    }
+  },[done,total]);
+
   const tap=(task,e)=>{
     if(task.id===deletingId){setDeletingId(null);return;}
-    if(task.status==="missed"){
-      setRedFlash(true);setTimeout(()=>setRedFlash(false),500);return;
-    }
+    if(task.status==="missed"){setRedFlash(true);setTimeout(()=>setRedFlash(false),500);return;}
     const rect=e.currentTarget.getBoundingClientRect();
     const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
     if(task.status!=="done"){
@@ -614,180 +747,149 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,onP
   };
 
   const deleteTask=id=>setTasks(prev=>prev.filter(t=>t.id!==id));
-
-  const filtered=filter==="all"?tasks
-    :filter==="done"?tasks.filter(t=>t.status==="done")
-    :tasks.filter(t=>t.status==="upcoming");
-
+  const filtered=filter==="all"?tasks:filter==="done"?tasks.filter(t=>t.status==="done"):tasks.filter(t=>t.status==="upcoming");
   const today=new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long"});
 
-  return(
-    <div style={{background:"#080C14",minHeight:"100vh",fontFamily:"Inter,sans-serif"}}>
-      {confettis.map(c=><Confetti key={c.id} x={c.x} y={c.y}/>)}
-      {redFlash&&<div style={{
-        position:"fixed",inset:0,background:"rgba(239,68,68,0.18)",
-        zIndex:998,animation:"flashRed 0.5s ease forwards",pointerEvents:"none",
-      }}/>}
-      {done===total&&total>0&&<div style={{
-        position:"fixed",inset:0,pointerEvents:"none",zIndex:0,
-        background:"radial-gradient(ellipse at 50% 0%,rgba(34,197,94,0.07),transparent 60%)",
-      }}/>}
+  // 5 quick taps on flame opens dev mode
+  const handleFlameTap=()=>{
+    clearTimeout(flameTapTimer.current);
+    const n=flameTaps+1;
+    if(n>=5){setFlameTaps(0);onOpenDev();return;}
+    setFlameTaps(n);
+    flameTapTimer.current=setTimeout(()=>setFlameTaps(0),1500);
+  };
 
-      {/* HEADER */}
-      <div style={{
-        background:"linear-gradient(180deg,#0D1321 0%,#080C14 100%)",
-        padding:"24px 20px 16px",
-        borderBottom:"1px solid rgba(255,255,255,0.05)",
-      }}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-          {/* Left: avatar + name + date + title */}
-          <div>
-            <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"4px"}}>
-              <div style={{
-                width:"38px",height:"38px",borderRadius:"12px",fontSize:"20px",
-                background:"rgba(99,102,241,0.15)",border:"1.5px solid rgba(99,102,241,0.3)",
-                display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,
-              }}>{userAvatar}</div>
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"100vh",background:"#080C14",
+      fontFamily:"Inter,sans-serif",overflow:"hidden"}}>
+      {confettis.map(c=><Confetti key={c.id} x={c.x} y={c.y}/>)}
+      {redFlash&&<div style={{position:"fixed",inset:0,background:"rgba(239,68,68,0.18)",
+        zIndex:998,animation:"flashRed 0.5s ease forwards",pointerEvents:"none"}}/>}
+      {showAllDone&&<AllDonePopup streak={streak} userName={userName} onClose={()=>setShowAllDone(false)}/>}
+
+      {/* SCROLLABLE CONTENT */}
+      <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+        {/* HEADER */}
+        <div style={{background:"linear-gradient(180deg,#0D1321 0%,#080C14 100%)",
+          padding:"24px 20px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+              <div style={{position:"relative"}}>
+                <div style={{width:"38px",height:"38px",borderRadius:"12px",fontSize:"20px",
+                  background:"rgba(99,102,241,0.15)",border:"1.5px solid rgba(99,102,241,0.3)",
+                  display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  {userAvatar}
+                </div>
+                <button onClick={onEditProfile} style={{position:"absolute",bottom:"-4px",right:"-4px",
+                  width:"16px",height:"16px",borderRadius:"50%",
+                  background:"rgba(99,102,241,0.9)",border:"1.5px solid #080C14",
+                  color:"#fff",fontSize:"9px",cursor:"pointer",
+                  display:"flex",alignItems:"center",justifyContent:"center",padding:0}}>✎</button>
+              </div>
               <div>
-                <p style={{color:"rgba(255,255,255,0.45)",fontSize:"11px",fontWeight:500,lineHeight:1.2}}>
+                <p style={{color:"rgba(255,255,255,0.55)",fontSize:"11px",fontWeight:500,lineHeight:1.2}}>
                   Hey, {userName} 👋
                 </p>
-                <p style={{color:"rgba(255,255,255,0.28)",fontSize:"11px",fontWeight:400}}>
-                  {today}
-                </p>
+                <p style={{color:"rgba(255,255,255,0.35)",fontSize:"11px"}}>{today}</p>
               </div>
             </div>
-            <h1 style={{
-              color:"#F1F5F9",fontSize:"22px",fontWeight:800,
-              fontFamily:"'Syne',sans-serif",marginTop:"6px",
-            }}>Today's Tasks</h1>
+            {/* Flame — tap 5x for dev mode */}
+            <button onClick={handleFlameTap} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"3px",
+              background:"rgba(0,0,0,0)",border:"none",cursor:"pointer",padding:"4px 8px"}}>
+              <FlameIcon streak={streak} size={34}/>
+              <span style={{color:fs.c2,fontSize:"11px",fontWeight:700,
+                textShadow:`0 0 8px ${fs.glow}`}}>{streak}d</span>
+            </button>
           </div>
-
-          {/* Right: animated flame streak */}
-          <button onClick={onProgress} style={{
-            display:"flex",flexDirection:"column",alignItems:"center",gap:"4px",
-            background:"rgba(0,0,0,0)",border:"none",cursor:"pointer",padding:"4px 8px",
-          }}>
-            <FlameIcon streak={streak} size={32}/>
-            <span style={{
-              color:fs.c2,fontSize:"11px",fontWeight:700,
-              textShadow:`0 0 8px ${fs.glow}`,
-            }}>{streak}d</span>
-          </button>
-        </div>
-
-        {/* Progress bar */}
-        <div style={{marginTop:"14px",marginBottom:"12px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:"6px"}}>
-            <span style={{color:"rgba(255,255,255,0.4)",fontSize:"11px"}}>Daily progress</span>
-            <span style={{color:pct===100?"#4ADE80":"rgba(255,255,255,0.5)",fontSize:"11px",fontWeight:600}}>{pct}%</span>
-          </div>
-          <div style={{height:"5px",background:"rgba(255,255,255,0.06)",borderRadius:"100px"}}>
-            <div style={{
-              height:"100%",width:pct+"%",
-              background:pct===100?"linear-gradient(90deg,#22C55E,#4ADE80)":"linear-gradient(90deg,#6366F1,#818CF8)",
-              borderRadius:"100px",transition:"width 0.6s cubic-bezier(0.4,0,0.2,1)",
-              boxShadow:pct===100?"0 0 12px rgba(34,197,94,0.6)":"0 0 10px rgba(99,102,241,0.4)",
-            }}/>
-          </div>
-        </div>
-
-        {/* Stats row */}
-        <div style={{display:"flex",gap:"8px"}}>
-          {[
-            {l:"Done",  v:done,       c:"#4ADE80",bg:"rgba(34,197,94,0.1)"},
-            {l:"Left",  v:total-done, c:"#818CF8",bg:"rgba(99,102,241,0.1)"},
-            {l:"Streak",v:streak+"d", c:fs.c2,    bg:"rgba(0,0,0,0.2)"},
-            {l:"Rank",  v:"#"+rank,   c:isCarrot?"#4ADE80":"#F87171",bg:isCarrot?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)"},
-          ].map(s=>(
-            <div key={s.l} style={{flex:1,textAlign:"center",background:s.bg,borderRadius:"10px",padding:"8px 4px"}}>
-              <p style={{color:s.c,fontSize:"15px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{s.v}</p>
-              <p style={{color:s.c,fontSize:"9px",fontWeight:600,opacity:0.7,marginTop:"2px",textTransform:"uppercase",letterSpacing:"0.05em"}}>{s.l}</p>
+          <WeekBar history={history}/>
+          {/* Progress bar */}
+          <div style={{marginTop:"8px",marginBottom:"12px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:"6px"}}>
+              <span style={{color:"rgba(255,255,255,0.5)",fontSize:"11px"}}>Daily progress</span>
+              <span style={{color:pct===100?"#4ADE80":"rgba(255,255,255,0.6)",fontSize:"11px",fontWeight:600}}>{pct}%</span>
             </div>
+            <div style={{height:"5px",background:"rgba(255,255,255,0.06)",borderRadius:"100px"}}>
+              <div style={{height:"100%",width:pct+"%",
+                background:pct===100?"linear-gradient(90deg,#22C55E,#4ADE80)":"linear-gradient(90deg,#6366F1,#818CF8)",
+                borderRadius:"100px",transition:"width 0.6s cubic-bezier(0.4,0,0.2,1)",
+                boxShadow:pct===100?"0 0 12px rgba(34,197,94,0.6)":"0 0 10px rgba(99,102,241,0.4)"}}/>
+            </div>
+          </div>
+          {/* Stats row */}
+          <div style={{display:"flex",gap:"8px"}}>
+            {[
+              {l:"Done",  v:done,       c:"#4ADE80",bg:"rgba(34,197,94,0.1)"},
+              {l:"Left",  v:total-done, c:"#818CF8",bg:"rgba(99,102,241,0.1)"},
+              {l:"Streak",v:streak+"d", c:fs.c2,    bg:"rgba(0,0,0,0.2)"},
+              {l:"Rank",  v:"#"+rank,   c:isCarrot?"#4ADE80":"#F87171",bg:isCarrot?"rgba(34,197,94,0.08)":"rgba(239,68,68,0.08)"},
+            ].map(s=>(
+              <div key={s.l} style={{flex:1,textAlign:"center",background:s.bg,borderRadius:"10px",padding:"8px 4px"}}>
+                <p style={{color:s.c,fontSize:"15px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{s.v}</p>
+                <p style={{color:s.c,fontSize:"9px",fontWeight:600,opacity:0.7,marginTop:"2px",
+                  textTransform:"uppercase",letterSpacing:"0.05em"}}>{s.l}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Title + filter */}
+        <div style={{padding:"14px 16px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <h1 style={{color:"#F1F5F9",fontSize:"20px",fontWeight:800,fontFamily:"'Syne',sans-serif",userSelect:"none"}}>
+            Today's Tasks
+          </h1>
+          <button onClick={()=>setShowAdd(true)} style={{padding:"6px 14px",borderRadius:"100px",
+            border:"1px solid rgba(99,102,241,0.35)",cursor:"pointer",
+            fontSize:"11px",fontWeight:700,background:"rgba(99,102,241,0.12)",
+            color:"#A5B4FC",fontFamily:"Inter,sans-serif"}}>+ Add</button>
+        </div>
+
+        {/* Filter tabs */}
+        <div style={{display:"flex",gap:"6px",padding:"10px 16px 4px"}}>
+          {[{f:"all",l:"All"},{f:"todo",l:"To do"},{f:"done",l:"Done"}].map(({f,l})=>(
+            <button key={f} onClick={()=>setFilter(f)} style={{
+              padding:"6px 14px",borderRadius:"100px",border:"none",cursor:"pointer",
+              fontSize:"11px",fontWeight:700,letterSpacing:"0.04em",
+              background:filter===f?"#6366F1":"rgba(255,255,255,0.07)",
+              color:filter===f?"#fff":"rgba(255,255,255,0.55)",
+              boxShadow:filter===f?"0 0 14px rgba(99,102,241,0.4)":"none",
+              transition:"all 0.2s",fontFamily:"Inter,sans-serif"}}>{l}</button>
+          ))}
+        </div>
+
+        <p style={{color:"rgba(255,255,255,0.2)",fontSize:"10px",paddingLeft:"18px",paddingBottom:"4px"}}>
+          Hold a task to remove it
+        </p>
+
+        {/* Task list */}
+        <div style={{padding:"4px 16px 24px",display:"flex",flexDirection:"column",gap:"8px"}}>
+          {filtered.map((task,i)=>(
+            <TaskRow key={task.id} task={task} i={i}
+              onTap={tap} onDelete={deleteTask}
+              isDeleting={deletingId===task.id}
+              onStartDelete={id=>setDeletingId(id)}
+              onCancelDelete={()=>setDeletingId(null)}/>
           ))}
         </div>
       </div>
 
-      {/* All-done banner */}
-      {done===total&&total>0&&(
-        <div style={{
-          margin:"12px 16px 0",background:"rgba(34,197,94,0.08)",
-          border:"1px solid rgba(34,197,94,0.25)",borderRadius:"14px",
-          padding:"12px 16px",display:"flex",alignItems:"center",gap:"10px",
-        }}>
-          <span style={{fontSize:"22px"}}>🎉</span>
-          <div>
-            <p style={{color:"#4ADE80",fontSize:"13px",fontWeight:700,fontFamily:"'Syne',sans-serif"}}>All done for today!</p>
-            <p style={{color:"rgba(74,222,128,0.5)",fontSize:"11px",marginTop:"1px"}}>Your streak is safe. See you tomorrow.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Filter tabs */}
-      <div style={{display:"flex",gap:"6px",padding:"14px 16px 8px",alignItems:"center"}}>
-        {[{f:"all",l:"All"},{f:"todo",l:"To do"},{f:"done",l:"Done"}].map(({f,l})=>(
-          <button key={f} onClick={()=>setFilter(f)} style={{
-            padding:"6px 14px",borderRadius:"100px",border:"none",cursor:"pointer",
-            fontSize:"11px",fontWeight:700,letterSpacing:"0.04em",
-            background:filter===f?"#6366F1":"rgba(255,255,255,0.05)",
-            color:filter===f?"#fff":"rgba(255,255,255,0.4)",
-            boxShadow:filter===f?"0 0 14px rgba(99,102,241,0.4)":"none",
-            transition:"all 0.2s",fontFamily:"Inter,sans-serif",
-          }}>{l}</button>
-        ))}
-        <button onClick={()=>setShowAdd(true)} style={{
-          marginLeft:"auto",padding:"6px 14px",borderRadius:"100px",
-          border:"1px solid rgba(99,102,241,0.35)",cursor:"pointer",
-          fontSize:"11px",fontWeight:700,background:"rgba(99,102,241,0.12)",
-          color:"#818CF8",fontFamily:"Inter,sans-serif",
-        }}>+ Add</button>
-      </div>
-
-      {/* Hint */}
-      <p style={{color:"rgba(255,255,255,0.15)",fontSize:"10px",paddingLeft:"18px",paddingBottom:"4px"}}>
-        Hold a task to remove it
-      </p>
-
-      {/* Task list */}
-      <div style={{padding:"4px 16px 100px",display:"flex",flexDirection:"column",gap:"8px"}}>
-        {filtered.map((task,i)=>(
-          <TaskRow key={task.id} task={task} i={i}
-            onTap={tap}
-            onDelete={deleteTask}
-            isDeleting={deletingId===task.id}
-            onStartDelete={id=>setDeletingId(id)}
-            onCancelDelete={()=>setDeletingId(null)}
-          />
-        ))}
-      </div>
-
-      {/* Bottom nav */}
-      <div style={{
-        position:"fixed",bottom:0,left:0,right:0,
-        background:"rgba(8,12,20,0.95)",backdropFilter:"blur(12px)",
-        borderTop:"1px solid rgba(255,255,255,0.06)",padding:"10px 24px 20px",
-        display:"flex",justifyContent:"space-around",
-      }}>
+      {/* BOTTOM NAV — outside scroll, always at bottom */}
+      <div style={{background:"rgba(8,12,20,0.98)",borderTop:"1px solid rgba(255,255,255,0.07)",
+        padding:"10px 24px 20px",display:"flex",justifyContent:"space-around",flexShrink:0}}>
         {[
           {icon:"📋",label:"Tasks",   active:true,  fn:()=>{}},
           {icon:"📊",label:"Progress",active:false, fn:onProgress},
           {icon:"👥",label:"Board",   active:false, fn:onLeaderboard},
         ].map(n=>(
-          <button key={n.label} onClick={n.fn} style={{
-            display:"flex",flexDirection:"column",alignItems:"center",gap:"3px",
-            background:"none",border:"none",cursor:"pointer",padding:"4px 16px",
-          }}>
+          <button key={n.label} onClick={n.fn} style={{display:"flex",flexDirection:"column",
+            alignItems:"center",gap:"3px",background:"none",border:"none",cursor:"pointer",padding:"8px 16px"}}>
             <span style={{fontSize:"20px"}}>{n.icon}</span>
             <span style={{fontSize:"10px",fontWeight:700,letterSpacing:"0.04em",
-              color:n.active?"#818CF8":"rgba(255,255,255,0.3)"}}>{n.label}</span>
+              color:n.active?"#818CF8":"rgba(255,255,255,0.5)"}}>{n.label}</span>
           </button>
         ))}
       </div>
 
-      {showAdd&&<AddTaskSheet
-        onAdd={t=>{setTasks(p=>[...p,t]);setShowAdd(false);}}
-        onClose={()=>setShowAdd(false)}
-      />}
+      {showAdd&&<AddTaskSheet onAdd={t=>{setTasks(p=>[...p,t]);setShowAdd(false);}} onClose={()=>setShowAdd(false)}/>}
     </div>
   );
 }
@@ -797,83 +899,59 @@ function TaskRow({task,i,onTap,onDelete,isDeleting,onStartDelete,onCancelDelete}
   const done=task.status==="done";
   const cc=CAT_COLORS[task.cat]||CAT_COLORS.theory;
   const pressTimer=useRef(null);
-
-  const startPress=()=>{
-    pressTimer.current=setTimeout(()=>{
-      onStartDelete(task.id);
-    },600);
-  };
+  const startPress=()=>{pressTimer.current=setTimeout(()=>onStartDelete(task.id),600);};
   const endPress=()=>clearTimeout(pressTimer.current);
-
   return(
-    <div
-      className={"task-card"+(isDeleting?" shaking":"")}
+    <div className={"task-card"+(isDeleting?" shaking":"")}
       onClick={e=>onTap(task,e)}
       onMouseDown={startPress} onMouseUp={endPress} onMouseLeave={endPress}
       onTouchStart={startPress} onTouchEnd={endPress}
-      style={{
-        position:"relative",overflow:"visible",
+      style={{position:"relative",overflow:"visible",
         background:isDeleting?"rgba(239,68,68,0.1)":done?"rgba(34,197,94,0.06)":"rgba(255,255,255,0.035)",
         border:"1px solid "+(isDeleting?"rgba(239,68,68,0.4)":done?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.07)"),
-        borderRadius:"16px",padding:"14px 16px",
-        display:"flex",alignItems:"center",gap:"14px",cursor:"pointer",
+        borderRadius:"16px",padding:"14px 16px",display:"flex",alignItems:"center",gap:"14px",cursor:"pointer",
         animation:`slideUp 0.4s cubic-bezier(0.4,0,0.2,1) ${i*0.04}s both`,
-        userSelect:"none",WebkitUserSelect:"none",
-      }}>
-      {done&&!isDeleting&&<div style={{position:"absolute",inset:0,borderRadius:"16px",background:"rgba(34,197,94,0.08)",pointerEvents:"none"}}/>}
-
-      <div style={{
-        width:"42px",height:"42px",borderRadius:"13px",flexShrink:0,
+        userSelect:"none",WebkitUserSelect:"none"}}>
+      {done&&!isDeleting&&<div style={{position:"absolute",inset:0,borderRadius:"16px",
+        background:"rgba(34,197,94,0.08)",pointerEvents:"none"}}/>}
+      <div style={{width:"42px",height:"42px",borderRadius:"13px",flexShrink:0,
         background:isDeleting?"rgba(239,68,68,0.15)":cc.bg,
         border:"1px solid "+(isDeleting?"rgba(239,68,68,0.4)":cc.border),
-        display:"flex",alignItems:"center",justifyContent:"center",fontSize:"20px",
-      }}>{task.emoji}</div>
-
+        display:"flex",alignItems:"center",justifyContent:"center",fontSize:"20px"}}>{task.emoji}</div>
       <div style={{flex:1,minWidth:0}}>
-        <p style={{
-          fontSize:"14px",fontWeight:600,
+        <p style={{fontSize:"14px",fontWeight:600,
           color:isDeleting?"#F87171":done?"rgba(74,222,128,0.7)":"#E2E8F0",
           fontFamily:"Inter,sans-serif",
-          textDecoration:done?"line-through":"none",
-          textDecorationColor:"rgba(74,222,128,0.5)",
-        }}>{isDeleting?"Hold to delete…":task.title}</p>
+          textDecoration:done?"line-through":"none",textDecorationColor:"rgba(74,222,128,0.5)"}}>
+          {isDeleting?"Hold to delete…":task.title}
+        </p>
         {!isDeleting&&(
           <div style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"4px"}}>
-            <span style={{
-              background:cc.bg,color:cc.text,fontSize:"9px",fontWeight:700,
+            <span style={{background:cc.bg,color:cc.text,fontSize:"9px",fontWeight:700,
               padding:"2px 7px",borderRadius:"100px",textTransform:"uppercase",
-              letterSpacing:"0.05em",border:"1px solid "+cc.border,
-            }}>{task.cat}</span>
-            <span style={{color:"rgba(255,255,255,0.25)",fontSize:"11px"}}>⏱ {task.dur}m</span>
+              letterSpacing:"0.05em",border:"1px solid "+cc.border}}>{task.cat}</span>
+            <span style={{color:"rgba(255,255,255,0.35)",fontSize:"11px"}}>⏱ {task.dur}m</span>
             {task.repeat&&task.repeat!=="none"&&(
-              <span style={{color:"rgba(255,255,255,0.2)",fontSize:"10px"}}>🔁 {task.repeat}</span>
+              <span style={{color:"rgba(255,255,255,0.25)",fontSize:"10px"}}>🔁 {task.repeat}</span>
             )}
           </div>
         )}
       </div>
-
       {isDeleting?(
-        <button
-          onClick={e=>{e.stopPropagation();onDelete(task.id);}}
-          style={{
-            width:"32px",height:"32px",borderRadius:"50%",flexShrink:0,
+        <button onClick={e=>{e.stopPropagation();onDelete(task.id);}}
+          onMouseDown={e=>e.stopPropagation()} onTouchStart={e=>e.stopPropagation()}
+          style={{width:"32px",height:"32px",borderRadius:"50%",flexShrink:0,
             background:"rgba(239,68,68,0.25)",border:"1.5px solid rgba(239,68,68,0.5)",
             color:"#F87171",fontSize:"18px",cursor:"pointer",fontWeight:700,
-            display:"flex",alignItems:"center",justifyContent:"center",
-          }}
-          onMouseDown={e=>e.stopPropagation()}
-          onTouchStart={e=>e.stopPropagation()}
-        >✕</button>
+            display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
       ):(
-        <div style={{
-          width:"26px",height:"26px",borderRadius:"50%",flexShrink:0,
+        <div style={{width:"26px",height:"26px",borderRadius:"50%",flexShrink:0,
           background:done?"#22C55E":"transparent",
           border:"2px solid "+(done?"#22C55E":"rgba(255,255,255,0.18)"),
           display:"flex",alignItems:"center",justifyContent:"center",
-          transition:"all 0.25s ease",
-          boxShadow:done?"0 0 10px rgba(34,197,94,0.5)":"none",
-        }}>
-          {done&&<span style={{color:"#fff",fontSize:"13px",fontWeight:800,animation:"checkBounce 0.35s cubic-bezier(0.34,1.56,0.64,1) both"}}>✓</span>}
+          transition:"all 0.25s ease",boxShadow:done?"0 0 10px rgba(34,197,94,0.5)":"none"}}>
+          {done&&<span style={{color:"#fff",fontSize:"13px",fontWeight:800,
+            animation:"checkBounce 0.35s cubic-bezier(0.34,1.56,0.64,1) both"}}>✓</span>}
         </div>
       )}
     </div>
@@ -883,26 +961,19 @@ function TaskRow({task,i,onTap,onDelete,isDeleting,onStartDelete,onCancelDelete}
 // ── ADD TASK SHEET ────────────────────────────────────────────────────────────
 const EMOJIS=["✏️","🎨","📐","📏","🖌️","📷","🔢","📓","🧩","💡","🎭","🌿","⚡","🔬","🎯","⚛️","🧪","⚗️"];
 const CATS=["drawing","aptitude","theory","health"];
-
 function AddTaskSheet({onAdd,onClose}){
   const [title,setTitle]=useState("");
   const [emoji,setEmoji]=useState("✏️");
   const [cat,setCat]=useState("drawing");
   const [dur,setDur]=useState(30);
   const [repeat,setRepeat]=useState("daily");
-  const submit=()=>{
-    if(!title.trim()) return;
-    onAdd({id:Date.now(),emoji,title:title.trim(),cat,dur,repeat,status:"upcoming"});
-  };
+  const submit=()=>{if(!title.trim())return;onAdd({id:Date.now(),emoji,title:title.trim(),cat,dur,repeat,status:"upcoming"});};
   return(
-    <div style={{
-      position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.65)",
-      display:"flex",alignItems:"flex-end",justifyContent:"center",
-    }} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{
-        background:"#0F172A",borderRadius:"24px 24px 0 0",width:"100%",
-        maxWidth:"500px",padding:"24px 20px 40px",border:"1px solid rgba(255,255,255,0.08)",
-      }}>
+    <div style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.65)",
+      display:"flex",alignItems:"flex-end",justifyContent:"center"}}
+      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{background:"#0F172A",borderRadius:"24px 24px 0 0",width:"100%",
+        maxWidth:"500px",padding:"24px 20px 40px",border:"1px solid rgba(255,255,255,0.08)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}}>
           <h3 style={{color:"#F1F5F9",fontSize:"17px",fontWeight:700,fontFamily:"'Syne',sans-serif"}}>New Task</h3>
           <button onClick={onClose} style={{background:"rgba(255,255,255,0.07)",border:"none",borderRadius:"50%",width:"30px",height:"30px",color:"#94A3B8",cursor:"pointer",fontSize:"18px"}}>×</button>
@@ -911,77 +982,69 @@ function AddTaskSheet({onAdd,onClose}){
           style={{width:"100%",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",
             borderRadius:"12px",padding:"12px 14px",color:"#F1F5F9",fontSize:"14px",
             fontFamily:"Inter,sans-serif",marginBottom:"16px"}}/>
-        <p style={{color:"rgba(255,255,255,0.3)",fontSize:"10px",letterSpacing:"0.1em",marginBottom:"8px",textTransform:"uppercase"}}>Emoji</p>
+        <p style={{color:"rgba(255,255,255,0.4)",fontSize:"10px",letterSpacing:"0.1em",marginBottom:"8px",textTransform:"uppercase"}}>Emoji</p>
         <div style={{display:"flex",flexWrap:"wrap",gap:"6px",marginBottom:"16px"}}>
           {EMOJIS.map(e=>(
-            <button key={e} onClick={()=>setEmoji(e)} style={{
-              width:"36px",height:"36px",borderRadius:"10px",fontSize:"18px",cursor:"pointer",
+            <button key={e} onClick={()=>setEmoji(e)} style={{width:"36px",height:"36px",borderRadius:"10px",fontSize:"18px",cursor:"pointer",
               background:emoji===e?"rgba(99,102,241,0.3)":"rgba(255,255,255,0.04)",
-              border:emoji===e?"1px solid rgba(99,102,241,0.5)":"1px solid transparent",
-            }}>{e}</button>
+              border:emoji===e?"1px solid rgba(99,102,241,0.5)":"1px solid transparent"}}>{e}</button>
           ))}
         </div>
-        <p style={{color:"rgba(255,255,255,0.3)",fontSize:"10px",letterSpacing:"0.1em",marginBottom:"8px",textTransform:"uppercase"}}>Category</p>
+        <p style={{color:"rgba(255,255,255,0.4)",fontSize:"10px",letterSpacing:"0.1em",marginBottom:"8px",textTransform:"uppercase"}}>Category</p>
         <div style={{display:"flex",gap:"6px",marginBottom:"16px"}}>
           {CATS.map(c=>{const cc=CAT_COLORS[c];return(
-            <button key={c} onClick={()=>setCat(c)} style={{
-              flex:1,padding:"7px 4px",
+            <button key={c} onClick={()=>setCat(c)} style={{flex:1,padding:"7px 4px",
               background:cat===c?cc.bg:"rgba(255,255,255,0.04)",
               border:"1px solid "+(cat===c?cc.border:"rgba(255,255,255,0.07)"),
               color:cat===c?cc.text:"rgba(255,255,255,0.4)",
               fontSize:"10px",fontWeight:700,textTransform:"uppercase",
-              letterSpacing:"0.05em",borderRadius:"8px",cursor:"pointer",
-            }}>{c}</button>
+              letterSpacing:"0.05em",borderRadius:"8px",cursor:"pointer"}}>{c}</button>
           );})}
         </div>
-        <p style={{color:"rgba(255,255,255,0.3)",fontSize:"10px",letterSpacing:"0.1em",marginBottom:"4px",textTransform:"uppercase"}}>Duration: {dur}m</p>
+        <p style={{color:"rgba(255,255,255,0.4)",fontSize:"10px",letterSpacing:"0.1em",marginBottom:"4px",textTransform:"uppercase"}}>Duration: {dur}m</p>
         <input type="range" min="10" max="120" step="5" value={dur} onChange={e=>setDur(+e.target.value)}
           style={{width:"100%",accentColor:"#6366F1",marginBottom:"4px"}}/>
         <div style={{display:"flex",gap:"6px",marginBottom:"16px",flexWrap:"wrap"}}>
           {[15,25,30,45,60].map(v=>(
-            <button key={v} onClick={()=>setDur(v)} style={{
-              padding:"4px 10px",borderRadius:"8px",cursor:"pointer",
+            <button key={v} onClick={()=>setDur(v)} style={{padding:"4px 10px",borderRadius:"8px",cursor:"pointer",
               background:dur===v?"rgba(99,102,241,0.25)":"rgba(255,255,255,0.05)",
               border:dur===v?"1px solid rgba(99,102,241,0.4)":"1px solid transparent",
-              color:dur===v?"#A5B4FC":"rgba(255,255,255,0.35)",fontSize:"11px",fontWeight:600,
-            }}>{v}m</button>
+              color:dur===v?"#A5B4FC":"rgba(255,255,255,0.35)",fontSize:"11px",fontWeight:600}}>{v}m</button>
           ))}
         </div>
-        <p style={{color:"rgba(255,255,255,0.3)",fontSize:"10px",letterSpacing:"0.1em",marginBottom:"8px",textTransform:"uppercase"}}>Repeat</p>
+        <p style={{color:"rgba(255,255,255,0.4)",fontSize:"10px",letterSpacing:"0.1em",marginBottom:"8px",textTransform:"uppercase"}}>Repeat</p>
         <div style={{display:"flex",gap:"6px",marginBottom:"22px",flexWrap:"wrap"}}>
           {["daily","weekday","weekly","none"].map(r=>(
-            <button key={r} onClick={()=>setRepeat(r)} style={{
-              padding:"6px 12px",borderRadius:"8px",cursor:"pointer",
+            <button key={r} onClick={()=>setRepeat(r)} style={{padding:"6px 12px",borderRadius:"8px",cursor:"pointer",
               background:repeat===r?"rgba(99,102,241,0.2)":"rgba(255,255,255,0.04)",
               border:repeat===r?"1px solid rgba(99,102,241,0.4)":"1px solid rgba(255,255,255,0.07)",
               color:repeat===r?"#A5B4FC":"rgba(255,255,255,0.35)",
-              fontSize:"11px",fontWeight:700,textTransform:"capitalize",
-            }}>{r}</button>
+              fontSize:"11px",fontWeight:700,textTransform:"capitalize"}}>{r}</button>
           ))}
         </div>
-        <button onClick={submit} style={{
-          width:"100%",
+        <button onClick={submit} style={{width:"100%",
           background:"linear-gradient(135deg,rgba(99,102,241,0.4),rgba(139,92,246,0.4))",
           border:"1px solid rgba(99,102,241,0.4)",borderRadius:"14px",padding:"14px",
           color:"#C7D2FE",fontSize:"14px",fontWeight:800,fontFamily:"'Syne',sans-serif",
-          cursor:"pointer",letterSpacing:"0.08em",
-        }}>ADD TO TODAY →</button>
+          cursor:"pointer",letterSpacing:"0.08em"}}>ADD TO TODAY →</button>
       </div>
     </div>
   );
 }
 
-// ── CONSISTENCY SCREEN (Progress / You vs You) ────────────────────────────────
+// ── CONSISTENCY SCREEN ────────────────────────────────────────────────────────
 function ConsistencyScreen({history,tasks,streak,onBack}){
-  const today=new Date().toISOString().slice(0,10);
-
-  // Build last 30 days
+  const now=new Date();
+  const todayStr=now.toISOString().slice(0,10);
+  const year=now.getFullYear();
+  const month=now.getMonth();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const firstDow=new Date(year,month,1).getDay();
+  const monthOffset=(firstDow+6)%7;
+  const monthName=now.toLocaleDateString("en-IN",{month:"long",year:"numeric"});
   const days=Array.from({length:30},(_,i)=>{
-    const d=new Date();
-    d.setDate(d.getDate()-(29-i));
-    return d.toISOString().slice(0,10);
+    const d=new Date(now);d.setDate(now.getDate()-(29-i));return d.toISOString().slice(0,10);
   });
-
   const dayStatus=date=>{
     const snap=history.find(h=>h.date===date);
     if(!snap) return "none";
@@ -989,19 +1052,15 @@ function ConsistencyScreen({history,tasks,streak,onBack}){
     if((snap.pct||0)>=50) return "yellow";
     return "red";
   };
-
-  // Chart data: last 14 days
   const chartDays=days.slice(-14);
   const chartData=chartDays.map(date=>{
     const snap=history.find(h=>h.date===date);
-    return {date, pct: snap?(snap.pct||0):null};
+    return {date,pct:snap?(snap.pct||0):null};
   });
-
-  // SVG line chart
   const W=320,H=130,PAD_X=28,PAD_Y=16;
-  const plotW=W-PAD_X*2, plotH=H-PAD_Y*2;
+  const plotW=W-PAD_X*2,plotH=H-PAD_Y*2;
   const valid=chartData.filter(d=>d.pct!==null);
-  const pts=valid.map((d,i)=>{
+  const pts=valid.map(d=>{
     const idx=chartDays.indexOf(d.date);
     const x=PAD_X+(idx/(chartDays.length-1))*plotW;
     const y=PAD_Y+plotH-(d.pct/100)*plotH;
@@ -1009,37 +1068,29 @@ function ConsistencyScreen({history,tasks,streak,onBack}){
   });
   const linePath=pts.map((p,i)=>`${i===0?"M":"L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   const areaPath=pts.length>0
-    ?`${linePath} L${pts[pts.length-1].x.toFixed(1)},${(PAD_Y+plotH).toFixed(1)} L${pts[0].x.toFixed(1)},${(PAD_Y+plotH).toFixed(1)} Z`
-    :"";
-  const y100=PAD_Y; // 100% line at top
-
+    ?`${linePath} L${pts[pts.length-1].x.toFixed(1)},${(PAD_Y+plotH).toFixed(1)} L${pts[0].x.toFixed(1)},${(PAD_Y+plotH).toFixed(1)} Z`:"";
+  const y100=PAD_Y;
   const statusColor={green:"#22C55E",yellow:"#FBBF24",red:"#EF4444",none:"rgba(255,255,255,0.07)"};
   const statusLabel={green:"All done",yellow:"Partial",red:"Missed",none:"No data"};
-
-  // Streak summary
   const totalDays=history.length;
   const perfectDays=history.filter(h=>h.allDone).length;
   const consistency=totalDays>0?Math.round((perfectDays/totalDays)*100):0;
 
   return(
-    <div style={{background:"#080C14",minHeight:"100vh",fontFamily:"Inter,sans-serif",paddingBottom:"80px"}}>
-      {/* Header */}
-      <div style={{
-        background:"linear-gradient(180deg,#0D1321,#080C14)",
-        padding:"20px 16px 16px",borderBottom:"1px solid rgba(255,255,255,0.05)",
-        position:"sticky",top:0,zIndex:10,
-      }}>
-        <button onClick={onBack} style={{
-          background:"none",border:"none",color:"rgba(255,255,255,0.5)",
+    <div style={{display:"flex",flexDirection:"column",height:"100vh",background:"#080C14",
+      fontFamily:"Inter,sans-serif",overflow:"hidden"}}>
+      {/* Sticky header */}
+      <div style={{background:"linear-gradient(180deg,#0D1321,#080C14)",
+        padding:"20px 16px 16px",borderBottom:"1px solid rgba(255,255,255,0.05)",flexShrink:0}}>
+        <button onClick={onBack} style={{background:"none",border:"none",color:"rgba(255,255,255,0.6)",
           fontSize:"13px",cursor:"pointer",fontFamily:"Inter,sans-serif",
-          padding:"0 0 12px",display:"flex",alignItems:"center",gap:"4px",
-        }}>← Back</button>
+          padding:"0 0 12px",display:"flex",alignItems:"center",gap:"4px"}}>← Back</button>
         <h1 style={{color:"#F1F5F9",fontSize:"22px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>Your Progress</h1>
-        <p style={{color:"rgba(255,255,255,0.3)",fontSize:"12px",marginTop:"2px"}}>You vs 100% consistency</p>
+        <p style={{color:"rgba(255,255,255,0.4)",fontSize:"12px",marginTop:"2px"}}>You vs 100% consistency</p>
       </div>
-
-      <div style={{padding:"16px 16px 0",display:"flex",flexDirection:"column",gap:"16px"}}>
-        {/* Summary cards */}
+      {/* Scrollable content */}
+      <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"16px 16px 32px",
+        display:"flex",flexDirection:"column",gap:"16px"}}>
         <div style={{display:"flex",gap:"8px"}}>
           {[
             {l:"Current Streak",v:streak+"d",   c:"#FB923C",bg:"rgba(249,115,22,0.1)"},
@@ -1048,18 +1099,14 @@ function ConsistencyScreen({history,tasks,streak,onBack}){
           ].map(s=>(
             <div key={s.l} style={{flex:1,textAlign:"center",background:s.bg,borderRadius:"12px",padding:"12px 6px",animation:"revealUp 0.5s ease both"}}>
               <p style={{color:s.c,fontSize:"18px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{s.v}</p>
-              <p style={{color:"rgba(255,255,255,0.35)",fontSize:"9px",fontWeight:600,marginTop:"3px",textTransform:"uppercase",letterSpacing:"0.05em",lineHeight:1.3}}>{s.l}</p>
+              <p style={{color:"rgba(255,255,255,0.4)",fontSize:"9px",fontWeight:600,marginTop:"3px",textTransform:"uppercase",letterSpacing:"0.05em",lineHeight:1.3}}>{s.l}</p>
             </div>
           ))}
         </div>
-
-        {/* Line chart */}
-        <div style={{
-          background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",
-          borderRadius:"18px",padding:"16px",
-          animation:"revealUp 0.5s ease 0.1s both",
-        }}>
-          <p style={{color:"rgba(255,255,255,0.5)",fontSize:"11px",fontWeight:600,marginBottom:"10px",letterSpacing:"0.06em",textTransform:"uppercase"}}>
+        {/* Chart */}
+        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",
+          borderRadius:"18px",padding:"16px",animation:"revealUp 0.5s ease 0.1s both"}}>
+          <p style={{color:"rgba(255,255,255,0.6)",fontSize:"11px",fontWeight:600,marginBottom:"10px",letterSpacing:"0.06em",textTransform:"uppercase"}}>
             Last 14 days
           </p>
           {pts.length>=2?(
@@ -1070,27 +1117,18 @@ function ConsistencyScreen({history,tasks,streak,onBack}){
                   <stop offset="100%" stopColor="#6366F1" stopOpacity="0"/>
                 </linearGradient>
               </defs>
-              {/* Grid lines */}
               {[0,25,50,75,100].map(pct=>{
                 const y=PAD_Y+plotH-(pct/100)*plotH;
-                return(
-                  <g key={pct}>
-                    <line x1={PAD_X} y1={y} x2={W-PAD_X} y2={y}
-                      stroke="rgba(255,255,255,0.06)" strokeWidth="1"/>
-                    <text x={PAD_X-4} y={y+4} textAnchor="end"
-                      fill="rgba(255,255,255,0.2)" fontSize="8">{pct}%</text>
-                  </g>
-                );
+                return(<g key={pct}>
+                  <line x1={PAD_X} y1={y} x2={W-PAD_X} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="1"/>
+                  <text x={PAD_X-4} y={y+4} textAnchor="end" fill="rgba(255,255,255,0.25)" fontSize="8">{pct}%</text>
+                </g>);
               })}
-              {/* 100% reference dashed */}
               <line x1={PAD_X} y1={y100} x2={W-PAD_X} y2={y100}
-                stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeDasharray="5,4"/>
-              <text x={W-PAD_X+4} y={y100+4} fill="rgba(255,255,255,0.3)" fontSize="8">Target</text>
-              {/* Area fill */}
+                stroke="#22C55E" strokeWidth="1.5" strokeDasharray="6,4"/>
+              <text x={W-PAD_X+4} y={y100+4} fill="#22C55E" fontSize="8">Target</text>
               <path d={areaPath} fill="url(#areaGrad)"/>
-              {/* Actual line */}
               <path d={linePath} fill="none" stroke="#6366F1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-              {/* Points */}
               {pts.map((p,i)=>(
                 <circle key={i} cx={p.x} cy={p.y} r="5"
                   fill={p.pct>=100?"#22C55E":p.pct>=50?"#FBBF24":"#EF4444"}
@@ -1099,65 +1137,61 @@ function ConsistencyScreen({history,tasks,streak,onBack}){
             </svg>
           ):(
             <div style={{height:"130px",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <p style={{color:"rgba(255,255,255,0.2)",fontSize:"13px",fontStyle:"italic"}}>
-                Complete some tasks to see your graph
-              </p>
+              <p style={{color:"rgba(255,255,255,0.25)",fontSize:"13px",fontStyle:"italic"}}>Complete some tasks to see your graph</p>
             </div>
           )}
         </div>
-
-        {/* 30-day calendar */}
-        <div style={{
-          background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",
-          borderRadius:"18px",padding:"16px",
-          animation:"revealUp 0.5s ease 0.2s both",
-        }}>
-          <p style={{color:"rgba(255,255,255,0.5)",fontSize:"11px",fontWeight:600,marginBottom:"12px",letterSpacing:"0.06em",textTransform:"uppercase"}}>
-            30-day calendar
+        {/* Month calendar */}
+        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",
+          borderRadius:"18px",padding:"16px",animation:"revealUp 0.5s ease 0.2s both"}}>
+          <p style={{color:"rgba(255,255,255,0.6)",fontSize:"11px",fontWeight:600,marginBottom:"12px",letterSpacing:"0.06em",textTransform:"uppercase"}}>
+            {monthName}
           </p>
-          <div style={{display:"flex",flexWrap:"wrap",gap:"5px"}}>
-            {days.map(date=>{
-              const st=dayStatus(date);
-              const isToday=date===today;
-              const dayNum=new Date(date).getDate();
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:"4px",marginBottom:"4px"}}>
+            {["M","T","W","T","F","S","S"].map((d,i)=>(
+              <div key={i} style={{textAlign:"center",color:"rgba(255,255,255,0.35)",fontSize:"9px",fontWeight:600,padding:"4px 0"}}>{d}</div>
+            ))}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:"4px"}}>
+            {Array.from({length:monthOffset},(_,i)=><div key={"e"+i}/>)}
+            {Array.from({length:daysInMonth},(_,i)=>{
+              const dayNum=i+1;
+              const dateStr=`${year}-${String(month+1).padStart(2,"0")}-${String(dayNum).padStart(2,"0")}`;
+              const st=dayStatus(dateStr);
+              const isToday=dateStr===todayStr;
+              const isFuture=new Date(dateStr)>now&&dateStr!==todayStr;
               return(
-                <div key={date} title={`${date}: ${statusLabel[st]}`} style={{
-                  width:"30px",height:"30px",borderRadius:"8px",flexShrink:0,
-                  background:statusColor[st],
-                  border:isToday?"2px solid #818CF8":"1px solid rgba(255,255,255,0.06)",
+                <div key={dayNum} title={`${dateStr}: ${statusLabel[st]}`} style={{
+                  aspectRatio:"1",borderRadius:"8px",
+                  background:isFuture?"rgba(255,255,255,0.03)":statusColor[st],
+                  border:isToday?"2px solid #818CF8":"1px solid rgba(255,255,255,0.05)",
                   display:"flex",alignItems:"center",justifyContent:"center",
-                  boxShadow:st==="green"?"0 0 8px rgba(34,197,94,0.4)":st==="yellow"?"0 0 8px rgba(251,191,36,0.3)":st==="red"?"0 0 6px rgba(239,68,68,0.3)":"none",
-                }}>
-                  <span style={{fontSize:"9px",color:st==="none"?"rgba(255,255,255,0.25)":"rgba(0,0,0,0.7)",fontWeight:700}}>
-                    {dayNum}
-                  </span>
+                  boxShadow:st==="green"&&!isFuture?"0 0 8px rgba(34,197,94,0.4)":
+                            st==="yellow"&&!isFuture?"0 0 8px rgba(251,191,36,0.3)":
+                            st==="red"&&!isFuture?"0 0 6px rgba(239,68,68,0.3)":"none"}}>
+                  <span style={{fontSize:"9px",
+                    color:isFuture?"rgba(255,255,255,0.12)":st==="none"?"rgba(255,255,255,0.3)":"rgba(0,0,0,0.75)",
+                    fontWeight:700}}>{dayNum}</span>
                 </div>
               );
             })}
           </div>
-          {/* Legend */}
           <div style={{display:"flex",gap:"12px",marginTop:"12px",flexWrap:"wrap"}}>
             {[{c:"#22C55E",l:"All done"},{c:"#FBBF24",l:"Partial"},{c:"#EF4444",l:"Missed"},{c:"rgba(255,255,255,0.07)",l:"No data"}].map(({c,l})=>(
               <div key={l} style={{display:"flex",alignItems:"center",gap:"5px"}}>
                 <div style={{width:"10px",height:"10px",borderRadius:"3px",background:c}}/>
-                <span style={{color:"rgba(255,255,255,0.35)",fontSize:"10px"}}>{l}</span>
+                <span style={{color:"rgba(255,255,255,0.45)",fontSize:"10px"}}>{l}</span>
               </div>
             ))}
           </div>
         </div>
-
         {/* Motivational note */}
-        <div style={{
-          background:consistency>=70?"rgba(34,197,94,0.07)":"rgba(99,102,241,0.07)",
+        <div style={{background:consistency>=70?"rgba(34,197,94,0.07)":"rgba(99,102,241,0.07)",
           border:"1px solid "+(consistency>=70?"rgba(34,197,94,0.2)":"rgba(99,102,241,0.2)"),
-          borderRadius:"14px",padding:"14px 16px",
-          animation:"revealUp 0.5s ease 0.3s both",
-        }}>
+          borderRadius:"14px",padding:"14px 16px",animation:"revealUp 0.5s ease 0.3s both"}}>
           <p style={{color:consistency>=70?"#4ADE80":"#A5B4FC",fontSize:"13px",fontWeight:600,fontFamily:"'Syne',sans-serif"}}>
-            {consistency>=70
-              ?"You're in the top tier of consistency 🔥 Keep it up."
-              :consistency>=40
-              ?"You're building momentum. Every green day compounds."
+            {consistency>=70?"You're in the top tier of consistency 🔥 Keep it up."
+              :consistency>=40?"You're building momentum. Every green day compounds."
               :"Start small — even one task a day builds the habit."}
           </p>
         </div>
@@ -1173,79 +1207,132 @@ function LeaderboardScreen({streak,rank,userAvatar,userName,onBack}){
     {name:userName||"You",streak,rank,done:Math.round(60+streak*2.5),avatar:userAvatar||"⭐",isYou:true},
   ].sort((a,b)=>a.rank-b.rank);
   const medals=["🥇","🥈","🥉"];
-
   return(
-    <div style={{background:"#080C14",minHeight:"100vh",fontFamily:"Inter,sans-serif"}}>
-      <div style={{
-        background:"linear-gradient(180deg,#0D1321,#080C14)",padding:"20px 16px 16px",
-        borderBottom:"1px solid rgba(255,255,255,0.05)",position:"sticky",top:0,zIndex:10,
-      }}>
-        <button onClick={onBack} style={{
-          background:"none",border:"none",color:"rgba(255,255,255,0.5)",
+    <div style={{display:"flex",flexDirection:"column",height:"100vh",background:"#080C14",
+      fontFamily:"Inter,sans-serif",overflow:"hidden"}}>
+      <div style={{background:"linear-gradient(180deg,#0D1321,#080C14)",padding:"20px 16px 16px",
+        borderBottom:"1px solid rgba(255,255,255,0.05)",flexShrink:0}}>
+        <button onClick={onBack} style={{background:"none",border:"none",color:"rgba(255,255,255,0.6)",
           fontSize:"13px",cursor:"pointer",fontFamily:"Inter,sans-serif",
-          padding:"0 0 12px",display:"flex",alignItems:"center",gap:"4px",
-        }}>← Back</button>
+          padding:"0 0 12px",display:"flex",alignItems:"center",gap:"4px"}}>← Back</button>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
             <h1 style={{color:"#F1F5F9",fontSize:"22px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>Leaderboard</h1>
-            <p style={{color:"rgba(255,255,255,0.3)",fontSize:"12px",marginTop:"3px"}}>Ranked by projected AIR</p>
+            <p style={{color:"rgba(255,255,255,0.4)",fontSize:"12px",marginTop:"3px"}}>Ranked by projected AIR</p>
           </div>
-          <div style={{
-            background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.25)",
-            borderRadius:"12px",padding:"8px 14px",textAlign:"center",
-          }}>
+          <div style={{background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.25)",
+            borderRadius:"12px",padding:"8px 14px",textAlign:"center"}}>
             <p style={{color:"#FBBF24",fontSize:"18px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>#{rank}</p>
             <p style={{color:"rgba(251,191,36,0.5)",fontSize:"9px",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>your rank</p>
           </div>
         </div>
       </div>
-
-      <div style={{padding:"12px 16px",display:"flex",flexDirection:"column",gap:"8px"}}>
+      <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",padding:"12px 16px 32px",
+        display:"flex",flexDirection:"column",gap:"8px"}}>
         {data.map((u,i)=>{
           const isTop=i<3,isYou=u.isYou;
           return(
-            <div key={u.name} className="rank-row" style={{
-              animationDelay:`${i*0.045}s`,
+            <div key={u.name} className="rank-row" style={{animationDelay:`${i*0.045}s`,
               background:isYou?"rgba(99,102,241,0.1)":isTop?"rgba(251,191,36,0.05)":"rgba(255,255,255,0.03)",
               border:"1px solid "+(isYou?"rgba(99,102,241,0.3)":isTop?"rgba(251,191,36,0.15)":"rgba(255,255,255,0.06)"),
-              borderRadius:"16px",padding:"14px 16px",display:"flex",alignItems:"center",gap:"12px",
-            }}>
+              borderRadius:"16px",padding:"14px 16px",display:"flex",alignItems:"center",gap:"12px"}}>
               <div style={{width:"28px",textAlign:"center",flexShrink:0}}>
-                {isTop
-                  ?<span style={{fontSize:"18px"}}>{medals[i]}</span>
-                  :<span style={{color:"rgba(255,255,255,0.3)",fontSize:"13px",fontWeight:600}}>#{i+1}</span>}
+                {isTop?<span style={{fontSize:"18px"}}>{medals[i]}</span>
+                      :<span style={{color:"rgba(255,255,255,0.4)",fontSize:"13px",fontWeight:600}}>#{i+1}</span>}
               </div>
-              <div style={{
-                width:"38px",height:"38px",borderRadius:"12px",flexShrink:0,
+              <div style={{width:"38px",height:"38px",borderRadius:"12px",flexShrink:0,
                 background:isYou?"rgba(99,102,241,0.2)":"rgba(255,255,255,0.06)",
-                display:"flex",alignItems:"center",justifyContent:"center",fontSize:"20px",
-              }}>{u.avatar}</div>
+                display:"flex",alignItems:"center",justifyContent:"center",fontSize:"20px"}}>{u.avatar}</div>
               <div style={{flex:1,minWidth:0}}>
-                <p style={{
-                  color:isYou?"#A5B4FC":"#E2E8F0",fontSize:"14px",
-                  fontWeight:isYou?700:500,
-                  fontFamily:isYou?"'Syne',sans-serif":"Inter,sans-serif",
-                }}>{u.name}{isYou?" (you)":""}</p>
+                <p style={{color:isYou?"#A5B4FC":"#E2E8F0",fontSize:"14px",
+                  fontWeight:isYou?700:500,fontFamily:isYou?"'Syne',sans-serif":"Inter,sans-serif"}}>
+                  {u.name}{isYou?" (you)":""}
+                </p>
                 <div style={{display:"flex",gap:"8px",marginTop:"3px",alignItems:"center"}}>
                   <span style={{color:"#FB923C",fontSize:"11px"}}>🔥 {u.streak}d</span>
                   <span style={{color:"rgba(255,255,255,0.25)",fontSize:"10px"}}>·</span>
-                  <span style={{color:"rgba(255,255,255,0.35)",fontSize:"11px"}}>{u.done}% done</span>
+                  <span style={{color:"rgba(255,255,255,0.4)",fontSize:"11px"}}>{u.done}% done</span>
                 </div>
               </div>
               <div style={{textAlign:"right",flexShrink:0}}>
-                <p style={{
-                  color:u.rank<100?"#4ADE80":u.rank<500?"#FBBF24":"#F87171",
-                  fontSize:"14px",fontWeight:800,fontFamily:"'Syne',sans-serif",
-                }}>#{u.rank}</p>
-                <p style={{color:"rgba(255,255,255,0.25)",fontSize:"9px",marginTop:"2px",textTransform:"uppercase",letterSpacing:"0.05em"}}>AIR</p>
+                <p style={{color:u.rank<100?"#4ADE80":u.rank<500?"#FBBF24":"#F87171",
+                  fontSize:"14px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>#{u.rank}</p>
+                <p style={{color:"rgba(255,255,255,0.3)",fontSize:"9px",marginTop:"2px",textTransform:"uppercase",letterSpacing:"0.05em"}}>AIR</p>
               </div>
             </div>
           );
         })}
+        <p style={{textAlign:"center",color:"rgba(255,255,255,0.15)",fontSize:"11px",paddingTop:"8px"}}>
+          Rankings update daily based on task completion
+        </p>
       </div>
-      <p style={{textAlign:"center",color:"rgba(255,255,255,0.12)",fontSize:"11px",padding:"8px 0 100px"}}>
-        Rankings update daily based on task completion
-      </p>
+    </div>
+  );
+}
+
+// ── DEV PANEL ─────────────────────────────────────────────────────────────────
+function DevPanel({onClose,tasks,setTasks,history,setHistory,streak,setStreak}){
+  const [day,setDay]=useState(()=>load("tint_devday",0));
+  const simulateDay=()=>{
+    const fakeDate=new Date();
+    fakeDate.setDate(fakeDate.getDate()-day-1);
+    const dateStr=fakeDate.toISOString().slice(0,10);
+    const study=tasks.filter(t=>t.cat!=="health");
+    const doneCount=Math.floor(study.length*(0.5+Math.random()*0.5));
+    const allDone=doneCount===study.length;
+    const pct=Math.round((doneCount/study.length)*100);
+    const snap={date:dateStr,allDone,pct,missedCount:study.length-doneCount,skippedTask:null};
+    setHistory(prev=>{
+      const upd=[...prev.filter(h=>h.date!==dateStr),snap];
+      save("tint_hist3",upd);
+      const sorted=[...upd].sort((a,b)=>b.date.localeCompare(a.date));
+      let s=0;
+      for(const e of sorted){if(e.allDone){s++;}else{break;}}
+      setStreak(s);
+      return upd;
+    });
+    setTasks(prev=>prev.map(t=>({...t,status:"upcoming"})));
+    const nd=day+1;setDay(nd);save("tint_devday",nd);
+  };
+  const resetAll=()=>{localStorage.clear();window.location.reload();};
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:400,background:"rgba(0,0,0,0.7)",
+      display:"flex",alignItems:"center",justifyContent:"center"}}
+      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{background:"#0F172A",border:"1px solid rgba(99,102,241,0.5)",
+        borderRadius:"20px",padding:"24px",width:"280px",
+        boxShadow:"0 20px 60px rgba(0,0,0,0.8)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+            <span style={{fontSize:"18px"}}>⚙️</span>
+            <span style={{color:"#818CF8",fontSize:"14px",fontWeight:700,letterSpacing:"0.05em",fontFamily:"'Syne',sans-serif"}}>DEV MODE</span>
+          </div>
+          <button onClick={onClose} style={{background:"rgba(255,255,255,0.07)",border:"none",
+            borderRadius:"50%",width:"28px",height:"28px",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:"16px"}}>×</button>
+        </div>
+        <div style={{background:"rgba(99,102,241,0.1)",border:"1px solid rgba(99,102,241,0.2)",
+          borderRadius:"12px",padding:"12px",marginBottom:"14px",textAlign:"center"}}>
+          <p style={{color:"rgba(255,255,255,0.45)",fontSize:"10px",marginBottom:"4px",textTransform:"uppercase",letterSpacing:"0.08em"}}>Simulated days</p>
+          <p style={{color:"#A5B4FC",fontSize:"28px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{day}</p>
+        </div>
+        <p style={{color:"rgba(255,255,255,0.35)",fontSize:"11px",marginBottom:"14px",lineHeight:1.6,textAlign:"center"}}>
+          Skip Day simulates a completed day with random task completion, updates streak + calendar.
+        </p>
+        <button onClick={simulateDay} style={{width:"100%",
+          background:"linear-gradient(135deg,rgba(99,102,241,0.5),rgba(139,92,246,0.4))",
+          border:"1px solid rgba(99,102,241,0.5)",borderRadius:"12px",padding:"12px",
+          color:"#C7D2FE",fontSize:"13px",fontWeight:800,cursor:"pointer",
+          fontFamily:"'Syne',sans-serif",marginBottom:"10px",
+          boxShadow:"0 4px 16px rgba(99,102,241,0.3)"}}>
+          Skip Day →
+        </button>
+        <button onClick={resetAll} style={{width:"100%",
+          background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",
+          borderRadius:"12px",padding:"12px",color:"#F87171",fontSize:"13px",
+          fontWeight:700,cursor:"pointer",fontFamily:"'Syne',sans-serif"}}>
+          Reset All Data
+        </button>
+      </div>
     </div>
   );
 }
@@ -1253,43 +1340,35 @@ function LeaderboardScreen({streak,rank,userAvatar,userName,onBack}){
 // ── ROOT ──────────────────────────────────────────────────────────────────────
 export default function TINT(){
   useCSS();
-
-  const [screen,setScreen]       = useState("cover");
-  const [onboarded]              = useState(()=>load("tint_onboarded",false));
-  const [userName,setUserName]   = useState(()=>load("tint_name",""));
+  const [screen,setScreen]        = useState("cover");
+  const [userName,setUserName]    = useState(()=>load("tint_name",""));
   const [userAvatar,setUserAvatar]= useState(()=>load("tint_avatar","⭐"));
-  const [userEmail,setUserEmail] = useState(()=>load("tint_email",""));
-  const [userExams,setUserExams] = useState(()=>load("tint_exams",[]));
-  const [tasks,setTasksRaw]      = useState(()=>load("tint_tasks3",null));
-  const [history,setHistoryRaw]  = useState(()=>load("tint_hist3",[]));
-  const [streak,setStreak]       = useState(0);
-  const [missed,setMissed]       = useState(0);
+  const [userEmail,setUserEmail]  = useState(()=>load("tint_email",""));
+  const [userExams,setUserExams]  = useState(()=>load("tint_exams",[]));
+  const [tasks,setTasksRaw]       = useState(()=>load("tint_tasks3",null));
+  const [history,setHistoryRaw]   = useState(()=>load("tint_hist3",[]));
+  const [streak,setStreak]        = useState(0);
+  const [missed,setMissed]        = useState(0);
+  const [showEdit,setShowEdit]    = useState(false);
+  const [showDev,setShowDev]      = useState(false);
 
   const setTasks=upd=>{
-    setTasksRaw(prev=>{
-      const next=typeof upd==="function"?upd(prev):upd;
-      save("tint_tasks3",next);
-      return next;
-    });
+    setTasksRaw(prev=>{const next=typeof upd==="function"?upd(prev):upd;save("tint_tasks3",next);return next;});
+  };
+  const setHistory=upd=>{
+    setHistoryRaw(prev=>{const next=typeof upd==="function"?upd(prev):upd;save("tint_hist3",next);return next;});
   };
 
-  // Day reset
   useEffect(()=>{
     if(!tasks) return;
     const last=load("tint_date","");
     const today=new Date().toISOString().slice(0,10);
     if(last!==today){
       save("tint_date",today);
-      setTasksRaw(prev=>{
-        if(!prev) return prev;
-        const next=prev.map(t=>({...t,status:"upcoming"}));
-        save("tint_tasks3",next);
-        return next;
-      });
+      setTasksRaw(prev=>{if(!prev)return prev;const next=prev.map(t=>({...t,status:"upcoming"}));save("tint_tasks3",next);return next;});
     }
   },[]);
 
-  // Snapshot + streak
   useEffect(()=>{
     if(!tasks||tasks.length===0) return;
     const today=new Date().toISOString().slice(0,10);
@@ -1300,7 +1379,6 @@ export default function TINT(){
     const pct=Math.round((doneStudy.length/study.length)*100);
     const skipped=study.filter(t=>t.status==="missed");
     const snap={date:today,allDone,missedCount:skipped.length,pct,skippedTask:skipped[0]?.title||null};
-
     setHistoryRaw(prev=>{
       const upd=[...prev.filter(h=>h.date!==today),snap];
       save("tint_hist3",upd);
@@ -1308,8 +1386,7 @@ export default function TINT(){
       let s=0,m=0;
       for(const e of sorted){
         if(e.date===today) continue;
-        if(e.allDone){s++;m=0;}
-        else{m++;s=0;break;}
+        if(e.allDone){s++;m=0;}else{m++;s=0;break;}
       }
       setStreak(s);setMissed(m);
       return upd;
@@ -1320,45 +1397,56 @@ export default function TINT(){
   const isCarrot=rank<100;
 
   const handleCoverDone=()=>{
-    if(load("tint_onboarded",false)){
-      setScreen("home");
-    } else {
-      setScreen("onboard");
-    }
+    if(load("tint_onboarded",false)){setScreen("home");}else{setScreen("onboard");}
   };
-
   const handleOnboardDone=({name,avatar,email,exams,tasks:newTasks})=>{
-    setUserName(name); save("tint_name",name);
-    setUserAvatar(avatar); save("tint_avatar",avatar);
-    setUserEmail(email); save("tint_email",email);
-    setUserExams(exams); save("tint_exams",exams);
-    setTasks(newTasks);
-    save("tint_onboarded",true);
+    setUserName(name);save("tint_name",name);
+    setUserAvatar(avatar);save("tint_avatar",avatar);
+    setUserEmail(email);save("tint_email",email);
+    setUserExams(exams);save("tint_exams",exams);
+    setTasks(newTasks);save("tint_onboarded",true);
     setScreen("home");
   };
+  const handleSaveProfile=(name,avatar)=>{
+    setUserName(name);save("tint_name",name);
+    setUserAvatar(avatar);save("tint_avatar",avatar);
+    setShowEdit(false);
+  };
 
-  // If tasks haven't been set yet (fresh install, no onboarding done), default to UCEED
-  const activeTasks = tasks || EXAM_TASKS.UCEED.map((t,i)=>({...t,id:i+1,status:"upcoming"}));
+  const activeTasks=tasks||EXAM_TASKS.UCEED.map((t,i)=>({...t,id:i+1,status:"upcoming"}));
 
   return(
     <div style={{position:"relative",width:"100%",minHeight:"100vh",background:"#05070F"}}>
-      {screen==="cover"       && <CoverScreen onDone={handleCoverDone}/>}
-      {screen==="onboard"     && <OnboardingScreen onDone={handleOnboardDone}/>}
-      {screen==="home"        && <HomeScreen
+      {screen==="cover"      &&<CoverScreen onDone={handleCoverDone}/>}
+      {screen==="onboard"    &&<OnboardingScreen onDone={handleOnboardDone}/>}
+      {screen==="home"       &&<HomeScreen
         tasks={activeTasks} setTasks={setTasks}
         streak={streak} missed={missed} rank={rank} isCarrot={isCarrot}
         userName={userName||"Friend"} userAvatar={userAvatar}
+        history={history}
         onProgress={()=>setScreen("progress")}
         onLeaderboard={()=>setScreen("leaderboard")}
+        onEditProfile={()=>setShowEdit(true)}
+        onOpenDev={()=>setShowDev(true)}
       />}
-      {screen==="progress"    && <ConsistencyScreen
+      {screen==="progress"   &&<ConsistencyScreen
         history={history} tasks={activeTasks} streak={streak}
         onBack={()=>setScreen("home")}
       />}
-      {screen==="leaderboard" && <LeaderboardScreen
+      {screen==="leaderboard"&&<LeaderboardScreen
         streak={streak} rank={rank}
         userAvatar={userAvatar} userName={userName||"You"}
         onBack={()=>setScreen("home")}
+      />}
+      {showEdit&&<EditProfileSheet
+        name={userName} avatar={userAvatar}
+        onSave={handleSaveProfile} onClose={()=>setShowEdit(false)}
+      />}
+      {showDev&&<DevPanel
+        onClose={()=>setShowDev(false)}
+        tasks={activeTasks} setTasks={setTasks}
+        history={history} setHistory={setHistory}
+        streak={streak} setStreak={setStreak}
       />}
     </div>
   );
