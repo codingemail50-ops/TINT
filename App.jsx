@@ -146,29 +146,31 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;overflow:hidden;}
 .task-card{transition:transform 0.15s ease,box-shadow 0.15s ease;}
 .task-card:hover{transform:scale(0.99);}
 
-/* ── Flame — clean teardrop ── */
-@keyframes flameBody{
-  0%,100%{transform:scaleY(1)    rotate(0deg);}
-  25%    {transform:scaleY(1.04) rotate(1.5deg);}
-  50%    {transform:scaleY(0.97) rotate(-1deg);}
-  75%    {transform:scaleY(1.03) rotate(0.8deg);}
+/* ── Flame — organic div layers ── */
+@keyframes flOuter{
+  0%,100%{transform:scaleX(1)    scaleY(1)    rotate(0deg);}
+  20%    {transform:scaleX(0.94) scaleY(1.05) rotate(1.3deg);}
+  40%    {transform:scaleX(1.05) scaleY(0.96) rotate(-1.6deg);}
+  60%    {transform:scaleX(0.96) scaleY(1.06) rotate(0.9deg);}
+  80%    {transform:scaleX(1.04) scaleY(0.97) rotate(-0.5deg);}
 }
-@keyframes flameCore{
-  0%,100%{opacity:0.65;transform:scaleY(1);}
-  40%    {opacity:0.95;transform:scaleY(1.07);}
+@keyframes flMid{
+  0%,100%{transform:scaleX(1)    scaleY(1);}
+  30%    {transform:scaleX(0.91) scaleY(1.08);}
+  65%    {transform:scaleX(1.06) scaleY(0.94);}
 }
-@keyframes flameTip{
-  0%,100%{opacity:0.5; transform:scaleY(1)    translateY(0);}
-  50%    {opacity:0.92;transform:scaleY(1.38) translateY(-2px);}
+@keyframes flCore{
+  0%,100%{opacity:0.82;transform:scaleY(1);}
+  45%    {opacity:1;   transform:scaleY(1.1);}
 }
-@keyframes flameBase{
-  0%,100%{transform:scaleX(1);   opacity:0.35;}
-  50%    {transform:scaleX(1.18);opacity:0.52;}
+@keyframes flEmber{
+  0%,100%{transform:scaleX(1);   opacity:0.4;}
+  50%    {transform:scaleX(1.22);opacity:0.6;}
 }
-.flame-body{animation:flameBody 0.85s ease-in-out infinite;transform-origin:50% 90%;}
-.flame-core{animation:flameCore 0.7s  ease-in-out infinite 0.12s;transform-origin:50% 85%;}
-.flame-tip {animation:flameTip  0.6s  ease-in-out infinite 0.22s;transform-origin:50% 100%;}
-.flame-base{animation:flameBase 1.1s  ease-in-out infinite;transform-origin:50% 100%;}
+.fl-outer{animation:flOuter 0.9s  ease-in-out infinite;   transform-origin:50% 92%;}
+.fl-mid  {animation:flMid   0.75s ease-in-out infinite 0.1s;transform-origin:50% 88%;}
+.fl-core {animation:flCore  0.65s ease-in-out infinite 0.2s;}
+.fl-ember{animation:flEmber 1.2s  ease-in-out infinite;   transform-origin:50% 100%;}
 
 /* ── Water fill ── */
 @keyframes waterRise{
@@ -291,43 +293,37 @@ function Confetti({x,y}){
   );
 }
 
-// ── FLAME ICON — smooth teardrop ─────────────────────────────────────────────
+// ── FLAME ICON — organic layered div flame ────────────────────────────────────
 function FlameIcon({streak,size=28}){
   const fs=flameStyle(streak);
-  const id=`nfg${streak}`;
-  const id2=`nfg2${streak}`;
+  const w=size, h=Math.round(size*1.28);
   return(
-    <svg width={size} height={size*1.2} viewBox="0 0 32 38"
-      style={{filter:`drop-shadow(0 0 5px ${fs.glow}) drop-shadow(0 0 18px ${fs.glow})`}}>
-      <defs>
-        <radialGradient id={id} cx="40%" cy="65%" r="65%">
-          <stop offset="0%"   stopColor="rgba(255,255,255,0.95)"/>
-          <stop offset="25%"  stopColor={fs.c2}/>
-          <stop offset="75%"  stopColor={fs.c1}/>
-          <stop offset="100%" stopColor={fs.c1} stopOpacity="0.7"/>
-        </radialGradient>
-        <radialGradient id={id2} cx="48%" cy="58%" r="52%">
-          <stop offset="0%"   stopColor="rgba(255,255,255,0.9)"/>
-          <stop offset="60%"  stopColor={fs.c2} stopOpacity="0.75"/>
-          <stop offset="100%" stopColor={fs.c2} stopOpacity="0.1"/>
-        </radialGradient>
-      </defs>
-      <g className="flame-base">
-        <ellipse cx="16" cy="35.5" rx="8.5" ry="2.8" fill={fs.c1} opacity="0.45"/>
-      </g>
-      <g className="flame-body">
-        <path d="M16,4 C21,10 27,18 27,26 C27,33 22,38 16,38 C10,38 5,33 5,26 C5,18 11,10 16,4Z"
-          fill={`url(#${id})`}/>
-      </g>
-      <g className="flame-core">
-        <path d="M16,14 C19,18 21,24 21,29 C21,33 18.5,36 16,36 C13.5,36 11,33 11,29 C11,24 13,18 16,14Z"
-          fill={`url(#${id2})`}/>
-      </g>
-      <g className="flame-tip">
-        <path d="M16,2 C17,5 17.5,9 16,12 C14.5,9 15,5 16,2Z"
-          fill="rgba(255,255,255,0.78)"/>
-      </g>
-    </svg>
+    <div style={{position:"relative",width:w,height:h,flexShrink:0,
+      filter:`drop-shadow(0 0 ${Math.round(size*0.2)}px ${fs.glow}) drop-shadow(0 0 ${Math.round(size*0.6)}px ${fs.glow})`}}>
+      {/* Base ember glow */}
+      <div className="fl-ember" style={{
+        position:"absolute",bottom:0,left:"8%",right:"8%",height:"18%",
+        background:fs.c1,borderRadius:"50%",opacity:0.5,
+      }}/>
+      {/* Outer flame — full height */}
+      <div className="fl-outer" style={{
+        position:"absolute",bottom:0,left:"4%",right:"4%",top:0,
+        background:`linear-gradient(to top,${fs.c1} 0%,${fs.c2} 52%,rgba(255,248,220,0.95) 100%)`,
+        borderRadius:"48% 52% 18% 18% / 54% 54% 46% 46%",
+      }}/>
+      {/* Mid flame */}
+      <div className="fl-mid" style={{
+        position:"absolute",bottom:0,left:"16%",right:"16%",top:"16%",
+        background:`linear-gradient(to top,${fs.c2} 0%,rgba(255,245,200,0.92) 55%,rgba(255,255,255,0.96) 100%)`,
+        borderRadius:"48% 52% 22% 22% / 58% 58% 42% 42%",
+      }}/>
+      {/* Bright inner core */}
+      <div className="fl-core" style={{
+        position:"absolute",bottom:"4%",left:"28%",right:"28%",top:"40%",
+        background:"rgba(255,255,255,0.92)",
+        borderRadius:"50% 50% 32% 32% / 60% 60% 40% 40%",
+      }}/>
+    </div>
   );
 }
 
@@ -679,12 +675,13 @@ function AllDonePopup({streak,userName,onClose}){
     color:[fs.c1,fs.c2,"#FFF9C4","rgba(255,220,120,0.9)"][i%4],
   })));
 
-  const msg=streak>=14
-    ?`${streak} days straight. Elite territory, ${userName}.`
-    :streak>=7
-    ?`${streak}-day streak! Momentum compounds.`
-    :streak>=3
-    ?`${streak} days strong. The habit is forming.`
+  const displayStreak=Math.max(1,streak);
+  const msg=displayStreak>=14
+    ?`${displayStreak} days straight. Elite territory, ${userName}.`
+    :displayStreak>=7
+    ?`${displayStreak}-day streak! Momentum compounds.`
+    :displayStreak>=3
+    ?`${displayStreak} days strong. The habit is forming.`
     :`First day done! Come back tomorrow to start your streak.`;
 
   return(
@@ -745,7 +742,7 @@ function AllDonePopup({streak,userName,onClose}){
                   <div style={{display:"inline-flex",alignItems:"center",gap:"8px",
                     background:`${fs.c1}28`,border:`1px solid ${fs.c1}60`,
                     borderRadius:"100px",padding:"8px 22px",marginBottom:"20px"}}>
-                    <span style={{color:fs.c2,fontSize:"28px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{streak}</span>
+                    <span style={{color:fs.c2,fontSize:"28px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{displayStreak}</span>
                     <span style={{color:fs.c2,fontSize:"13px",fontWeight:600}}>day streak 🔥</span>
                   </div>
                   <h1 style={{color:"#F1F5F9",fontSize:"26px",fontWeight:800,
@@ -829,9 +826,35 @@ function EditProfileSheet({name,avatar,exams,onSave,onClose}){
   );
 }
 
+// ── BOTTOM NAV ────────────────────────────────────────────────────────────────
+function BottomNav({active,onTasks,onProgress,onLeaderboard}){
+  const items=[
+    {icon:"📋",label:"Tasks",   key:"tasks",   fn:onTasks},
+    {icon:"📊",label:"Progress",key:"progress",fn:onProgress},
+    {icon:"👥",label:"Board",   key:"board",   fn:onLeaderboard},
+  ];
+  return(
+    <div className="nav-safe" style={{background:"rgba(8,12,20,0.98)",
+      borderTop:"1px solid rgba(255,255,255,0.08)",
+      padding:"8px 16px 0",display:"flex",justifyContent:"space-around",flexShrink:0}}>
+      {items.map(n=>(
+        <button key={n.key} onClick={n.fn} style={{display:"flex",flexDirection:"column",
+          alignItems:"center",gap:"4px",cursor:"pointer",padding:"8px 20px",
+          background:active===n.key?"rgba(99,102,241,0.15)":"none",
+          border:active===n.key?"1px solid rgba(99,102,241,0.3)":"1px solid transparent",
+          borderRadius:"14px"}}>
+          <span style={{fontSize:"26px",lineHeight:1}}>{n.icon}</span>
+          <span style={{fontSize:"11px",fontWeight:700,letterSpacing:"0.04em",
+            color:active===n.key?"#818CF8":"rgba(255,255,255,0.45)"}}>{n.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── HOME SCREEN ───────────────────────────────────────────────────────────────
 function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,history,
-  onProgress,onLeaderboard,onEditProfile,onOpenDev}){
+  onProgress,onLeaderboard,onEditProfile,onOpenDev,onLogPastDay}){
   const [confettis,setConfettis]=useState([]);
   const [redFlash,setRedFlash]=useState(false);
   const [filter,setFilter]=useState("all");
@@ -973,27 +996,44 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
 
         {/* Past-day banner */}
         {selectedDate!==todayStr&&(
-          <div style={{margin:"10px 16px 0",padding:"10px 14px",
+          <div style={{margin:"10px 16px 0",padding:"12px 14px",
             background:"rgba(99,102,241,0.08)",border:"1px solid rgba(99,102,241,0.22)",
-            borderRadius:"12px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px"}}>
-            <div style={{minWidth:0}}>
-              <p style={{color:"#A5B4FC",fontSize:"12px",fontWeight:700}}>
-                📅 {new Date(selectedDate+"T00:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
-              </p>
-              {(()=>{const snap=history.find(h=>h.date===selectedDate);
-                return snap
-                  ?<p style={{color:"rgba(255,255,255,0.45)",fontSize:"11px",marginTop:"2px"}}>
-                      {snap.allDone?"✅ All done":snap.pct>=50?`⚡ ${snap.pct}% complete`:"❌ Missed"}
-                    </p>
-                  :<p style={{color:"rgba(255,255,255,0.3)",fontSize:"11px",marginTop:"2px"}}>No data for this day</p>;
-              })()}
+            borderRadius:"12px",display:"flex",flexDirection:"column",gap:"10px"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px"}}>
+              <div style={{minWidth:0}}>
+                <p style={{color:"#A5B4FC",fontSize:"12px",fontWeight:700}}>
+                  📅 {new Date(selectedDate+"T00:00:00").toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})}
+                </p>
+                {(()=>{const snap=history.find(h=>h.date===selectedDate);
+                  return snap
+                    ?<p style={{color:"rgba(255,255,255,0.45)",fontSize:"11px",marginTop:"2px"}}>
+                        {snap.allDone?"✅ All done":snap.pct>=50?`⚡ ${snap.pct}% complete`:"❌ Missed"}
+                      </p>
+                    :<p style={{color:"rgba(255,255,255,0.3)",fontSize:"11px",marginTop:"2px"}}>No data — log it below</p>;
+                })()}
+              </div>
+              <button onClick={()=>setSelectedDate(todayStr)} style={{
+                flexShrink:0,background:"rgba(99,102,241,0.15)",border:"1px solid rgba(99,102,241,0.3)",
+                borderRadius:"8px",padding:"5px 10px",color:"#A5B4FC",fontSize:"11px",
+                cursor:"pointer",fontFamily:"Inter,sans-serif",fontWeight:600,whiteSpace:"nowrap"}}>
+                Today →
+              </button>
             </div>
-            <button onClick={()=>setSelectedDate(todayStr)} style={{
-              flexShrink:0,background:"rgba(99,102,241,0.2)",border:"1px solid rgba(99,102,241,0.35)",
-              borderRadius:"8px",padding:"5px 10px",color:"#A5B4FC",fontSize:"11px",
-              cursor:"pointer",fontFamily:"Inter,sans-serif",fontWeight:600,whiteSpace:"nowrap"}}>
-              Today →
-            </button>
+            {/* Manual log buttons */}
+            <div style={{display:"flex",gap:"8px"}}>
+              <button onClick={()=>onLogPastDay(selectedDate,true)} style={{
+                flex:1,padding:"8px",borderRadius:"10px",cursor:"pointer",
+                background:"rgba(34,197,94,0.15)",border:"1px solid rgba(34,197,94,0.35)",
+                color:"#4ADE80",fontSize:"12px",fontWeight:700,fontFamily:"Inter,sans-serif"}}>
+                ✅ Mark Done
+              </button>
+              <button onClick={()=>onLogPastDay(selectedDate,false)} style={{
+                flex:1,padding:"8px",borderRadius:"10px",cursor:"pointer",
+                background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",
+                color:"#F87171",fontSize:"12px",fontWeight:700,fontFamily:"Inter,sans-serif"}}>
+                ❌ Mark Missed
+              </button>
+            </div>
           </div>
         )}
 
@@ -1032,25 +1072,7 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
         </div>
       </div>
 
-      {/* BOTTOM NAV — outside scroll, always at bottom */}
-      <div className="nav-safe" style={{background:"rgba(8,12,20,0.98)",borderTop:"1px solid rgba(255,255,255,0.08)",
-        padding:"8px 16px 0",display:"flex",justifyContent:"space-around",flexShrink:0}}>
-        {[
-          {icon:"📋",label:"Tasks",   active:true,  fn:()=>{}},
-          {icon:"📊",label:"Progress",active:false, fn:onProgress},
-          {icon:"👥",label:"Board",   active:false, fn:onLeaderboard},
-        ].map(n=>(
-          <button key={n.label} onClick={n.fn} style={{display:"flex",flexDirection:"column",
-            alignItems:"center",gap:"4px",cursor:"pointer",padding:"8px 20px",
-            background:n.active?"rgba(99,102,241,0.15)":"none",
-            border:n.active?"1px solid rgba(99,102,241,0.3)":"1px solid transparent",
-            borderRadius:"14px"}}>
-            <span style={{fontSize:"26px",lineHeight:1}}>{n.icon}</span>
-            <span style={{fontSize:"11px",fontWeight:700,letterSpacing:"0.04em",
-              color:n.active?"#818CF8":"rgba(255,255,255,0.45)"}}>{n.label}</span>
-          </button>
-        ))}
-      </div>
+      <BottomNav active="tasks" onTasks={()=>{}} onProgress={onProgress} onLeaderboard={onLeaderboard}/>
 
       {showAdd&&<AddTaskSheet onAdd={t=>{setTasks(p=>[...p,t]);setShowAdd(false);}} onClose={()=>setShowAdd(false)}/>}
     </div>
@@ -1196,7 +1218,7 @@ function AddTaskSheet({onAdd,onClose}){
 }
 
 // ── CONSISTENCY SCREEN ────────────────────────────────────────────────────────
-function ConsistencyScreen({history,tasks,streak,onBack}){
+function ConsistencyScreen({history,tasks,streak,onBack,onTasks,onLeaderboard}){
   const now=new Date();
   const todayStr=now.toISOString().slice(0,10);
   const year=now.getFullYear();
@@ -1359,12 +1381,13 @@ function ConsistencyScreen({history,tasks,streak,onBack}){
           </p>
         </div>
       </div>
+      <BottomNav active="progress" onTasks={onTasks} onProgress={()=>{}} onLeaderboard={onLeaderboard}/>
     </div>
   );
 }
 
 // ── LEADERBOARD SCREEN ────────────────────────────────────────────────────────
-function LeaderboardScreen({streak,rank,userAvatar,userName,onBack}){
+function LeaderboardScreen({streak,rank,userAvatar,userName,onBack,onTasks,onProgress}){
   const data=[
     ...LB_DATA,
     {name:userName||"You",streak,rank,done:Math.round(60+streak*2.5),avatar:userAvatar||"⭐",isYou:true},
@@ -1429,6 +1452,7 @@ function LeaderboardScreen({streak,rank,userAvatar,userName,onBack}){
           Rankings update daily based on task completion
         </p>
       </div>
+      <BottomNav active="board" onTasks={onTasks} onProgress={onProgress} onLeaderboard={()=>{}}/>
     </div>
   );
 }
@@ -1436,17 +1460,16 @@ function LeaderboardScreen({streak,rank,userAvatar,userName,onBack}){
 // ── DEV PANEL ─────────────────────────────────────────────────────────────────
 function DevPanel({onClose,tasks,setTasks,history,setHistory,streak,setStreak}){
   const [day,setDay]=useState(()=>load("tint_devday",0));
-  const simulateDay=()=>{
-    const fakeDate=new Date();
-    fakeDate.setDate(fakeDate.getDate()-day-1);
-    const dateStr=fakeDate.toISOString().slice(0,10);
+  const advanceDay=()=>{
+    // Mark today complete, then reset tasks as if a new day started
+    const today=new Date().toISOString().slice(0,10);
     const study=tasks.filter(t=>t.cat!=="health");
-    const doneCount=Math.floor(study.length*(0.5+Math.random()*0.5));
+    const doneCount=study.filter(t=>t.status==="done").length||Math.floor(study.length*(0.6+Math.random()*0.4));
     const allDone=doneCount===study.length;
-    const pct=Math.round((doneCount/study.length)*100);
-    const snap={date:dateStr,allDone,pct,missedCount:study.length-doneCount,skippedTask:null};
+    const pct=study.length?Math.round((doneCount/study.length)*100):0;
+    const snap={date:today,allDone,pct,missedCount:study.length-doneCount,skippedTask:null};
     setHistory(prev=>{
-      const upd=[...prev.filter(h=>h.date!==dateStr),snap];
+      const upd=[...prev.filter(h=>h.date!==today),snap];
       save("tint_hist3",upd);
       const sorted=[...upd].sort((a,b)=>b.date.localeCompare(a.date));
       let s=0;
@@ -1455,6 +1478,7 @@ function DevPanel({onClose,tasks,setTasks,history,setHistory,streak,setStreak}){
       return upd;
     });
     setTasks(prev=>prev.map(t=>({...t,status:"upcoming"})));
+    save("tint_alldone_date",""); // reset all-done guard so popup can show again
     const nd=day+1;setDay(nd);save("tint_devday",nd);
   };
   const resetAll=()=>{localStorage.clear();window.location.reload();};
@@ -1481,13 +1505,13 @@ function DevPanel({onClose,tasks,setTasks,history,setHistory,streak,setStreak}){
         <p style={{color:"rgba(255,255,255,0.35)",fontSize:"11px",marginBottom:"14px",lineHeight:1.6,textAlign:"center"}}>
           Skip Day simulates a completed day with random task completion, updates streak + calendar.
         </p>
-        <button onClick={simulateDay} style={{width:"100%",
+        <button onClick={advanceDay} style={{width:"100%",
           background:"linear-gradient(135deg,rgba(99,102,241,0.5),rgba(139,92,246,0.4))",
           border:"1px solid rgba(99,102,241,0.5)",borderRadius:"12px",padding:"12px",
           color:"#C7D2FE",fontSize:"13px",fontWeight:800,cursor:"pointer",
           fontFamily:"'Syne',sans-serif",marginBottom:"10px",
           boxShadow:"0 4px 16px rgba(99,102,241,0.3)"}}>
-          Skip Day →
+          Next Day →
         </button>
         <button onClick={resetAll} style={{width:"100%",
           background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",
@@ -1570,11 +1594,36 @@ export default function TINT(){
     setTasks(newTasks);save("tint_onboarded",true);
     setScreen("home");
   };
-  const handleSaveProfile=(name,avatar,exams)=>{
+  const handleSaveProfile=(name,avatar,newExams)=>{
     setUserName(name);save("tint_name",name);
     setUserAvatar(avatar);save("tint_avatar",avatar);
-    if(exams&&exams.length){setUserExams(exams);save("tint_exams",exams);}
+    if(newExams&&newExams.length){
+      const changed=JSON.stringify(newExams)!==JSON.stringify(userExams);
+      setUserExams(newExams);save("tint_exams",newExams);
+      if(changed){
+        const seen=new Set();const out=[];
+        for(const ex of newExams)
+          for(const t of (EXAM_TASKS[ex]||[]))
+            if(!seen.has(t.title)){seen.add(t.title);out.push({...t,id:Date.now()+Math.random(),status:"upcoming"});}
+        setTasks(out);
+      }
+    }
     setShowEdit(false);
+  };
+
+  const handlePastDayLog=(date,allDone)=>{
+    const snap={date,allDone,pct:allDone?100:30,missedCount:allDone?0:1,skippedTask:null};
+    const updHistory=[...history.filter(h=>h.date!==date),snap];
+    save("tint_hist3",updHistory);
+    setHistoryRaw(updHistory);
+    const today=new Date().toISOString().slice(0,10);
+    const sorted=[...updHistory].sort((a,b)=>b.date.localeCompare(a.date));
+    let s=0,m=0;
+    for(const e of sorted){
+      if(e.date===today)continue;
+      if(e.allDone){s++;m=0;}else{m++;s=0;break;}
+    }
+    setStreak(s);setMissed(m);
   };
 
   const activeTasks=tasks||EXAM_TASKS.UCEED.map((t,i)=>({...t,id:i+1,status:"upcoming"}));
@@ -1592,15 +1641,20 @@ export default function TINT(){
         onLeaderboard={()=>setScreen("leaderboard")}
         onEditProfile={()=>setShowEdit(true)}
         onOpenDev={()=>setShowDev(true)}
+        onLogPastDay={handlePastDayLog}
       />}
       {screen==="progress"   &&<ConsistencyScreen
         history={history} tasks={activeTasks} streak={streak}
         onBack={()=>setScreen("home")}
+        onTasks={()=>setScreen("home")}
+        onLeaderboard={()=>setScreen("leaderboard")}
       />}
       {screen==="leaderboard"&&<LeaderboardScreen
         streak={streak} rank={rank}
         userAvatar={userAvatar} userName={userName||"You"}
         onBack={()=>setScreen("home")}
+        onTasks={()=>setScreen("home")}
+        onProgress={()=>setScreen("progress")}
       />}
       {showEdit&&<EditProfileSheet
         name={userName} avatar={userAvatar} exams={userExams}
