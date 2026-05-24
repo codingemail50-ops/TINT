@@ -94,9 +94,12 @@ const LB_DATA = [
 
 const CSS = `
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter',system-ui,-apple-system,sans-serif;overflow:hidden;}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;overflow:hidden;background:linear-gradient(135deg,#080B18,#0D1128,#080B18);background-attachment:fixed;}
 .app-screen{height:100vh;height:100dvh;}
 .nav-safe{padding-bottom:max(16px,env(safe-area-inset-bottom));}
+.glass-card{background:rgba(255,255,255,0.055)!important;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.10)!important;}
+.glass-nav{background:rgba(5,8,20,0.70)!important;backdrop-filter:blur(24px)!important;-webkit-backdrop-filter:blur(24px)!important;border-top:1px solid rgba(255,255,255,0.08)!important;}
+.glass-header{background:rgba(5,8,20,0.60)!important;backdrop-filter:blur(20px)!important;-webkit-backdrop-filter:blur(20px)!important;border-bottom:1px solid rgba(255,255,255,0.07)!important;}
 
 @keyframes orbDrift{
   0%,100%{transform:translate(0,0);}
@@ -1087,7 +1090,7 @@ function BottomNav({active,onTasks,onFocus,onProgress,onLeaderboard}){
     </button>
   );
   return(
-    <div className="nav-safe" style={{
+    <div className="nav-safe glass-nav" style={{
       display:'flex',borderTop:'1px solid rgba(255,255,255,0.07)',
       background:'rgba(5,7,15,0.97)',backdropFilter:'blur(20px)',
     }}>
@@ -1166,7 +1169,7 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
       {/* SCROLLABLE CONTENT */}
       <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
         {/* HEADER */}
-        <div style={{background:"linear-gradient(180deg,#0D1321 0%,#080C14 100%)",
+        <div className="glass-header" style={{background:"linear-gradient(180deg,#0D1321 0%,#080C14 100%)",
           padding:"20px 20px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
           <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"2px"}}>
             {/* Left: avatar + edit */}
@@ -1215,7 +1218,7 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
               {l:"Left",  v:total-done, c:"#818CF8",bg:"rgba(99,102,241,0.1)"},
               {l:"Streak",v:streak+"d", c:fs.c2,    bg:"rgba(0,0,0,0.2)"},
             ].map(s=>(
-              <div key={s.l} style={{flex:1,textAlign:"center",background:s.bg,borderRadius:"10px",padding:"8px 4px"}}>
+              <div key={s.l} className="glass-card" style={{flex:1,textAlign:"center",background:s.bg,borderRadius:"10px",padding:"8px 4px"}}>
                 <p style={{color:s.c,fontSize:"15px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{s.v}</p>
                 <p style={{color:s.c,fontSize:"9px",fontWeight:600,opacity:0.7,marginTop:"2px",
                   textTransform:"uppercase",letterSpacing:"0.05em"}}>{s.l}</p>
@@ -1512,7 +1515,7 @@ function ConsistencyScreen({history,tasks,streak,onBack,onTasks,onFocus,onLeader
     <div className="app-screen" style={{display:"flex",flexDirection:"column",background:"#080C14",
       fontFamily:"Inter,sans-serif",overflow:"hidden"}}>
       {/* Sticky header */}
-      <div style={{background:"linear-gradient(180deg,#0D1321,#080C14)",
+      <div className="glass-header" style={{background:"linear-gradient(180deg,#0D1321,#080C14)",
         padding:"20px 16px 16px",borderBottom:"1px solid rgba(255,255,255,0.05)",flexShrink:0}}>
         <button onClick={onBack} style={{background:"none",border:"none",color:"rgba(255,255,255,0.6)",
           fontSize:"13px",cursor:"pointer",fontFamily:"Inter,sans-serif",
@@ -1643,7 +1646,7 @@ function LeaderboardScreen({streak,rank,userAvatar,userName,onBack,onTasks,onFoc
   return(
     <div className="app-screen" style={{display:"flex",flexDirection:"column",background:"#080C14",
       fontFamily:"Inter,sans-serif",overflow:"hidden"}}>
-      <div style={{background:"linear-gradient(180deg,#0D1321,#080C14)",padding:"20px 16px 16px",
+      <div className="glass-header" style={{background:"linear-gradient(180deg,#0D1321,#080C14)",padding:"20px 16px 16px",
         borderBottom:"1px solid rgba(255,255,255,0.05)",flexShrink:0}}>
         <button onClick={onBack} style={{background:"none",border:"none",color:"rgba(255,255,255,0.6)",
           fontSize:"13px",cursor:"pointer",fontFamily:"Inter,sans-serif",
