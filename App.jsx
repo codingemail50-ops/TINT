@@ -7,6 +7,55 @@ function save(key, v) {
   try { localStorage.setItem(key, JSON.stringify(v)); } catch(e) {}
 }
 
+function playChime(){
+  try{
+    const ac=new(window.AudioContext||window.webkitAudioContext)();
+    const freqs=[523.25,659.25,783.99,1046.5]; // C5 E5 G5 C6
+    freqs.forEach((f,i)=>{
+      const o=ac.createOscillator();
+      const g=ac.createGain();
+      o.connect(g);g.connect(ac.destination);
+      o.type='sine';o.frequency.value=f;
+      const start=ac.currentTime+i*0.10;
+      g.gain.setValueAtTime(0,start);
+      g.gain.linearRampToValueAtTime(0.18,start+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001,start+0.45);
+      o.start(start);o.stop(start+0.5);
+    });
+  }catch(e){}
+}
+
+function requestDailyReminder(){
+  if(!('Notification' in window))return;
+  if(Notification.permission==='default'){
+    Notification.requestPermission().then(perm=>{
+      if(perm==='granted') scheduleDailyCheck();
+    });
+  } else if(Notification.permission==='granted'){
+    scheduleDailyCheck();
+  }
+}
+
+function scheduleDailyCheck(){
+  const today=new Date().toISOString().slice(0,10);
+  const hist=JSON.parse(localStorage.getItem('tint_hist3')||'[]');
+  const todayLogged=hist.some(h=>h.date===today&&h.allDone);
+  if(!todayLogged){
+    const now=new Date();
+    const evening=new Date(now);
+    evening.setHours(21,0,0,0);
+    const ms=evening-now;
+    if(ms>0&&ms<86400000){
+      setTimeout(()=>{
+        new Notification('TINT — Log your tasks!',{
+          body:"Don't break your streak. Log today's tasks now.",
+          icon:'/favicon.ico',
+        });
+      },ms);
+    }
+  }
+}
+
 function projectedRank(streak, missedDays) {
   if (missedDays>=14) return 3500; if (missedDays>=7) return 2500;
   if (missedDays>=5)  return 2000; if (missedDays>=3) return 1500;
@@ -131,8 +180,11 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;overflow:hidden;}
   background:linear-gradient(90deg,transparent,rgba(99,102,241,0.8),rgba(139,92,246,0.6),transparent);}
 
 @keyframes containerSpin{
-  from{transform:rotateY(0deg);}
-  to  {transform:rotateY(360deg);}
+  0%  {transform:rotate(0deg)   scale(1);}
+  25% {transform:rotate(90deg)  scale(0.92);}
+  50% {transform:rotate(180deg) scale(1);}
+  75% {transform:rotate(270deg) scale(0.92);}
+  100%{transform:rotate(360deg) scale(1);}
 }
 @keyframes quoteIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
 @keyframes dotWave{
@@ -188,6 +240,17 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;overflow:hidden;}
   to  {opacity:1;transform:translateY(0);}
 }
 
+@keyframes breatheCircle{
+  0%,100%{transform:scale(1);opacity:0.6;}
+  40%    {transform:scale(1.35);opacity:1;}
+  60%    {transform:scale(1.35);opacity:1;}
+}
+@keyframes breatheText{
+  0%,100%{opacity:0.5;}
+  20%    {opacity:1;content:'Breathe in...';}
+  50%    {opacity:0.8;}
+}
+
 @keyframes shake{
   0%,100%{transform:translateX(0);}
   20%    {transform:translateX(-4px);}
@@ -237,40 +300,65 @@ function useCSS() {
   },[]);
 }
 
-const CC=["#22C55E","#38BDF8","#A78BFA","#FBBF24","#F97316","#EC4899","#84CC16"];
 function Confetti({x,y}){
-  const [pieces]=useState(()=>Array.from({length:28},(_,i)=>({
-    id:i,color:CC[i%CC.length],angle:(i/28)*360,
-    speed:Math.random()*5+3,size:Math.random()*6+4,
-    rot:Math.random()*360,circ:Math.random()>0.5,
+  const SHAPES=['circle','square','star','ribbon'];
+  const CC2=["#FF6B6B","#FFE66D","#4ECDC4","#A29BFE","#FD79A8","#FDCB6E","#6C5CE7","#00CEC9","#55EFC4","#FFF"];
+  const [pieces]=useState(()=>Array.from({length:40},(_,i)=>({
+    id:i,
+    color:CC2[i%CC2.length],
+    shape:SHAPES[i%SHAPES.length],
+    angle:(i/40)*360+Math.random()*20,
+    speed:Math.random()*6+4,
+    size:Math.random()*8+4,
+    rot:Math.random()*360,
+    rotSpeed:(Math.random()-0.5)*15,
+    wobble:Math.random()*Math.PI*2,
   })));
-  const [t,setT]=useState(0);
+  const [tick,setTick]=useState(0);
   useEffect(()=>{
-    let raf,tick=0;
-    const go=()=>{tick++;setT(tick);if(tick<35)raf=requestAnimationFrame(go);};
+    let raf,t=0;
+    const go=()=>{t++;setTick(t);if(t<55)raf=requestAnimationFrame(go);};
     raf=requestAnimationFrame(go);
-    return ()=>cancelAnimationFrame(raf);
+    return()=>cancelAnimationFrame(raf);
   },[]);
-  const prog=Math.min(t/35,1);
+  const prog=Math.min(tick/55,1);
   return(
     <div style={{position:"fixed",left:x,top:y,pointerEvents:"none",zIndex:999}}>
       {pieces.map(p=>{
         const rad=p.angle*Math.PI/180;
-        const dist=p.speed*prog*18;
+        const dist=p.speed*prog*22;
+        const px=Math.cos(rad)*dist+Math.sin(p.wobble+tick*0.1)*prog*8;
+        const py=Math.sin(rad)*dist-prog*42+prog*prog*30;
+        const alpha=Math.max(0,1-prog*1.2);
+        if(p.shape==='ribbon'){
+          return <div key={p.id} style={{
+            position:"absolute",width:p.size*0.5,height:p.size*2,
+            background:p.color,left:px,top:py,opacity:alpha,
+            transform:`rotate(${p.rot+tick*p.rotSpeed}deg) skewX(${Math.sin(tick*0.15)*20}deg)`,
+            borderRadius:2,boxShadow:`0 0 4px ${p.color}`,
+          }}/>;
+        }
+        if(p.shape==='star'){
+          return <div key={p.id} style={{
+            position:"absolute",left:px,top:py,opacity:alpha,
+            fontSize:p.size+4,lineHeight:1,
+            transform:`rotate(${p.rot+tick*p.rotSpeed*0.5}deg)`,
+            filter:`drop-shadow(0 0 3px ${p.color})`,
+          }}>⭐</div>;
+        }
         return <div key={p.id} style={{
-          position:"absolute",width:p.size,height:p.size,background:p.color,
-          borderRadius:p.circ?"50%":"3px",
-          left:Math.cos(rad)*dist,top:Math.sin(rad)*dist-prog*30,
-          opacity:Math.max(0,1-prog*1.4),
-          transform:`rotate(${p.rot+prog*3}deg)`,
-          boxShadow:"0 0 4px "+p.color,
+          position:"absolute",width:p.size,height:p.size,
+          background:p.color,left:px,top:py,opacity:alpha,
+          borderRadius:p.shape==='circle'?'50%':'3px',
+          transform:`rotate(${p.rot+tick*p.rotSpeed}deg)`,
+          boxShadow:`0 0 6px ${p.color}`,
         }}/>;
       })}
     </div>
   );
 }
 
-// ── FLAME ICON — canvas-based tentacle flame ─────────────────────────────────
+// ── FLAME ICON — cartoon reference-style with 3 bezier layers ────────────────
 function FlameIcon({streak,size=28}){
   const ref=useRef(null);
   const rafRef=useRef(null);
@@ -278,82 +366,94 @@ function FlameIcon({streak,size=28}){
     const canvas=ref.current;
     if(!canvas)return;
     const dpr=Math.min(window.devicePixelRatio||1,2);
-    const CW=Math.round(size*dpr), CH=Math.round(size*1.5*dpr);
-    canvas.width=CW; canvas.height=CH;
+    canvas.width=Math.round(size*dpr);
+    canvas.height=Math.round(size*1.55*dpr);
     const ctx=canvas.getContext('2d');
     ctx.scale(dpr,dpr);
-    const cw=size, ch=size*1.5;
+    const W=size, H=size*1.55;
 
-    // Streak-based color tiers
-    let c1,c2,c3;
-    if(streak>=30){c1='#9333EA';c2='#C084FC';c3='#F0ABFC';}
-    else if(streak>=22){c1='#A855F7';c2='#C084FC';c3='#E9D5FF';}
-    else if(streak>=15){c1='#1D4ED8';c2='#3B82F6';c3='#93C5FD';}
-    else if(streak>=8){c1='#CC2200';c2='#FF4400';c3='#FF9900';}
-    else if(streak>=4){c1='#E03800';c2='#FF5C00';c3='#FFAA00';}
-    else{c1='#FF5500';c2='#FF8000';c3='#FFD100';}
+    const tier=Math.min(Math.floor(streak/3),8);
+    const TIERS=[
+      ['#CC5500','#FF8C00','#FFD700'],
+      ['#CC2200','#FF5500','#FFAA00'],
+      ['#880000','#CC1100','#FF4400'],
+      ['#880033','#CC0055','#FF4499'],
+      ['#440088','#8800BB','#CC66FF'],
+      ['#005500','#008800','#44FF44'],
+      ['#001188','#0044EE','#66AAFF'],
+      ['#000044','#001177','#2255AA'],
+      ['#555555','#999999','#FFFFFF'],
+    ];
+    const [c1,c2,c3]=TIERS[tier];
 
     let t=0;
     function w(seed,freq,amp=1){
-      return(Math.sin(t*freq+seed)*0.65+Math.sin(t*freq*1.618+seed*2.39)*0.35)*amp;
+      return(Math.sin(t*freq+seed)*0.6+Math.sin(t*freq*1.7+seed*2.1)*0.4)*amp;
     }
 
-    function draw(){
-      ctx.clearRect(0,0,cw,ch);
-      const cx=cw/2,by=ch-3,fw=cw*0.84,fh=ch*0.88;
+    function drawLayer(cx,by,fw,fh,color1,color2,animate){
+      const sw=animate?w(0,1.8,fw*0.07):0;
+      const t1=animate?w(1,2.2,fh*0.04):0;
+      const dip=animate?w(2,2.7,fw*0.05):0;
+      const tipW=animate?w(3,1.5,fw*0.05):0;
 
-      const sw=w(0,1.7,fw*0.10), t1y=w(1,2.3,fh*0.04), t1x=w(2,1.9,fw*0.06);
-      const dip1=w(3,2.7,fw*0.07), t2y=w(4,2.0,fh*0.05), t2x=w(5,1.5,fw*0.07);
-      const dip2=w(6,3.1,fw*0.05);
-
-      // Outer body
       ctx.beginPath();
-      ctx.moveTo(cx-fw*0.5,by);
-      ctx.bezierCurveTo(cx-fw*0.72,by-fh*0.10,cx-fw*0.75+t1x,by-fh*0.28+t1y,cx-fw*0.68+t1x,by-fh*0.38+t1y);
-      ctx.bezierCurveTo(cx-fw*0.55+dip1,by-fh*0.44,cx-fw*0.28+dip1,by-fh*0.48,cx-fw*0.38,by-fh*0.54);
-      ctx.bezierCurveTo(cx-fw*0.52+t2x,by-fh*0.60,cx-fw*0.60+t2x,by-fh*0.70+t2y,cx-fw*0.50+t2x,by-fh*0.78+t2y);
-      ctx.bezierCurveTo(cx-fw*0.30+dip2,by-fh*0.84,cx-fw*0.12+dip2,by-fh*0.88,cx+sw,by-fh);
-      ctx.bezierCurveTo(cx+fw*0.20,by-fh*0.88,cx+fw*0.50,by-fh*0.62,cx+fw*0.56,by-fh*0.44);
-      ctx.bezierCurveTo(cx+fw*0.60,by-fh*0.28,cx+fw*0.58,by-fh*0.10,cx+fw*0.50,by);
-      ctx.arc(cx,by,fw*0.50,0,Math.PI);
-      const g1=ctx.createLinearGradient(cx,by,cx,by-fh);
-      g1.addColorStop(0,c1);g1.addColorStop(0.55,c2);g1.addColorStop(1,c3);
-      ctx.fillStyle=g1;ctx.fill();
+      ctx.moveTo(cx-fw*0.46,by);
 
-      // Mid layer
-      const f2=0.68,ox=fw*0.04;
-      ctx.beginPath();
-      ctx.moveTo(cx-fw*f2*0.5+ox,by-fh*0.08);
-      ctx.bezierCurveTo(cx-fw*f2*0.62+ox,by-fh*0.22,cx-fw*f2*0.62+ox+t1x*0.8,by-fh*0.36+t1y*0.8,cx-fw*f2*0.56+ox+t1x*0.8,by-fh*0.44+t1y*0.8);
-      ctx.bezierCurveTo(cx-fw*f2*0.42+ox+dip1*0.8,by-fh*0.50,cx-fw*f2*0.22+ox+dip1*0.8,by-fh*0.54,cx-fw*f2*0.30+ox,by-fh*0.58);
-      ctx.bezierCurveTo(cx-fw*f2*0.44+ox+t2x*0.8,by-fh*0.63,cx-fw*f2*0.50+ox+t2x*0.8,by-fh*0.72+t2y*0.8,cx-fw*f2*0.42+ox+t2x*0.8,by-fh*0.80+t2y*0.8);
-      ctx.bezierCurveTo(cx-fw*f2*0.22+ox+dip2*0.8,by-fh*0.86,cx-fw*f2*0.06+ox+dip2*0.8,by-fh*0.90,cx+sw*0.85,by-fh*0.94);
-      ctx.bezierCurveTo(cx+fw*f2*0.18,by-fh*0.86,cx+fw*f2*0.46,by-fh*0.56,cx+fw*f2*0.50,by-fh*0.40);
-      ctx.bezierCurveTo(cx+fw*f2*0.54,by-fh*0.24,cx+fw*f2*0.52,by-fh*0.10,cx+fw*f2*0.44+ox,by-fh*0.06);
-      ctx.arc(cx+ox*0.3,by-fh*0.06,fw*f2*0.44,0,Math.PI);
-      const g2=ctx.createLinearGradient(cx,by,cx,by-fh);
-      g2.addColorStop(0,c2);g2.addColorStop(0.6,c3);g2.addColorStop(1,'rgba(255,255,255,0.9)');
-      ctx.fillStyle=g2;ctx.fill();
+      ctx.bezierCurveTo(
+        cx-fw*0.70, by-fh*0.12+t1*0.3,
+        cx-fw*0.76, by-fh*0.35+t1,
+        cx-fw*0.65, by-fh*0.46+t1
+      );
 
-      // Inner core highlight
-      const f3=0.34;
-      ctx.beginPath();
-      ctx.moveTo(cx-fw*f3*0.5,by-fh*0.18);
-      ctx.bezierCurveTo(cx-fw*f3*0.55+t2x*0.4,by-fh*0.38,cx-fw*f3*0.52+t2x*0.4,by-fh*0.65+t2y*0.4,cx+sw*0.4,by-fh*0.84);
-      ctx.bezierCurveTo(cx+fw*f3*0.28,by-fh*0.65,cx+fw*f3*0.50,by-fh*0.38,cx+fw*f3*0.50,by-fh*0.18);
-      ctx.arc(cx,by-fh*0.16,fw*f3*0.5,0,Math.PI);
-      const g3=ctx.createLinearGradient(cx,by,cx,by-fh*0.88);
-      g3.addColorStop(0,c3);g3.addColorStop(1,'rgba(255,255,255,0.95)');
-      ctx.fillStyle=g3;ctx.fill();
+      ctx.bezierCurveTo(
+        cx-fw*0.50+dip, by-fh*0.54,
+        cx-fw*0.18+dip, by-fh*0.56,
+        cx-fw*0.28,     by-fh*0.63
+      );
+
+      ctx.bezierCurveTo(
+        cx-fw*0.40, by-fh*0.72,
+        cx-fw*0.22+tipW, by-fh*0.88,
+        cx+fw*0.02+sw,   by-fh
+      );
+
+      ctx.bezierCurveTo(
+        cx+fw*0.22+sw, by-fh*0.86,
+        cx+fw*0.52,    by-fh*0.58,
+        cx+fw*0.58,    by-fh*0.38
+      );
+      ctx.bezierCurveTo(
+        cx+fw*0.62, by-fh*0.20,
+        cx+fw*0.56, by-fh*0.05,
+        cx+fw*0.46, by
+      );
+      ctx.arc(cx,by,fw*0.46,0,Math.PI);
+
+      const g=ctx.createLinearGradient(cx,by,cx,by-fh);
+      g.addColorStop(0,color1);
+      g.addColorStop(0.5,color2);
+      g.addColorStop(1,'rgba(255,255,220,0.9)');
+      ctx.fillStyle=g;
+      ctx.fill();
+    }
+
+    function frame(){
+      ctx.clearRect(0,0,W,H);
+      const cx=W/2, by=H-4, fw=W*0.86, fh=H*0.88;
+
+      drawLayer(cx,by,fw,fh,c1,c2,true);
+      drawLayer(cx,by,fw*0.68,fh*0.78,c2,c3,true);
+      drawLayer(cx,by,fw*0.40,fh*0.52,c3,'rgba(255,255,200,0.95)',true);
 
       t+=0.016;
-      rafRef.current=requestAnimationFrame(draw);
+      rafRef.current=requestAnimationFrame(frame);
     }
-    rafRef.current=requestAnimationFrame(draw);
+    rafRef.current=requestAnimationFrame(frame);
     return()=>cancelAnimationFrame(rafRef.current);
   },[streak,size]);
 
-  return <canvas ref={ref} style={{width:size,height:size*1.5,display:'block',flexShrink:0}}/>;
+  return <canvas ref={ref} style={{width:size,height:size*1.55,display:'block',flexShrink:0}}/>;
 }
 
 // ── COVER SCREEN ──────────────────────────────────────────────────────────────
@@ -715,13 +815,31 @@ function AllDonePopup({streak,userName,onClose}){
       ctx.restore();
     }
 
+    function drawCartoonFlame(fcx,fby,fw,fh,col1,col2,col3){
+      function layer(lfw,lfh,lc1,lc2){
+        ctx.beginPath();
+        ctx.moveTo(fcx-lfw*0.46,fby);
+        ctx.bezierCurveTo(fcx-lfw*0.70,fby-lfh*0.12,fcx-lfw*0.76,fby-lfh*0.35,fcx-lfw*0.65,fby-lfh*0.46);
+        ctx.bezierCurveTo(fcx-lfw*0.50,fby-lfh*0.54,fcx-lfw*0.18,fby-lfh*0.56,fcx-lfw*0.28,fby-lfh*0.63);
+        ctx.bezierCurveTo(fcx-lfw*0.40,fby-lfh*0.72,fcx-lfw*0.22,fby-lfh*0.88,fcx,fby-lfh);
+        ctx.bezierCurveTo(fcx+lfw*0.22,fby-lfh*0.86,fcx+lfw*0.52,fby-lfh*0.58,fcx+lfw*0.58,fby-lfh*0.38);
+        ctx.bezierCurveTo(fcx+lfw*0.62,fby-lfh*0.20,fcx+lfw*0.56,fby-lfh*0.05,fcx+lfw*0.46,fby);
+        ctx.arc(fcx,fby,lfw*0.46,0,Math.PI);
+        const g=ctx.createLinearGradient(fcx,fby,fcx,fby-lfh);
+        g.addColorStop(0,lc1);g.addColorStop(0.5,lc2);g.addColorStop(1,'rgba(255,255,220,0.9)');
+        ctx.fillStyle=g;ctx.fill();
+      }
+      layer(fw,fh,col1,col2);
+      layer(fw*0.68,fh*0.78,col2,col3);
+      layer(fw*0.40,fh*0.52,col3,'rgba(255,255,200,0.95)');
+    }
+
     function frame(){
       ctx.clearRect(0,0,W,H);
       const dur=phase==='trails'?1.3:2.5;
       const progress=Math.min(t2/dur,1);
 
       if(phase==='trails'){
-        // 6 teardrops spiral in from radius 130 to center
         for(let i=0;i<NUM;i++){
           const baseAngle=(i/NUM)*Math.PI*2;
           const spiralAngle=baseAngle+progress*Math.PI*1.5;
@@ -734,27 +852,13 @@ function AllDonePopup({streak,userName,onClose}){
           drawTeardrop(x,y,r,spiralAngle+Math.PI/2,alpha,hue);
         }
       } else {
-        // form phase: big flame erupting from center
         const p2=Math.min((t2-0)/1.2,1);
         const scale=0.3+p2*0.7;
         ctx.save();
         ctx.translate(cx,cy+30);
         ctx.scale(scale,scale);
-        // draw tentacle flame shape
-        const fw=80,fh=120,bx=0,by=0;
-        ctx.beginPath();
-        ctx.moveTo(-fw*0.5,by);
-        ctx.bezierCurveTo(-fw*0.72,by-fh*0.10,-fw*0.75,by-fh*0.32,-fw*0.65,by-fh*0.40);
-        ctx.bezierCurveTo(-fw*0.45,by-fh*0.46,-fw*0.28,by-fh*0.50,-fw*0.38,by-fh*0.55);
-        ctx.bezierCurveTo(-fw*0.55,by-fh*0.62,-fw*0.58,by-fh*0.72,-fw*0.45,by-fh*0.80);
-        ctx.bezierCurveTo(-fw*0.28,by-fh*0.87,-fw*0.10,by-fh*0.92,0,by-fh);
-        ctx.bezierCurveTo(fw*0.18,by-fh*0.90,fw*0.50,by-fh*0.62,fw*0.55,by-fh*0.44);
-        ctx.bezierCurveTo(fw*0.60,by-fh*0.28,fw*0.58,by-fh*0.10,fw*0.50,by);
-        ctx.arc(0,by,fw*0.50,0,Math.PI);
-        const g=ctx.createLinearGradient(0,by,0,by-fh);
-        g.addColorStop(0,'#CC2200');g.addColorStop(0.4,'#FF5C00');g.addColorStop(0.8,'#FFAA00');g.addColorStop(1,'#FFF3A0');
-        ctx.fillStyle=g;ctx.fill();
-        ctx.globalAlpha=p2*0.5;
+        ctx.globalAlpha=p2;
+        drawCartoonFlame(0,60,80,120,'#CC2200','#FF5500','#FFAA00');
         ctx.restore();
       }
 
@@ -932,7 +1036,7 @@ const FOCUS_APPS=[
 ];
 
 function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
-  const [phase,setPhase]=useState('setup'); // 'setup'|'active'|'done'
+  const [phase,setPhase]=useState('setup'); // 'setup'|'breathe'|'active'|'done'
   const [duration,setDuration]=useState(25);
   const [blocked,setBlocked]=useState(['instagram','youtube','tiktok']);
   const [timeLeft,setTimeLeft]=useState(0);
@@ -940,16 +1044,22 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
 
   const toggle=(id)=>setBlocked(b=>b.includes(id)?b.filter(x=>x!==id):[...b,id]);
 
-  const startFocus=()=>{
-    setTimeLeft(duration*60);
-    setPhase('active');
-    timerRef.current=setInterval(()=>{
-      setTimeLeft(p=>{
-        if(p<=1){clearInterval(timerRef.current);setPhase('done');return 0;}
-        return p-1;
-      });
-    },1000);
-  };
+  const startFocus=()=>{ setPhase('breathe'); };
+
+  useEffect(()=>{
+    if(phase!=='breathe')return;
+    const timer=setTimeout(()=>{
+      setTimeLeft(duration*60);
+      setPhase('active');
+      timerRef.current=setInterval(()=>{
+        setTimeLeft(p=>{
+          if(p<=1){clearInterval(timerRef.current);setPhase('done');return 0;}
+          return p-1;
+        });
+      },1000);
+    },20000);
+    return()=>clearTimeout(timer);
+  },[phase,duration]);
 
   const endFocus=()=>{clearInterval(timerRef.current);setPhase('setup');};
 
@@ -1022,6 +1132,51 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
         }}>Start Focus Session ⚡</button>
       </>}
 
+      {phase==='breathe'&&(()=>{
+        return(
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',paddingTop:32,textAlign:'center'}}>
+            <div style={{fontSize:13,color:'rgba(255,255,255,0.4)',letterSpacing:1,textTransform:'uppercase',marginBottom:32}}>Before you begin</div>
+
+            <div style={{position:'relative',width:180,height:180,marginBottom:32}}>
+              <div style={{
+                position:'absolute',inset:0,borderRadius:'50%',
+                background:'radial-gradient(circle,rgba(99,102,241,0.3),rgba(99,102,241,0.05))',
+                border:'2px solid rgba(99,102,241,0.4)',
+                animation:'breatheCircle 7s ease-in-out infinite',
+              }}/>
+              <div style={{
+                position:'absolute',inset:'20%',borderRadius:'50%',
+                background:'radial-gradient(circle,rgba(139,92,246,0.4),rgba(99,102,241,0.1))',
+                animation:'breatheCircle 7s ease-in-out infinite 0.3s',
+              }}/>
+              <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:4}}>
+                <span style={{fontSize:28}}>🧘</span>
+                <div style={{fontSize:11,color:'rgba(255,255,255,0.5)',letterSpacing:1}}>BREATHE</div>
+              </div>
+            </div>
+
+            <div style={{fontSize:16,fontWeight:600,color:'rgba(255,255,255,0.8)',marginBottom:8,animation:'breatheText 7s ease-in-out infinite'}}>
+              Breathe in... hold... breathe out
+            </div>
+            <div style={{fontSize:12,color:'rgba(255,255,255,0.35)',marginBottom:32}}>Session starts in 20 seconds</div>
+
+            <button onClick={()=>{
+              setTimeLeft(duration*60);
+              setPhase('active');
+              timerRef.current=setInterval(()=>{
+                setTimeLeft(p=>{
+                  if(p<=1){clearInterval(timerRef.current);setPhase('done');return 0;}
+                  return p-1;
+                });
+              },1000);
+            }} style={{
+              padding:'10px 24px',borderRadius:12,border:'1px solid rgba(99,102,241,0.3)',
+              background:'none',color:'rgba(255,255,255,0.5)',fontSize:13,cursor:'pointer',
+            }}>Skip breathing</button>
+          </div>
+        );
+      })()}
+
       {phase==='active'&&(
         <div style={{display:'flex',flexDirection:'column',alignItems:'center',paddingTop:32}}>
           {/* Big timer */}
@@ -1066,6 +1221,65 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
       </div>
 
       <BottomNav active="focus" onTasks={onTasks} onFocus={()=>{}} onProgress={onProgress} onLeaderboard={onLeaderboard}/>
+    </div>
+  );
+}
+
+// ── MISSED TASK ALERT ─────────────────────────────────────────────────────────
+function MissedTaskAlert({history,tasks,onDismiss}){
+  const [dismissed,setDismissed]=useState(false);
+  if(dismissed)return null;
+
+  const today=new Date().toISOString().slice(0,10);
+  const recent=[...history]
+    .filter(h=>h.date!==today)
+    .sort((a,b)=>b.date.localeCompare(a.date))
+    .slice(0,5);
+
+  if(recent.length<3)return null;
+
+  const taskMissCount={};
+  for(const entry of recent){
+    const missed=entry.missedTasks||[];
+    for(const t of missed){
+      taskMissCount[t]=(taskMissCount[t]||0)+1;
+    }
+  }
+
+  const chronic=Object.entries(taskMissCount)
+    .filter(([,count])=>count>=3)
+    .sort((a,b)=>b[1]-a[1]);
+
+  if(chronic.length===0)return null;
+
+  const [topTask,topCount]=chronic[0];
+
+  return(
+    <div style={{
+      margin:'10px 16px 0',padding:'12px 14px',
+      background:'rgba(239,68,68,0.10)',
+      border:'1px solid rgba(239,68,68,0.30)',
+      borderRadius:14,display:'flex',alignItems:'flex-start',gap:10,
+    }}>
+      <span style={{fontSize:18,flexShrink:0}}>⚠️</span>
+      <div style={{flex:1}}>
+        <div style={{fontSize:13,fontWeight:700,color:'#FCA5A5',marginBottom:3}}>
+          Missed {topCount} days in a row
+        </div>
+        <div style={{fontSize:12,color:'rgba(255,255,255,0.55)',lineHeight:1.5}}>
+          <strong style={{color:'rgba(255,255,255,0.8)'}}>{topTask}</strong> hasn't been done recently. This is hurting your consistency score.
+        </div>
+        <div style={{display:'flex',gap:8,marginTop:8}}>
+          <button onClick={()=>setDismissed(true)} style={{
+            fontSize:11,padding:'5px 12px',borderRadius:8,border:'1px solid rgba(239,68,68,0.35)',
+            background:'rgba(239,68,68,0.15)',color:'#FCA5A5',cursor:'pointer',fontWeight:600,
+          }}>Got it, I'll do it now</button>
+          <button onClick={()=>setDismissed(true)} style={{
+            fontSize:11,padding:'5px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.12)',
+            background:'none',color:'rgba(255,255,255,0.4)',cursor:'pointer',
+          }}>Dismiss</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1138,6 +1352,7 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
       const id=Date.now();
       setConfettis(p=>[...p,{id,x:cx,y:cy}]);
       setTimeout(()=>setConfettis(p=>p.filter(c=>c.id!==id)),1200);
+      playChime();
     }
     setTasks(prev=>prev.map(t=>t.id===task.id?{...t,status:t.status==="done"?"upcoming":"done"}:t));
   };
@@ -1283,6 +1498,8 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
             </div>
           </div>
         )}
+
+        <MissedTaskAlert history={history} tasks={tasks} onDismiss={()=>{}}/>
 
         {/* Filter + Add */}
         <div style={{padding:"12px 16px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -1651,12 +1868,12 @@ function LeaderboardScreen({streak,rank,userAvatar,userName,onBack,onTasks,onFoc
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
           <div>
             <h1 style={{color:"#F1F5F9",fontSize:"22px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>Leaderboard</h1>
-            <p style={{color:"rgba(255,255,255,0.4)",fontSize:"12px",marginTop:"3px"}}>Ranked by projected AIR</p>
+            <p style={{color:"rgba(255,255,255,0.4)",fontSize:"12px",marginTop:"3px"}}>Ranked by Consistency Score</p>
           </div>
           <div style={{background:"rgba(251,191,36,0.1)",border:"1px solid rgba(251,191,36,0.25)",
             borderRadius:"12px",padding:"8px 14px",textAlign:"center"}}>
             <p style={{color:"#FBBF24",fontSize:"18px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>#{rank}</p>
-            <p style={{color:"rgba(251,191,36,0.5)",fontSize:"9px",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>your rank</p>
+            <p style={{color:"rgba(251,191,36,0.5)",fontSize:"9px",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.05em"}}>Consistency Score</p>
           </div>
         </div>
       </div>
@@ -1690,7 +1907,7 @@ function LeaderboardScreen({streak,rank,userAvatar,userName,onBack,onTasks,onFoc
               <div style={{textAlign:"right",flexShrink:0}}>
                 <p style={{color:u.rank<100?"#4ADE80":u.rank<500?"#FBBF24":"#F87171",
                   fontSize:"14px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>#{u.rank}</p>
-                <p style={{color:"rgba(255,255,255,0.3)",fontSize:"9px",marginTop:"2px",textTransform:"uppercase",letterSpacing:"0.05em"}}>AIR</p>
+                <p style={{color:"rgba(255,255,255,0.3)",fontSize:"9px",marginTop:"2px",textTransform:"uppercase",letterSpacing:"0.05em"}}>Score</p>
               </div>
             </div>
           );
@@ -1714,7 +1931,7 @@ function DevPanel({onClose,tasks,setTasks,history,setHistory,streak,setStreak}){
     const doneCount=study.filter(t=>t.status==="done").length||Math.floor(study.length*(0.6+Math.random()*0.4));
     const allDone=doneCount===study.length;
     const pct=study.length?Math.round((doneCount/study.length)*100):0;
-    const snap={date:today,allDone,pct,missedCount:study.length-doneCount,skippedTask:null};
+    const snap={date:today,allDone,pct,missedCount:study.length-doneCount,skippedTask:null,missedTasks:tasks.filter(tk=>tk.status!=='done').map(tk=>tk.title)};
     setHistory(prev=>{
       const upd=[...prev.filter(h=>h.date!==today),snap];
       save("tint_hist3",upd);
@@ -1774,6 +1991,7 @@ function DevPanel({onClose,tasks,setTasks,history,setHistory,streak,setStreak}){
 // ── ROOT ──────────────────────────────────────────────────────────────────────
 export default function TINT(){
   useCSS();
+  useEffect(()=>{ requestDailyReminder(); },[]);
   const [screen,setScreen]        = useState("cover");
   const [userName,setUserName]    = useState(()=>load("tint_name",""));
   const [userAvatar,setUserAvatar]= useState(()=>load("tint_avatar","⭐"));
@@ -1812,7 +2030,7 @@ export default function TINT(){
     const allDone=doneStudy.length===study.length;
     const pct=Math.round((doneStudy.length/study.length)*100);
     const skipped=study.filter(t=>t.status==="missed");
-    const snap={date:today,allDone,missedCount:skipped.length,pct,skippedTask:skipped[0]?.title||null};
+    const snap={date:today,allDone,missedCount:skipped.length,pct,skippedTask:skipped[0]?.title||null,missedTasks:tasks.filter(tk=>tk.status!=='done').map(tk=>tk.title)};
     setHistoryRaw(prev=>{
       const upd=[...prev.filter(h=>h.date!==today),snap];
       save("tint_hist3",upd);
@@ -1865,9 +2083,9 @@ export default function TINT(){
       const total=tasks.length||1;
       const pct=Math.round((done/total)*100);
       const missedCount=total-done;
-      snap={date,allDone:missedCount===0,pct,missedCount,skippedTask:null};
+      snap={date,allDone:missedCount===0,pct,missedCount,skippedTask:null,missedTasks:tasks.filter(tk=>tk.status!=='done').map(tk=>tk.title)};
     }else{
-      snap={date,allDone:false,pct:0,missedCount:tasks.length,skippedTask:null};
+      snap={date,allDone:false,pct:0,missedCount:tasks.length,skippedTask:null,missedTasks:tasks.map(tk=>tk.title)};
     }
     const updHistory=[...history.filter(h=>h.date!==date),snap];
     save("tint_hist3",updHistory);
