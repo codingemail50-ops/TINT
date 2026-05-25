@@ -245,6 +245,17 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;overflow:hidden;}
   40%    {transform:scale(1.35);opacity:1;}
   60%    {transform:scale(1.35);opacity:1;}
 }
+@keyframes flamePlay{
+  0%{opacity:1;}
+  16.66%{opacity:0;}
+  100%{opacity:0;}
+}
+.fl-f1{animation:flamePlay 0.6s steps(1) infinite;animation-delay:0.0s;}
+.fl-f2{animation:flamePlay 0.6s steps(1) infinite;animation-delay:0.1s;}
+.fl-f3{animation:flamePlay 0.6s steps(1) infinite;animation-delay:0.2s;}
+.fl-f4{animation:flamePlay 0.6s steps(1) infinite;animation-delay:0.3s;}
+.fl-f5{animation:flamePlay 0.6s steps(1) infinite;animation-delay:0.4s;}
+.fl-f6{animation:flamePlay 0.6s steps(1) infinite;animation-delay:0.5s;}
 @keyframes breatheText{
   0%,100%{opacity:0.5;}
   20%    {opacity:1;content:'Breathe in...';}
@@ -358,102 +369,53 @@ function Confetti({x,y}){
   );
 }
 
-// ── FLAME ICON — cartoon reference-style with 3 bezier layers ────────────────
+// ── FLAME ICON — SVG frame-by-frame cartoon flame ────────────────────────────
 function FlameIcon({streak,size=28}){
-  const ref=useRef(null);
-  const rafRef=useRef(null);
-  useEffect(()=>{
-    const canvas=ref.current;
-    if(!canvas)return;
-    const dpr=Math.min(window.devicePixelRatio||1,2);
-    canvas.width=Math.round(size*dpr);
-    canvas.height=Math.round(size*1.55*dpr);
-    const ctx=canvas.getContext('2d');
-    ctx.scale(dpr,dpr);
-    const W=size, H=size*1.55;
-
-    const tier=Math.min(Math.floor(streak/3),8);
-    const TIERS=[
-      ['#CC5500','#FF8C00','#FFD700'],
-      ['#CC2200','#FF5500','#FFAA00'],
-      ['#880000','#CC1100','#FF4400'],
-      ['#880033','#CC0055','#FF4499'],
-      ['#440088','#8800BB','#CC66FF'],
-      ['#005500','#008800','#44FF44'],
-      ['#001188','#0044EE','#66AAFF'],
-      ['#000044','#001177','#2255AA'],
-      ['#555555','#999999','#FFFFFF'],
-    ];
-    const [c1,c2,c3]=TIERS[tier];
-
-    let t=0;
-    function w(seed,freq,amp=1){
-      return(Math.sin(t*freq+seed)*0.6+Math.sin(t*freq*1.7+seed*2.1)*0.4)*amp;
-    }
-
-    function drawLayer(cx,by,fw,fh,color1,color2,animate){
-      const sw=animate?w(0,1.8,fw*0.07):0;
-      const t1=animate?w(1,2.2,fh*0.04):0;
-      const dip=animate?w(2,2.7,fw*0.05):0;
-      const tipW=animate?w(3,1.5,fw*0.05):0;
-
-      ctx.beginPath();
-      ctx.moveTo(cx-fw*0.46,by);
-
-      ctx.bezierCurveTo(
-        cx-fw*0.70, by-fh*0.12+t1*0.3,
-        cx-fw*0.76, by-fh*0.35+t1,
-        cx-fw*0.65, by-fh*0.46+t1
-      );
-
-      ctx.bezierCurveTo(
-        cx-fw*0.50+dip, by-fh*0.54,
-        cx-fw*0.18+dip, by-fh*0.56,
-        cx-fw*0.28,     by-fh*0.63
-      );
-
-      ctx.bezierCurveTo(
-        cx-fw*0.40, by-fh*0.72,
-        cx-fw*0.22+tipW, by-fh*0.88,
-        cx+fw*0.02+sw,   by-fh
-      );
-
-      ctx.bezierCurveTo(
-        cx+fw*0.22+sw, by-fh*0.86,
-        cx+fw*0.52,    by-fh*0.58,
-        cx+fw*0.58,    by-fh*0.38
-      );
-      ctx.bezierCurveTo(
-        cx+fw*0.62, by-fh*0.20,
-        cx+fw*0.56, by-fh*0.05,
-        cx+fw*0.46, by
-      );
-      ctx.arc(cx,by,fw*0.46,0,Math.PI);
-
-      const g=ctx.createLinearGradient(cx,by,cx,by-fh);
-      g.addColorStop(0,color1);
-      g.addColorStop(0.5,color2);
-      g.addColorStop(1,'rgba(255,255,220,0.9)');
-      ctx.fillStyle=g;
-      ctx.fill();
-    }
-
-    function frame(){
-      ctx.clearRect(0,0,W,H);
-      const cx=W/2, by=H-4, fw=W*0.86, fh=H*0.88;
-
-      drawLayer(cx,by,fw,fh,c1,c2,true);
-      drawLayer(cx,by,fw*0.68,fh*0.78,c2,c3,true);
-      drawLayer(cx,by,fw*0.40,fh*0.52,c3,'rgba(255,255,200,0.95)',true);
-
-      t+=0.016;
-      rafRef.current=requestAnimationFrame(frame);
-    }
-    rafRef.current=requestAnimationFrame(frame);
-    return()=>cancelAnimationFrame(rafRef.current);
-  },[streak,size]);
-
-  return <canvas ref={ref} style={{width:size,height:size*1.55,display:'block',flexShrink:0}}/>;
+  const tier=Math.min(Math.floor((streak||0)/3),8);
+  const TIERS=[
+    {oc:'#FF6600',ic:'#FFCC00'},
+    {oc:'#FF4A00',ic:'#FFA500'},
+    {oc:'#CC2200',ic:'#FF5500'},
+    {oc:'#CC0055',ic:'#FF44AA'},
+    {oc:'#8800BB',ic:'#DD66FF'},
+    {oc:'#007722',ic:'#44FF88'},
+    {oc:'#0044CC',ic:'#55BBFF'},
+    {oc:'#110077',ic:'#3355CC'},
+    {oc:'#555555',ic:'#FFFFFF'},
+  ];
+  const {oc,ic}=TIERS[tier];
+  const h=Math.round(size*1.4);
+  const svgStyle={position:'absolute',top:0,left:0,width:'100%',height:'100%',opacity:0};
+  return(
+    <div style={{position:'relative',width:size,height:h,flexShrink:0}}>
+      <svg className="fl-f1" style={svgStyle} viewBox="0 0 400 400">
+        <path d="M160,280 C130,260 120,210 140,180 C130,170 125,155 135,145 C145,135 155,145 155,155 C165,200 200,200 190,160 C230,100 210,130 250,160 C260,190 230,220 260,250 C290,270 240,310 190,320 C170,310 165,295 160,280 Z" fill={oc}/>
+        <path d="M175,270 C160,250 160,220 175,205 C185,190 200,195 210,210 C225,230 220,260 210,280 C190,295 185,285 175,270 Z" fill={ic}/>
+      </svg>
+      <svg className="fl-f2" style={svgStyle} viewBox="0 0 400 400">
+        <path d="M155,275 C125,250 125,200 145,175 C140,150 155,130 165,140 C170,165 185,185 200,170 C220,120 240,110 245,150 C250,180 235,200 250,230 C275,265 245,305 195,315 C170,305 160,290 155,275 Z" fill={oc}/>
+        <path d="M170,265 C155,245 165,210 180,200 C195,190 210,210 215,225 C220,250 210,275 195,285 C180,285 175,275 170,265 Z" fill={ic}/>
+      </svg>
+      <svg className="fl-f3" style={svgStyle} viewBox="0 0 400 400">
+        <path d="M135,160 C130,150 135,140 145,140 C155,145 150,155 140,165 Z" fill={oc}/>
+        <path d="M185,130 C190,100 215,90 220,120 C225,145 250,155 240,185 C230,215 255,245 235,275 C215,305 165,310 155,280 C145,245 175,215 170,190 Z" fill={oc}/>
+        <path d="M180,260 C165,235 175,205 190,195 C205,185 220,210 220,235 C220,260 200,280 190,275 Z" fill={ic}/>
+      </svg>
+      <svg className="fl-f4" style={svgStyle} viewBox="0 0 400 400">
+        <path d="M140,150 C135,140 140,130 150,135 C155,145 150,155 142,158 Z" fill={ic}/>
+        <path d="M190,140 C195,110 210,95 225,115 C230,140 240,160 250,195 C260,225 240,255 220,280 C190,305 155,290 160,260 C165,230 180,210 180,180 Z" fill={oc}/>
+        <path d="M185,250 C175,230 180,200 195,195 C210,190 215,220 210,245 C205,265 195,265 185,250 Z" fill={ic}/>
+      </svg>
+      <svg className="fl-f5" style={svgStyle} viewBox="0 0 400 400">
+        <path d="M195,150 C190,120 215,105 230,125 C235,145 225,175 245,205 C255,235 245,265 215,285 C185,305 150,285 165,255 C175,235 170,215 185,190 Z" fill={oc}/>
+        <path d="M185,250 C175,235 185,210 195,205 C205,200 215,225 215,245 C210,265 195,265 185,250 Z" fill={ic}/>
+      </svg>
+      <svg className="fl-f6" style={svgStyle} viewBox="0 0 400 400">
+        <path d="M165,270 C145,250 145,215 160,190 C165,170 160,150 175,155 C185,175 195,195 210,185 C225,140 240,130 245,170 C250,195 235,215 250,245 C265,275 230,305 185,310 C170,300 170,285 165,270 Z" fill={oc}/>
+        <path d="M175,265 C165,250 170,220 185,210 C200,200 210,225 215,240 C215,260 195,275 185,275 Z" fill={ic}/>
+      </svg>
+    </div>
+  );
 }
 
 // ── COVER SCREEN ──────────────────────────────────────────────────────────────
