@@ -180,11 +180,8 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;overflow:hidden;}
   background:linear-gradient(90deg,transparent,rgba(99,102,241,0.8),rgba(139,92,246,0.6),transparent);}
 
 @keyframes containerSpin{
-  0%  {transform:rotate(0deg)   scale(1);}
-  25% {transform:rotate(90deg)  scale(0.92);}
-  50% {transform:rotate(180deg) scale(1);}
-  75% {transform:rotate(270deg) scale(0.92);}
-  100%{transform:rotate(360deg) scale(1);}
+  from{transform:rotate(0deg);}
+  to{transform:rotate(360deg);}
 }
 @keyframes quoteIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
 @keyframes dotWave{
@@ -384,36 +381,86 @@ function FlameIcon({streak,size=28}){
     {oc:'#555555',ic:'#FFFFFF'},
   ];
   const {oc,ic}=TIERS[tier];
-  const h=Math.round(size*1.4);
+  const h=Math.round(size*1.6);
   const svgStyle={position:'absolute',top:0,left:0,width:'100%',height:'100%',opacity:0};
+
+  // Each frame: outer orange body with hook arm + mask-punched hole + yellow core + sparks
+  // viewBox 0 0 200 280. Base center ~(100,268). Hook arm goes upper-right then curls left.
+  // Mask punches out the enclosed space inside the curl.
+  const frames=[
+    // Frame 1 — neutral
+    {
+      body:"M52,268 C30,252 26,212 38,182 C24,164 22,142 36,132 C50,122 66,128 72,142 C80,155 82,170 88,182 C96,162 104,138 108,114 C112,92 112,72 106,58 C100,46 92,42 86,46 C80,50 78,60 82,70 C86,80 94,84 102,80 C110,76 114,64 110,52 C106,42 98,36 90,38 C98,32 108,34 114,44 C120,54 120,70 116,86 C124,68 132,58 138,70 C142,82 136,100 130,118 C138,104 148,96 152,110 C156,124 148,146 140,164 C150,152 162,148 164,164 C166,180 152,200 140,214 C152,216 164,226 160,246 C156,262 138,272 118,274 C100,276 72,274 52,268 Z",
+      hole:{cx:104,cy:68,rx:16,ry:12,rot:-10},
+      core:"M70,240 C58,220 60,194 74,184 C88,174 104,180 112,196 C120,212 116,238 104,248 C90,254 78,252 70,240 Z",
+      s1:{cx:55,cy:148,rx:8,ry:11},
+      s2:{cx:45,cy:128,rx:5,ry:7},
+    },
+    // Frame 2 — leans right
+    {
+      body:"M50,268 C28,250 24,210 38,178 C22,160 20,136 36,126 C50,118 68,124 74,140 C84,158 84,174 90,186 C100,164 108,138 112,112 C116,88 116,66 108,52 C102,42 94,38 88,42 C82,46 80,58 86,68 C90,78 100,82 108,76 C116,70 118,58 112,48 C120,42 130,46 134,58 C138,72 134,92 128,110 C136,96 148,90 152,104 C156,118 148,140 140,158 C150,146 162,142 164,158 C168,176 154,198 142,212 C154,214 166,224 162,244 C158,260 140,272 120,274 C100,276 70,274 50,268 Z",
+      hole:{cx:106,cy:62,rx:15,ry:11,rot:-8},
+      core:"M72,238 C60,218 62,192 76,182 C90,172 106,178 114,194 C122,210 118,236 106,246 C92,252 80,250 72,238 Z",
+      s1:{cx:44,cy:140,rx:9,ry:12},
+      s2:{cx:36,cy:118,rx:6,ry:8},
+    },
+    // Frame 3 — higher tongue, spark higher
+    {
+      body:"M54,268 C30,252 26,210 40,180 C25,162 22,138 38,128 C52,120 68,126 74,142 C82,158 82,172 86,184 C94,162 102,136 106,108 C110,84 110,62 102,48 C96,38 88,34 82,38 C76,42 76,54 80,64 C86,76 96,78 104,72 C112,66 114,52 108,42 C116,36 126,40 130,54 C134,68 130,90 124,108 C132,92 144,86 148,100 C154,116 144,140 136,158 C148,146 160,142 162,160 C164,178 150,200 138,214 C150,218 162,228 158,248 C154,264 136,274 116,276 C96,276 68,274 54,268 Z",
+      hole:{cx:100,cy:56,rx:15,ry:11,rot:-12},
+      core:"M68,240 C56,220 58,192 72,182 C86,172 104,178 112,196 C120,214 116,240 104,250 C90,256 76,252 68,240 Z",
+      s1:{cx:50,cy:135,rx:7,ry:10},
+      s2:{cx:40,cy:112,rx:5,ry:7},
+    },
+    // Frame 4 — curl tighter, leans left
+    {
+      body:"M50,268 C26,250 22,208 36,178 C20,158 18,134 34,124 C48,114 66,122 72,138 C80,154 80,170 84,182 C92,160 100,134 104,108 C108,84 108,64 100,50 C94,40 86,36 80,40 C74,46 74,58 80,68 C86,78 96,80 104,72 C110,64 110,52 104,44 C98,36 90,34 84,38 C92,30 102,34 108,48 C114,62 112,84 106,104 C114,88 126,82 132,96 C136,112 128,136 120,154 C130,142 144,138 146,156 C148,174 134,196 122,210 C136,212 148,224 144,244 C140,262 122,272 102,274 C82,276 62,272 50,268 Z",
+      hole:{cx:98,cy:60,rx:14,ry:10,rot:-14},
+      core:"M66,238 C54,218 56,190 70,180 C84,170 102,176 110,194 C118,212 114,238 102,248 C88,254 74,250 66,238 Z",
+      s1:{cx:42,cy:130,rx:8,ry:11},
+      s2:{cx:34,cy:110,rx:5,ry:7},
+    },
+    // Frame 5 — taller
+    {
+      body:"M56,268 C32,252 28,212 42,182 C26,162 24,138 40,128 C54,120 70,126 76,142 C84,158 84,174 90,188 C98,164 106,136 110,108 C114,82 112,60 104,46 C98,36 90,32 84,36 C78,42 78,54 84,66 C90,78 100,80 108,72 C114,64 116,50 110,40 C118,34 128,40 132,54 C136,70 130,92 124,112 C132,96 144,90 148,106 C152,122 142,146 134,164 C146,150 158,148 160,166 C162,184 148,204 136,218 C148,222 160,232 156,252 C152,268 134,276 114,276 C94,276 68,274 56,268 Z",
+      hole:{cx:102,cy:54,rx:16,ry:12,rot:-10},
+      core:"M72,242 C60,222 62,194 76,184 C90,174 108,180 116,198 C124,216 118,242 106,252 C92,258 78,254 72,242 Z",
+      s1:{cx:52,cy:144,rx:9,ry:13},
+      s2:{cx:42,cy:122,rx:6,ry:8},
+    },
+    // Frame 6 — wide body
+    {
+      body:"M48,270 C24,252 20,208 36,176 C18,156 16,130 34,120 C50,112 68,120 76,138 C86,156 86,172 90,186 C98,162 106,134 110,106 C114,80 112,58 104,44 C98,34 90,30 84,34 C78,40 78,52 84,64 C90,76 100,78 108,70 C116,62 116,50 110,40 C118,34 128,38 132,52 C136,68 130,92 122,112 C132,94 146,88 150,104 C154,120 144,146 134,164 C146,150 160,146 162,166 C164,186 148,208 134,222 C148,226 162,238 156,258 C150,274 130,280 108,280 C86,278 64,276 48,270 Z",
+      hole:{cx:102,cy:58,rx:15,ry:11,rot:-10},
+      core:"M66,242 C52,220 56,192 70,180 C86,170 104,178 112,196 C122,216 116,244 104,254 C88,260 74,256 66,242 Z",
+      s1:{cx:40,cy:136,rx:8,ry:11},
+      s2:{cx:30,cy:114,rx:5,ry:7},
+    },
+  ];
+
   return(
     <div style={{position:'relative',width:size,height:h,flexShrink:0}}>
-      <svg className="fl-f1" style={svgStyle} viewBox="0 0 400 400">
-        <path d="M160,280 C130,260 120,210 140,180 C130,170 125,155 135,145 C145,135 155,145 155,155 C165,200 200,200 190,160 C230,100 210,130 250,160 C260,190 230,220 260,250 C290,270 240,310 190,320 C170,310 165,295 160,280 Z" fill={oc}/>
-        <path d="M175,270 C160,250 160,220 175,205 C185,190 200,195 210,210 C225,230 220,260 210,280 C190,295 185,285 175,270 Z" fill={ic}/>
-      </svg>
-      <svg className="fl-f2" style={svgStyle} viewBox="0 0 400 400">
-        <path d="M155,275 C125,250 125,200 145,175 C140,150 155,130 165,140 C170,165 185,185 200,170 C220,120 240,110 245,150 C250,180 235,200 250,230 C275,265 245,305 195,315 C170,305 160,290 155,275 Z" fill={oc}/>
-        <path d="M170,265 C155,245 165,210 180,200 C195,190 210,210 215,225 C220,250 210,275 195,285 C180,285 175,275 170,265 Z" fill={ic}/>
-      </svg>
-      <svg className="fl-f3" style={svgStyle} viewBox="0 0 400 400">
-        <path d="M135,160 C130,150 135,140 145,140 C155,145 150,155 140,165 Z" fill={oc}/>
-        <path d="M185,130 C190,100 215,90 220,120 C225,145 250,155 240,185 C230,215 255,245 235,275 C215,305 165,310 155,280 C145,245 175,215 170,190 Z" fill={oc}/>
-        <path d="M180,260 C165,235 175,205 190,195 C205,185 220,210 220,235 C220,260 200,280 190,275 Z" fill={ic}/>
-      </svg>
-      <svg className="fl-f4" style={svgStyle} viewBox="0 0 400 400">
-        <path d="M140,150 C135,140 140,130 150,135 C155,145 150,155 142,158 Z" fill={ic}/>
-        <path d="M190,140 C195,110 210,95 225,115 C230,140 240,160 250,195 C260,225 240,255 220,280 C190,305 155,290 160,260 C165,230 180,210 180,180 Z" fill={oc}/>
-        <path d="M185,250 C175,230 180,200 195,195 C210,190 215,220 210,245 C205,265 195,265 185,250 Z" fill={ic}/>
-      </svg>
-      <svg className="fl-f5" style={svgStyle} viewBox="0 0 400 400">
-        <path d="M195,150 C190,120 215,105 230,125 C235,145 225,175 245,205 C255,235 245,265 215,285 C185,305 150,285 165,255 C175,235 170,215 185,190 Z" fill={oc}/>
-        <path d="M185,250 C175,235 185,210 195,205 C205,200 215,225 215,245 C210,265 195,265 185,250 Z" fill={ic}/>
-      </svg>
-      <svg className="fl-f6" style={svgStyle} viewBox="0 0 400 400">
-        <path d="M165,270 C145,250 145,215 160,190 C165,170 160,150 175,155 C185,175 195,195 210,185 C225,140 240,130 245,170 C250,195 235,215 250,245 C265,275 230,305 185,310 C170,300 170,285 165,270 Z" fill={oc}/>
-        <path d="M175,265 C165,250 170,220 185,210 C200,200 210,225 215,240 C215,260 195,275 185,275 Z" fill={ic}/>
-      </svg>
+      {frames.map((f,i)=>{
+        const maskId=`fm${i}_${tier}`;
+        return(
+          <svg key={i} className={`fl-f${i+1}`} style={svgStyle} viewBox="0 0 200 280">
+            <defs>
+              <mask id={maskId}>
+                <rect width="200" height="280" fill="white"/>
+                <ellipse cx={f.hole.cx} cy={f.hole.cy} rx={f.hole.rx} ry={f.hole.ry}
+                  transform={`rotate(${f.hole.rot},${f.hole.cx},${f.hole.cy})`} fill="black"/>
+              </mask>
+            </defs>
+            {/* Outer orange body with hook, hole punched by mask */}
+            <path d={f.body} fill={oc} mask={`url(#${maskId})`}/>
+            {/* Yellow core */}
+            <path d={f.core} fill={ic}/>
+            {/* Floating sparks */}
+            <ellipse cx={f.s1.cx} cy={f.s1.cy} rx={f.s1.rx} ry={f.s1.ry} fill={oc}/>
+            <ellipse cx={f.s2.cx} cy={f.s2.cy} rx={f.s2.rx} ry={f.s2.ry} fill={ic}/>
+          </svg>
+        );
+      })}
     </div>
   );
 }
@@ -466,7 +513,7 @@ function CoverScreen({onDone}){
             display:"inline-flex",alignItems:"baseline",
             gap:settled?"10px":spinning?"8px":"3px",
             transition:"gap 1.6s cubic-bezier(0.4,0,0.2,1)",
-            animation:spinning?"containerSpin 1.6s cubic-bezier(0.25,0.46,0.45,0.94) forwards":"none",
+            animation:spinning?"containerSpin 1.6s linear forwards":"none",
           }}>
             {LETTERS.map((l,i)=>(
               <div key={i} style={{display:"inline-flex",alignItems:"baseline"}}>
@@ -743,99 +790,12 @@ function WeekBar({history,selectedDate,onSelectDate}){
 
 // ── ALL-DONE POPUP — cinematic flame buildup ──────────────────────────────────
 function AllDonePopup({streak,userName,onClose}){
-  const fs=flameStyle(streak);
-  const [phase,setPhase]=useState("trails"); // trails → form → show
+  const [phase,setPhase]=useState("spiral");
   useEffect(()=>{
-    const t1=setTimeout(()=>setPhase("form"),1300);
-    const t2=setTimeout(()=>setPhase("show"),2500);
+    const t1=setTimeout(()=>setPhase("burst"),1200);
+    const t2=setTimeout(()=>setPhase("show"),2200);
     return()=>{clearTimeout(t1);clearTimeout(t2);};
   },[]);
-
-  const cvRef=useRef(null);
-  useEffect(()=>{
-    if(phase!=='trails'&&phase!=='form')return;
-    const cv=cvRef.current;
-    if(!cv)return;
-    const ctx=cv.getContext('2d');
-    const W=320,H=320;
-    cv.width=W;cv.height=H;
-    let t2=0,raf;
-    const cx=W/2,cy=H/2;
-    const NUM=6;
-
-    function drawTeardrop(x,y,r,angle,alpha,col){
-      ctx.save();
-      ctx.globalAlpha=alpha;
-      ctx.translate(x,y);
-      ctx.rotate(angle);
-      ctx.beginPath();
-      ctx.arc(0,r*0.15,r,0,Math.PI*2);
-      ctx.moveTo(-r*0.5,r*0.1);
-      ctx.bezierCurveTo(-r*0.25,-r*0.85,r*0.25,-r*0.85,r*0.5,r*0.1);
-      ctx.fillStyle=col;
-      ctx.fill();
-      ctx.restore();
-    }
-
-    function drawCartoonFlame(fcx,fby,fw,fh,col1,col2,col3){
-      function layer(lfw,lfh,lc1,lc2){
-        ctx.beginPath();
-        ctx.moveTo(fcx-lfw*0.46,fby);
-        ctx.bezierCurveTo(fcx-lfw*0.70,fby-lfh*0.12,fcx-lfw*0.76,fby-lfh*0.35,fcx-lfw*0.65,fby-lfh*0.46);
-        ctx.bezierCurveTo(fcx-lfw*0.50,fby-lfh*0.54,fcx-lfw*0.18,fby-lfh*0.56,fcx-lfw*0.28,fby-lfh*0.63);
-        ctx.bezierCurveTo(fcx-lfw*0.40,fby-lfh*0.72,fcx-lfw*0.22,fby-lfh*0.88,fcx,fby-lfh);
-        ctx.bezierCurveTo(fcx+lfw*0.22,fby-lfh*0.86,fcx+lfw*0.52,fby-lfh*0.58,fcx+lfw*0.58,fby-lfh*0.38);
-        ctx.bezierCurveTo(fcx+lfw*0.62,fby-lfh*0.20,fcx+lfw*0.56,fby-lfh*0.05,fcx+lfw*0.46,fby);
-        ctx.arc(fcx,fby,lfw*0.46,0,Math.PI);
-        const g=ctx.createLinearGradient(fcx,fby,fcx,fby-lfh);
-        g.addColorStop(0,lc1);g.addColorStop(0.5,lc2);g.addColorStop(1,'rgba(255,255,220,0.9)');
-        ctx.fillStyle=g;ctx.fill();
-      }
-      layer(fw,fh,col1,col2);
-      layer(fw*0.68,fh*0.78,col2,col3);
-      layer(fw*0.40,fh*0.52,col3,'rgba(255,255,200,0.95)');
-    }
-
-    function frame(){
-      ctx.clearRect(0,0,W,H);
-      const dur=phase==='trails'?1.3:2.5;
-      const progress=Math.min(t2/dur,1);
-
-      if(phase==='trails'){
-        for(let i=0;i<NUM;i++){
-          const baseAngle=(i/NUM)*Math.PI*2;
-          const spiralAngle=baseAngle+progress*Math.PI*1.5;
-          const radius=130*(1-progress*0.9);
-          const x=cx+Math.cos(spiralAngle)*radius;
-          const y=cy+Math.sin(spiralAngle)*radius;
-          const alpha=progress<0.1?progress/0.1:1;
-          const r=8+progress*6;
-          const hue=i%2===0?'#FF5C00':'#FFD100';
-          drawTeardrop(x,y,r,spiralAngle+Math.PI/2,alpha,hue);
-        }
-      } else {
-        const p2=Math.min((t2-0)/1.2,1);
-        const scale=0.3+p2*0.7;
-        ctx.save();
-        ctx.translate(cx,cy+30);
-        ctx.scale(scale,scale);
-        ctx.globalAlpha=p2;
-        drawCartoonFlame(0,60,80,120,'#CC2200','#FF5500','#FFAA00');
-        ctx.restore();
-      }
-
-      t2+=0.016;
-      raf=requestAnimationFrame(frame);
-    }
-    raf=requestAnimationFrame(frame);
-    return()=>cancelAnimationFrame(raf);
-  },[phase]);
-
-  const [particles]=useState(()=>Array.from({length:22},(_,i)=>({
-    id:i,x:Math.random()*100,delay:Math.random()*2.5,
-    dur:2.5+Math.random()*4,size:3+Math.random()*8,
-    color:[fs.c1,fs.c2,"#FFF9C4","rgba(255,220,120,0.9)"][i%4],
-  })));
 
   const displayStreak=Math.max(1,streak);
   const msg=displayStreak>=14
@@ -846,79 +806,76 @@ function AllDonePopup({streak,userName,onClose}){
     ?`${displayStreak} days strong. The habit is forming.`
     :`First day done! Come back tomorrow to start your streak.`;
 
-  return(
-    <div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(4,6,14,0.98)",
-      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-      overflow:"hidden",animation:"fadeIn 0.25s ease forwards"}}>
+  // 6 small flames spiral in from edges
+  const spiralFlames=Array.from({length:6},(_,i)=>{
+    const angle=(i/6)*360;
+    const dist=phase==='spiral'?130:0;
+    const rot=phase==='spiral'?angle:0;
+    const scale=phase==='spiral'?0.6:1;
+    return{angle,dist,rot,scale,delay:i*0.08};
+  });
 
-      {/* Phase 1 & 2: canvas spiral animation */}
-      {(phase==='trails'||phase==='form')&&(
-        <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-          <canvas ref={cvRef} style={{width:320,height:320}}/>
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(4,6,14,0.97)",
+      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+      overflow:"hidden",animation:"fadeIn 0.2s ease forwards"}}>
+
+      {/* Spiral flames converging */}
+      {phase!=='show'&&(
+        <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',pointerEvents:'none'}}>
+          {spiralFlames.map((f,i)=>{
+            const rad=f.angle*Math.PI/180;
+            const x=Math.cos(rad)*f.dist;
+            const y=Math.sin(rad)*f.dist;
+            return(
+              <div key={i} style={{
+                position:'absolute',
+                transform:`translate(${phase==='spiral'?x:0}px,${phase==='spiral'?y:0}px) rotate(${phase==='spiral'?f.angle:0}deg) scale(${phase==='burst'?1.4:0.7})`,
+                transition:`transform ${phase==='spiral'?0.8:0.4}s cubic-bezier(0.22,1,0.36,1) ${f.delay}s, opacity 0.3s ease ${f.delay}s`,
+                opacity:phase==='show'?0:1,
+              }}>
+                <FlameIcon streak={streak} size={phase==='burst'?36:22}/>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Phase 2+3: flame forms then content reveals */}
-      {phase!=="trails"&&(
-        <>
-          {/* Glow ring on formation */}
-          {phase==="form"&&(
-            <div style={{position:"absolute",width:"180px",height:"180px",borderRadius:"50%",
-              border:`2px solid ${fs.c2}`,
-              boxShadow:`0 0 40px 10px ${fs.glow},inset 0 0 30px ${fs.glow}`,
-              animation:"glowRing 0.75s ease forwards",pointerEvents:"none"}}/>
-          )}
-          {/* Ambient pulse */}
-          <div style={{position:"absolute",width:"360px",height:"360px",borderRadius:"50%",
-            background:`radial-gradient(circle,${fs.glow.replace(/[\d.]+\)$/,"0.22)")},transparent 70%)`,
-            animation:"pulseGlow 2s ease-in-out infinite",pointerEvents:"none"}}/>
-
-          <div style={{position:"relative",textAlign:"center",padding:"0 32px",maxWidth:"360px",width:"100%"}}>
-            {/* Flame — forms on entry, then loops */}
-            {phase==="form"&&(
-              <div style={{marginBottom:"22px",
-                animation:"flameFormIn 0.85s cubic-bezier(0.34,1.56,0.64,1) forwards"}}>
-                <FlameIcon streak={streak} size={96}/>
-              </div>
-            )}
-            {phase==="show"&&(
-              <div style={{marginBottom:"22px",
-                animation:"flamePop 1.1s ease-in-out infinite"}}>
-                <FlameIcon streak={streak} size={96}/>
-              </div>
-            )}
-
-            {/* Content — only after show phase */}
-            {phase==="show"&&(
-              <>
-                {particles.map(p=>(
-                  <div key={p.id} style={{position:"fixed",left:p.x+"%",bottom:"-20px",
-                    width:p.size,height:p.size,borderRadius:"50%",
-                    background:p.color,boxShadow:`0 0 8px ${p.color}`,
-                    animation:`floatUp ${p.dur}s ease-in ${p.delay}s infinite`,opacity:0.85}}/>
-                ))}
-                <div style={{animation:"contentReveal 0.55s cubic-bezier(0.34,1.56,0.64,1) forwards"}}>
-                  <div style={{display:"inline-flex",alignItems:"center",gap:"8px",
-                    background:`${fs.c1}28`,border:`1px solid ${fs.c1}60`,
-                    borderRadius:"100px",padding:"8px 22px",marginBottom:"20px"}}>
-                    <span style={{color:fs.c2,fontSize:"28px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{displayStreak}</span>
-                    <span style={{color:fs.c2,fontSize:"13px",fontWeight:600}}>day streak 🔥</span>
-                  </div>
-                  <h1 style={{color:"#F1F5F9",fontSize:"26px",fontWeight:800,
-                    fontFamily:"'Syne',system-ui,sans-serif",
-                    marginBottom:"12px",textShadow:`0 0 30px ${fs.glow}`}}>All Done for Today!</h1>
-                  <p style={{color:"rgba(255,255,255,0.5)",fontSize:"14px",lineHeight:1.75,marginBottom:"30px"}}>{msg}</p>
-                  <button onClick={onClose} style={{width:"100%",
-                    background:`linear-gradient(135deg,${fs.c1},${fs.c2})`,
-                    border:"none",borderRadius:"16px",padding:"16px",
-                    color:"#fff",fontSize:"14px",fontWeight:800,
-                    fontFamily:"'Syne',system-ui,sans-serif",letterSpacing:"0.08em",cursor:"pointer",
-                    boxShadow:`0 8px 28px ${fs.glow}`}}>SEE YOU TOMORROW →</button>
-                </div>
-              </>
-            )}
+      {/* Burst / main content */}
+      {phase==='burst'&&(
+        <div style={{
+          display:'flex',flexDirection:'column',alignItems:'center',
+          animation:'contentReveal 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards',
+        }}>
+          <div style={{transform:'scale(2.2)',marginBottom:24}}>
+            <FlameIcon streak={streak} size={48}/>
           </div>
-        </>
+        </div>
+      )}
+
+      {phase==='show'&&(
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'0 32px',textAlign:'center',
+          animation:'contentReveal 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards'}}>
+          <div style={{marginBottom:20}}>
+            <FlameIcon streak={streak} size={72}/>
+          </div>
+          <div style={{fontSize:48,fontWeight:900,color:'#fff',letterSpacing:-2,marginBottom:8,lineHeight:1}}>
+            {displayStreak}
+          </div>
+          <div style={{fontSize:14,color:'rgba(255,255,255,0.5)',letterSpacing:2,textTransform:'uppercase',marginBottom:16}}>
+            day streak
+          </div>
+          <p style={{fontSize:15,color:'rgba(255,255,255,0.75)',lineHeight:1.6,marginBottom:32,maxWidth:280}}>
+            {msg}
+          </p>
+          <button onClick={onClose} style={{
+            padding:'14px 40px',borderRadius:16,border:'none',cursor:'pointer',
+            background:'linear-gradient(135deg,#FF5C00,#FF8C00)',
+            color:'#fff',fontSize:16,fontWeight:700,letterSpacing:0.3,
+            boxShadow:'0 8px 24px rgba(255,92,0,0.4)',
+            animation:'contentReveal 0.4s ease 0.2s both',
+          }}>Keep it going 🔥</button>
+        </div>
       )}
     </div>
   );
