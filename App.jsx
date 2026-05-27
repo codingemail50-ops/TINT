@@ -68,6 +68,24 @@ function flameStyle(streak) {
 }
 // flameStyle kept for AllDonePopup ambient glow usage
 
+const FLAME_LEVELS = [
+  {min:0,  name:"Spark",      emoji:"✨", desc:"Your journey begins"},
+  {min:3,  name:"Kindle",     emoji:"🌟", desc:"Getting warmer"},
+  {min:6,  name:"Blaze",      emoji:"🔥", desc:"On fire!"},
+  {min:9,  name:"Inferno",    emoji:"💥", desc:"Unstoppable"},
+  {min:12, name:"Wildfire",   emoji:"🌪️", desc:"Can't be stopped"},
+  {min:15, name:"Storm",      emoji:"⚡", desc:"Forces of nature"},
+  {min:18, name:"Phoenix",    emoji:"🦅", desc:"Reborn in flames"},
+  {min:21, name:"Solar Flare",emoji:"☀️", desc:"Burning bright"},
+  {min:24, name:"Platinum",   emoji:"💎", desc:"Legendary"},
+];
+function getFlameLevel(streak) {
+  for(let i=FLAME_LEVELS.length-1;i>=0;i--){
+    if((streak||0)>=FLAME_LEVELS[i].min) return FLAME_LEVELS[i];
+  }
+  return FLAME_LEVELS[0];
+}
+
 const EXAM_TASKS = {
   UCEED:[
     {emoji:"✏️",title:"Sketching practice",        cat:"drawing", dur:45,repeat:"daily"},
@@ -280,6 +298,31 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;overflow:hidden;}
 ::-webkit-scrollbar{width:3px;}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:4px;}
 input:focus{outline:none;border-color:rgba(99,102,241,0.6)!important;}
+
+/* ── UCEED Countdown ── */
+@keyframes hourglassSpin{
+  0%{transform:rotate(0deg);}
+  45%{transform:rotate(0deg);}
+  55%{transform:rotate(180deg);}
+  100%{transform:rotate(180deg);}
+}
+.hourglass-spin{animation:hourglassSpin 2s ease-in-out infinite;}
+
+/* ── Onboarding slides ── */
+@keyframes slideEnter{from{opacity:0;transform:translateX(60px);}to{opacity:1;transform:translateX(0);}}
+@keyframes slideExit{from{opacity:1;transform:translateX(0);}to{opacity:0;transform:translateX(-60px);}}
+@keyframes emojiPop{0%{transform:scale(0) rotate(-20deg);opacity:0;}60%{transform:scale(1.2) rotate(5deg);opacity:1;}100%{transform:scale(1) rotate(0deg);opacity:1;}}
+.ob-slide-enter{animation:slideEnter 0.4s cubic-bezier(0.22,1,0.36,1) forwards;}
+.ob-emoji-pop{animation:emojiPop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.2s both;}
+
+/* ── AllDone share card ── */
+@keyframes flamesFlyIn{0%{opacity:0;}100%{opacity:1;}}
+@keyframes centerFlameReveal{0%{transform:scale(0);opacity:0;}60%{transform:scale(1.2);opacity:1;}100%{transform:scale(1);opacity:1;}}
+@keyframes glowRingExpand{0%{transform:scale(0.5);opacity:0.8;}100%{transform:scale(3.5);opacity:0;}}
+
+/* ── Focus distraction modal ── */
+@keyframes sheetSlideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.distraction-sheet{animation:sheetSlideUp 0.35s cubic-bezier(0.22,1,0.36,1) forwards;}
 `;
 
 function useCSS() {
@@ -1241,12 +1284,16 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
                 {today}
               </p>
             </div>
-            {/* Right: flame */}
+            {/* Right: flame + level */}
             <button onClick={handleFlameTap} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"2px",
               flexShrink:0,background:"transparent",border:"none",cursor:"pointer",padding:"2px 4px"}}>
               <FlameIcon streak={streak} size={30}/>
               <span style={{color:fs.c2,fontSize:"10px",fontWeight:700,
-                textShadow:`0 0 8px ${fs.glow}`}}>{streak}d</span>
+                textShadow:`0 0 8px ${fs.glow}`}}>{streak}🔥</span>
+              <span style={{color:fs.c2,fontSize:"8px",fontWeight:600,opacity:0.85,maxWidth:"50px",
+                textAlign:"center",lineHeight:1,letterSpacing:"0.02em"}}>
+                {getFlameLevel(streak).name}
+              </span>
             </button>
           </div>
           <WeekBar history={history} selectedDate={selectedDate} onSelectDate={setSelectedDate}/>
