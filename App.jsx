@@ -1300,7 +1300,18 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
       setPhase('active');
       timerRef.current=setInterval(()=>{
         setTimeLeft(p=>{
-          if(p<=1){clearInterval(timerRef.current);setPhase('done');return 0;}
+          if(p<=1){
+            clearInterval(timerRef.current);
+            setPhase('done');
+            // Save focus session
+            try{
+              const todayStr2=new Date().toISOString().slice(0,10);
+              const sessions=JSON.parse(localStorage.getItem('tint_focus_sessions')||'[]');
+              sessions.push({date:todayStr2,minutes:duration});
+              localStorage.setItem('tint_focus_sessions',JSON.stringify(sessions));
+            }catch(e){}
+            return 0;
+          }
           return p-1;
         });
       },1000);
@@ -1338,8 +1349,12 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
       <div style={{flex:1,overflowY:'auto',padding:'0 20px 20px'}}>
 
       {phase==='setup'&&<>
+        {/* Focus stats card */}
+        <div style={{marginTop:20}}>
+          <FocusStatsCard/>
+        </div>
         {/* Timer picker */}
-        <div style={{marginTop:24,marginBottom:8,fontSize:12,color:'rgba(255,255,255,0.4)',letterSpacing:1,textTransform:'uppercase'}}>Session length</div>
+        <div style={{marginBottom:8,fontSize:12,color:'rgba(255,255,255,0.4)',letterSpacing:1,textTransform:'uppercase'}}>Session length</div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:28}}>
           {DURATIONS.map(d=>(
             <button key={d} onClick={()=>setDuration(d)} style={{
@@ -1412,7 +1427,17 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
               setPhase('active');
               timerRef.current=setInterval(()=>{
                 setTimeLeft(p=>{
-                  if(p<=1){clearInterval(timerRef.current);setPhase('done');return 0;}
+                  if(p<=1){
+                    clearInterval(timerRef.current);
+                    setPhase('done');
+                    try{
+                      const todayStr2=new Date().toISOString().slice(0,10);
+                      const sessions=JSON.parse(localStorage.getItem('tint_focus_sessions')||'[]');
+                      sessions.push({date:todayStr2,minutes:duration});
+                      localStorage.setItem('tint_focus_sessions',JSON.stringify(sessions));
+                    }catch(e){}
+                    return 0;
+                  }
                   return p-1;
                 });
               },1000);
@@ -1522,6 +1547,32 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
   );
 }
 
+// ── FOCUS STATS CARD ─────────────────────────────────────────────────────────
+function FocusStatsCard(){
+  const todayStr=new Date().toISOString().slice(0,10);
+  const sessions=(()=>{try{return JSON.parse(localStorage.getItem('tint_focus_sessions')||'[]');}catch{return[];}})();
+  const now=new Date();
+  const startOfWeek=(()=>{const d=new Date(now);const day=d.getDay();const diff=(day+6)%7;d.setDate(d.getDate()-diff);d.setHours(0,0,0,0);return d;})();
+  const totalMins=sessions.reduce((s,x)=>s+(x.minutes||0),0);
+  const weekMins=sessions.filter(x=>new Date(x.date+'T00:00:00')>=startOfWeek).reduce((s,x)=>s+(x.minutes||0),0);
+  const todayMins=sessions.filter(x=>x.date===todayStr).reduce((s,x)=>s+(x.minutes||0),0);
+  const totalH=(totalMins/60).toFixed(1);
+  const weekH=(weekMins/60).toFixed(1);
+  const todayH=(todayMins/60).toFixed(1);
+  return(
+    <div style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',
+      borderRadius:16,padding:16,display:'flex',marginBottom:20}}>
+      {[{label:'Total',val:totalH},{label:'This Week',val:weekH},{label:'Today',val:todayH}].map((s,i)=>(
+        <div key={s.label} style={{flex:1,textAlign:'center',
+          borderLeft:i>0?'1px solid rgba(255,255,255,0.07)':'none',padding:'0 4px'}}>
+          <div style={{color:'#F87171',fontSize:22,fontWeight:800,fontFamily:"'Syne',sans-serif",lineHeight:1}}>{s.val}</div>
+          <div style={{color:'rgba(255,255,255,0.35)',fontSize:10,marginTop:4,fontWeight:500}}>{s.label} (h)</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── MISSED TASK ALERT ─────────────────────────────────────────────────────────
 function MissedTaskAlert({history,tasks,onDismiss}){
   const [dismissed,setDismissed]=useState(false);
@@ -1623,8 +1674,18 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
   const flameTapTimer=useRef(null);
 
   const todayStr=new Date().toISOString().slice(0,10);
+  const [viewDate,setViewDate]=useState(todayStr);
   const [selectedDate,setSelectedDate]=useState(todayStr);
   const [allDoneShownDate,setAllDoneShownDate]=useState(()=>load("tint_alldone_date",""));
+  const isToday=viewDate===todayStr;
+
+  // Navigate dates — only backward
+  const goBack=()=>{
+    const d=new Date(viewDate+'T00:00:00');
+    d.setDate(d.getDate()-1);
+    setViewDate(d.toISOString().slice(0,10));
+  };
+  const goToday=()=>setViewDate(todayStr);
 
   const done=tasks.filter(t=>t.status==="done").length;
   const total=tasks.length;
@@ -1672,6 +1733,12 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
     flameTapTimer.current=setTimeout(()=>setFlameTaps(0),1500);
   };
 
+  // Arc ring constants
+  const ARC_R=110, ARC_CX=160, ARC_CY=155;
+  const halfCirc=Math.PI*ARC_R; // half circumference
+  const arcPct=total>0?done/total:0;
+  const arcFill=arcPct*halfCirc;
+
   return(
     <div className="app-screen" style={{display:"flex",flexDirection:"column",background:"#080C14",
       fontFamily:"Inter,sans-serif",overflow:"hidden"}}>
@@ -1684,26 +1751,32 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
       <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
         {/* HEADER */}
         <div style={{background:"linear-gradient(180deg,#0D1321 0%,#080C14 100%)",
-          padding:"20px 20px 10px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-          <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"2px"}}>
-            {/* Left: avatar + edit */}
+          padding:"16px 20px 12px",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+
+          {/* Top row: avatar | streak+level | flame */}
+          <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"8px"}}>
             <button onClick={onEditProfile} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"3px",
               flexShrink:0,background:"rgba(99,102,241,0.1)",border:"1px solid rgba(99,102,241,0.25)",
               borderRadius:"14px",padding:"6px 8px",cursor:"pointer"}}>
               <span style={{fontSize:"22px",lineHeight:1}}>{userAvatar}</span>
               <span style={{color:"rgba(255,255,255,0.45)",fontSize:"8px",fontWeight:600,letterSpacing:"0.05em"}}>EDIT</span>
             </button>
-            {/* Center: title + date */}
+            {/* Center: date nav */}
             <div style={{flex:1,textAlign:"center"}}>
-              <h1 style={{color:"#F1F5F9",fontSize:"22px",fontWeight:800,
-                fontFamily:"'Syne',system-ui,sans-serif",lineHeight:1.1,userSelect:"none"}}>
-                Today's Tasks
-              </h1>
-              <p style={{color:"rgba(255,255,255,0.45)",fontSize:"12px",marginTop:"3px",fontWeight:500}}>
-                {today}
-              </p>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"6px"}}>
+                <button onClick={goBack} style={{background:"rgba(255,255,255,0.06)",border:"none",
+                  borderRadius:"8px",color:"rgba(255,255,255,0.5)",fontSize:"14px",cursor:"pointer",
+                  padding:"3px 8px",lineHeight:1}}>‹</button>
+                <span style={{color:"rgba(255,255,255,0.45)",fontSize:"11px",fontWeight:500,minWidth:"130px",textAlign:"center"}}>
+                  {isToday?today:new Date(viewDate+'T00:00:00').toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"long"})}
+                </span>
+                {!isToday&&(
+                  <button onClick={goToday} style={{background:"rgba(99,102,241,0.18)",border:"1px solid rgba(99,102,241,0.3)",
+                    borderRadius:"8px",color:"#A5B4FC",fontSize:"10px",cursor:"pointer",padding:"3px 7px",fontWeight:600}}>Today</button>
+                )}
+                {isToday&&<div style={{width:"57px"}}/>}
+              </div>
             </div>
-            {/* Right: flame + level */}
             <button onClick={handleFlameTap} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"2px",
               flexShrink:0,background:"transparent",border:"none",cursor:"pointer",padding:"2px 4px"}}>
               <FlameIcon streak={streak} size={30}/>
@@ -1715,55 +1788,78 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
               </span>
             </button>
           </div>
-          <WeekBar history={history} selectedDate={selectedDate} onSelectDate={setSelectedDate}/>
-          {/* Progress bar */}
-          <div style={{marginTop:"8px",marginBottom:"12px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:"6px"}}>
-              <span style={{color:"rgba(255,255,255,0.5)",fontSize:"11px"}}>Daily progress</span>
-              <span style={{color:pct===100?"#4ADE80":"rgba(255,255,255,0.6)",fontSize:"11px",fontWeight:600}}>{pct}%</span>
+
+          {/* Arc progress ring */}
+          {isToday&&(
+            <div style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",marginBottom:"4px"}}>
+              <svg width="320" height="175" viewBox="0 0 320 175" style={{overflow:"visible"}}>
+                <defs>
+                  <linearGradient id="arcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#818CF8"/>
+                    <stop offset="100%" stopColor="#6366F1"/>
+                  </linearGradient>
+                </defs>
+                {/* Background arc */}
+                <path
+                  d={`M ${ARC_CX-ARC_R},${ARC_CY} A ${ARC_R},${ARC_R} 0 0 1 ${ARC_CX+ARC_R},${ARC_CY}`}
+                  fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="16" strokeLinecap="round"/>
+                {/* Progress arc */}
+                <path
+                  d={`M ${ARC_CX-ARC_R},${ARC_CY} A ${ARC_R},${ARC_R} 0 0 1 ${ARC_CX+ARC_R},${ARC_CY}`}
+                  fill="none" stroke="url(#arcGrad)" strokeWidth="16" strokeLinecap="round"
+                  strokeDasharray={`${arcFill} ${halfCirc}`}
+                  strokeDashoffset="0"
+                  style={{transition:"stroke-dasharray 0.8s cubic-bezier(0.4,0,0.2,1)"}}/>
+                {/* Left label */}
+                <text x={ARC_CX-ARC_R+4} y={ARC_CY+22} textAnchor="middle" fill="rgba(255,255,255,0.45)" fontSize="10" fontWeight="600">Done: {done}</text>
+                {/* Right label */}
+                <text x={ARC_CX+ARC_R-4} y={ARC_CY+22} textAnchor="middle" fill="rgba(255,255,255,0.45)" fontSize="10" fontWeight="600">Left: {total-done}</text>
+              </svg>
+              {/* Center text overlay */}
+              <div style={{position:"absolute",top:"54px",left:"50%",transform:"translateX(-50%)",
+                textAlign:"center",pointerEvents:"none"}}>
+                <div style={{color:pct===100?"#4ADE80":"#F1F5F9",fontSize:"44px",fontWeight:900,
+                  fontFamily:"'Syne',sans-serif",lineHeight:1}}>{done}</div>
+                <div style={{color:"rgba(255,255,255,0.4)",fontSize:"12px",fontWeight:500,marginTop:"2px"}}>
+                  / {total} tasks
+                </div>
+              </div>
             </div>
-            <div style={{height:"5px",background:"rgba(255,255,255,0.06)",borderRadius:"100px"}}>
+          )}
+
+          {/* Slim progress bar */}
+          <div style={{marginTop:"4px",marginBottom:"10px",padding:"0 4px"}}>
+            <div style={{height:"4px",background:"rgba(255,255,255,0.06)",borderRadius:"100px"}}>
               <div style={{height:"100%",width:pct+"%",
                 background:pct===100?"linear-gradient(90deg,#22C55E,#4ADE80)":"linear-gradient(90deg,#6366F1,#818CF8)",
                 borderRadius:"100px",transition:"width 0.6s cubic-bezier(0.4,0,0.2,1)",
-                boxShadow:pct===100?"0 0 12px rgba(34,197,94,0.6)":"0 0 10px rgba(99,102,241,0.4)"}}/>
+                boxShadow:pct===100?"0 0 10px rgba(34,197,94,0.5)":"0 0 8px rgba(99,102,241,0.4)"}}/>
             </div>
           </div>
-          {/* Stats row */}
-          <div style={{display:"flex",gap:"8px"}}>
-            {[
-              {l:"Done",  v:done,       c:"#4ADE80",bg:"rgba(34,197,94,0.1)"},
-              {l:"Left",  v:total-done, c:"#818CF8",bg:"rgba(99,102,241,0.1)"},
-              {l:"Streak",v:streak+"d", c:fs.c2,    bg:"rgba(0,0,0,0.2)"},
-            ].map(s=>(
-              <div key={s.l} style={{flex:1,textAlign:"center",background:s.bg,borderRadius:"10px",padding:"8px 4px"}}>
-                <p style={{color:s.c,fontSize:"15px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{s.v}</p>
-                <p style={{color:s.c,fontSize:"9px",fontWeight:600,opacity:0.7,marginTop:"2px",
-                  textTransform:"uppercase",letterSpacing:"0.05em"}}>{s.l}</p>
-              </div>
-            ))}
-            {/* Water-fill % card */}
-            <div style={{flex:1,textAlign:"center",background:"rgba(0,0,0,0.25)",borderRadius:"10px",
-              padding:"8px 4px",position:"relative",overflow:"hidden",minHeight:"52px"}}>
-              <div style={{
-                position:"absolute",bottom:0,left:0,right:0,
-                height:pct+"%",
-                background:pct===100?"rgba(34,197,94,0.28)":"rgba(99,102,241,0.22)",
-                transition:"height 0.9s cubic-bezier(0.4,0,0.2,1)",
-                borderRadius:pct>95?"10px":"0 0 10px 10px",
-                animation:"waterRise 2.2s ease-in-out infinite",
-              }}/>
-              <p style={{position:"relative",zIndex:1,color:pct===100?"#4ADE80":"#818CF8",
-                fontSize:"15px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{pct}%</p>
-              <p style={{position:"relative",zIndex:1,color:pct===100?"#4ADE80":"#818CF8",
-                fontSize:"9px",fontWeight:600,opacity:0.7,marginTop:"2px",
-                textTransform:"uppercase",letterSpacing:"0.05em"}}>Today</p>
-            </div>
-          </div>
+
+          <WeekBar history={history} selectedDate={selectedDate} onSelectDate={setSelectedDate}/>
         </div>
 
-        {/* Past-day banner */}
-        {selectedDate!==todayStr&&(
+        {/* Past-day banner (viewDate nav) */}
+        {!isToday&&(
+          <div style={{margin:"10px 16px 0",padding:"12px 14px",
+            background:"rgba(99,102,241,0.08)",border:"1px solid rgba(99,102,241,0.22)",
+            borderRadius:"12px"}}>
+            <p style={{color:"#A5B4FC",fontSize:"12px",fontWeight:700,marginBottom:"4px"}}>
+              📅 {new Date(viewDate+'T00:00:00').toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})} — Read-only view
+            </p>
+            {(()=>{const snap=history.find(h=>h.date===viewDate);
+              return snap
+                ?<p style={{color:"rgba(255,255,255,0.45)",fontSize:"11px"}}>
+                    {snap.allDone?"✅ All done":snap.pct>=50?`⚡ ${snap.pct}% complete`:"❌ Missed"}
+                  </p>
+                :<p style={{color:"rgba(255,255,255,0.3)",fontSize:"11px"}}>No record for this day</p>;
+            })()}
+          </div>
+        )}
+
+        {/* Past-day banner (weekbar selectedDate) */}
+        {selectedDate!==todayStr&&isToday&&(
           <div style={{margin:"10px 16px 0",padding:"12px 14px",
             background:"rgba(99,102,241,0.08)",border:"1px solid rgba(99,102,241,0.22)",
             borderRadius:"12px",display:"flex",flexDirection:"column",gap:"10px"}}>
@@ -1857,36 +1953,61 @@ function TaskRow({task,i,onTap,onDelete,isDeleting,onStartDelete,onCancelDelete}
   const done=task.status==="done";
   const cc=CAT_COLORS[task.cat]||CAT_COLORS.theory;
   const pressTimer=useRef(null);
-  const startPress=()=>{pressTimer.current=setTimeout(()=>onStartDelete(task.id),600);};
-  const endPress=()=>clearTimeout(pressTimer.current);
+  const [pressProgress,setPressProgress]=useState(0);
+  const pressRafRef=useRef(null);
+  const pressStartRef=useRef(null);
+
+  const startPress=()=>{
+    pressStartRef.current=Date.now();
+    const tick=()=>{
+      const elapsed=Date.now()-pressStartRef.current;
+      const prog=Math.min(elapsed/600,1);
+      setPressProgress(prog);
+      if(prog<1){pressRafRef.current=requestAnimationFrame(tick);}
+      else{onStartDelete(task.id);}
+    };
+    pressRafRef.current=requestAnimationFrame(tick);
+    pressTimer.current=setTimeout(()=>onStartDelete(task.id),600);
+  };
+  const endPress=()=>{
+    clearTimeout(pressTimer.current);
+    cancelAnimationFrame(pressRafRef.current);
+    setPressProgress(0);
+  };
+
   return(
     <div className={"task-card"+(isDeleting?" shaking":"")}
       onClick={e=>onTap(task,e)}
       onMouseDown={startPress} onMouseUp={endPress} onMouseLeave={endPress}
       onTouchStart={startPress} onTouchEnd={endPress}
-      style={{position:"relative",overflow:"visible",
-        background:isDeleting?"rgba(239,68,68,0.1)":done?"rgba(34,197,94,0.06)":"rgba(255,255,255,0.035)",
-        border:"1px solid "+(isDeleting?"rgba(239,68,68,0.4)":done?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.07)"),
-        borderRadius:"16px",padding:"14px 16px",display:"flex",alignItems:"center",gap:"14px",cursor:"pointer",
+      style={{position:"relative",overflow:"hidden",
+        background:isDeleting?"rgba(239,68,68,0.1)":done?"rgba(34,197,94,0.05)":"rgba(255,255,255,0.03)",
+        borderLeft:done&&!isDeleting?"2px solid #22C55E":isDeleting?"2px solid rgba(239,68,68,0.5)":"2px solid transparent",
+        borderRight:"none",borderTop:"none",borderBottom:"1px solid rgba(255,255,255,0.04)",
+        borderRadius:"16px",padding:"16px 16px",display:"flex",alignItems:"center",gap:"14px",cursor:"pointer",
         animation:`slideUp 0.4s cubic-bezier(0.4,0,0.2,1) ${i*0.04}s both`,
         userSelect:"none",WebkitUserSelect:"none"}}>
-      {done&&!isDeleting&&<div style={{position:"absolute",inset:0,borderRadius:"16px",
-        background:"rgba(34,197,94,0.08)",pointerEvents:"none"}}/>}
-      <div style={{width:"42px",height:"42px",borderRadius:"13px",flexShrink:0,
+      {/* Hold-to-delete progress overlay */}
+      {pressProgress>0&&!isDeleting&&(
+        <div style={{position:"absolute",bottom:0,left:0,height:"2px",
+          background:"rgba(239,68,68,0.6)",width:(pressProgress*100)+"%",
+          borderRadius:"0 2px 2px 0",transition:"none"}}/>
+      )}
+      <div style={{width:"44px",height:"44px",borderRadius:"12px",flexShrink:0,
         background:isDeleting?"rgba(239,68,68,0.15)":cc.bg,
         border:"1px solid "+(isDeleting?"rgba(239,68,68,0.4)":cc.border),
-        display:"flex",alignItems:"center",justifyContent:"center",fontSize:"20px"}}>{task.emoji}</div>
+        display:"flex",alignItems:"center",justifyContent:"center",fontSize:"22px"}}>{task.emoji}</div>
       <div style={{flex:1,minWidth:0}}>
-        <p style={{fontSize:"14px",fontWeight:600,
-          color:isDeleting?"#F87171":done?"rgba(74,222,128,0.7)":"#E2E8F0",
+        <p style={{fontSize:"15px",fontWeight:600,
+          color:isDeleting?"#F87171":done?"rgba(74,222,128,0.7)":"#F1F5F9",
           fontFamily:"Inter,sans-serif",
           textDecoration:done?"line-through":"none",textDecorationColor:"rgba(74,222,128,0.5)"}}>
           {isDeleting?"Hold to delete…":task.title}
         </p>
         {!isDeleting&&(
-          <div style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"4px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"8px",marginTop:"5px"}}>
             <span style={{background:cc.bg,color:cc.text,fontSize:"9px",fontWeight:700,
-              padding:"2px 7px",borderRadius:"100px",textTransform:"uppercase",
+              padding:"3px 8px",borderRadius:"100px",textTransform:"uppercase",
               letterSpacing:"0.05em",border:"1px solid "+cc.border}}>{task.cat}</span>
             <span style={{color:"rgba(255,255,255,0.35)",fontSize:"11px"}}>⏱ {task.dur}m</span>
             {task.repeat&&task.repeat!=="none"&&(
@@ -1903,11 +2024,11 @@ function TaskRow({task,i,onTap,onDelete,isDeleting,onStartDelete,onCancelDelete}
             color:"#F87171",fontSize:"18px",cursor:"pointer",fontWeight:700,
             display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
       ):(
-        <div style={{width:"26px",height:"26px",borderRadius:"50%",flexShrink:0,
-          background:done?"#22C55E":"transparent",
-          border:"2px solid "+(done?"#22C55E":"rgba(255,255,255,0.18)"),
+        <div style={{width:"28px",height:"28px",borderRadius:"50%",flexShrink:0,
+          background:done?"#6366F1":"transparent",
+          border:"2px solid "+(done?"#6366F1":"rgba(255,255,255,0.18)"),
           display:"flex",alignItems:"center",justifyContent:"center",
-          transition:"all 0.25s ease",boxShadow:done?"0 0 10px rgba(34,197,94,0.5)":"none"}}>
+          transition:"all 0.25s ease",boxShadow:done?"0 0 12px rgba(99,102,241,0.5)":"none"}}>
           {done&&<span style={{color:"#fff",fontSize:"13px",fontWeight:800,
             animation:"checkBounce 0.35s cubic-bezier(0.34,1.56,0.64,1) both"}}>✓</span>}
         </div>
@@ -1994,12 +2115,26 @@ function AddTaskSheet({onAdd,onClose}){
 function ConsistencyScreen({history,tasks,streak,onBack,onTasks,onFocus,onLeaderboard}){
   const now=new Date();
   const todayStr=now.toISOString().slice(0,10);
+  const [calMonth,setCalMonth]=useState(()=>({year:now.getFullYear(),month:now.getMonth()}));
+
+  const prevMonth=()=>setCalMonth(({year,month})=>{
+    if(month===0)return{year:year-1,month:11};
+    return{year,month:month-1};
+  });
+  const nextMonth=()=>setCalMonth(({year,month})=>{
+    const next=new Date(year,month+1,1);
+    if(next>now)return{year,month}; // don't go past current month
+    return{year,month:month+1};
+  });
+  const isCurrentMonth=calMonth.year===now.getFullYear()&&calMonth.month===now.getMonth();
+
+  const calDaysInMonth=new Date(calMonth.year,calMonth.month+1,0).getDate();
+  const calFirstDow=new Date(calMonth.year,calMonth.month,1).getDay();
+  const calOffset=(calFirstDow+6)%7; // Monday-first offset
+  const calMonthName=new Date(calMonth.year,calMonth.month,1).toLocaleDateString("en-IN",{month:"long",year:"numeric"});
+
   const year=now.getFullYear();
   const month=now.getMonth();
-  const daysInMonth=new Date(year,month+1,0).getDate();
-  const firstDow=new Date(year,month,1).getDay();
-  const monthOffset=(firstDow+6)%7;
-  const monthName=now.toLocaleDateString("en-IN",{month:"long",year:"numeric"});
   const days=Array.from({length:30},(_,i)=>{
     const d=new Date(now);d.setDate(now.getDate()-(29-i));return d.toISOString().slice(0,10);
   });
@@ -2099,6 +2234,64 @@ function ConsistencyScreen({history,tasks,streak,onBack,onTasks,onFocus,onLeader
             </div>
           )}
         </div>
+        {/* Month calendar with navigation */}
+        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",
+          borderRadius:"18px",padding:"16px",animation:"revealUp 0.5s ease 0.15s both"}}>
+          {/* Month nav header */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+            <button onClick={prevMonth} style={{background:"rgba(255,255,255,0.06)",border:"none",
+              borderRadius:8,color:"rgba(255,255,255,0.6)",fontSize:16,cursor:"pointer",padding:"4px 10px"}}>‹</button>
+            <span style={{color:"#F1F5F9",fontSize:13,fontWeight:700}}>{calMonthName}</span>
+            <button onClick={nextMonth} style={{background:isCurrentMonth?"rgba(255,255,255,0.02)":"rgba(255,255,255,0.06)",
+              border:"none",borderRadius:8,
+              color:isCurrentMonth?"rgba(255,255,255,0.2)":"rgba(255,255,255,0.6)",
+              fontSize:16,cursor:isCurrentMonth?"default":"pointer",padding:"4px 10px"}}>›</button>
+          </div>
+          {/* Day of week headers */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:"4px",marginBottom:6}}>
+            {["Mo","Tu","We","Th","Fr","Sa","Su"].map(d=>(
+              <div key={d} style={{textAlign:"center",color:"rgba(255,255,255,0.3)",fontSize:"9px",fontWeight:700,
+                letterSpacing:"0.04em",paddingBottom:2}}>{d}</div>
+            ))}
+          </div>
+          {/* Calendar grid */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:"4px"}}>
+            {Array.from({length:calOffset},(_,i)=>(
+              <div key={"empty"+i}/>
+            ))}
+            {Array.from({length:calDaysInMonth},(_,i)=>{
+              const dateStr=`${calMonth.year}-${String(calMonth.month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
+              const st=dayStatus(dateStr);
+              const isT=dateStr===todayStr;
+              const isFuture=dateStr>todayStr;
+              const bg=isFuture?"rgba(255,255,255,0.03)"
+                :st==="green"?"#22C55E"
+                :st==="yellow"?"#FBBF24"
+                :st==="red"?"#EF4444"
+                :"rgba(255,255,255,0.07)";
+              return(
+                <div key={dateStr} title={dateStr} style={{
+                  aspectRatio:"1",borderRadius:6,background:bg,
+                  display:"flex",alignItems:"center",justifyContent:"center",
+                  fontSize:"9px",fontWeight:700,
+                  color:isFuture?"rgba(255,255,255,0.2)":st==="none"?"rgba(255,255,255,0.3)":"#fff",
+                  border:isT?"1.5px solid #818CF8":"1px solid transparent",
+                  boxShadow:st==="green"&&!isFuture?"0 0 6px rgba(34,197,94,0.4)":"none",
+                }}>{i+1}</div>
+              );
+            })}
+          </div>
+          {/* Legend */}
+          <div style={{display:"flex",gap:"10px",marginTop:"12px",flexWrap:"wrap"}}>
+            {[{c:"#22C55E",l:"All done"},{c:"#FBBF24",l:"Partial"},{c:"#EF4444",l:"Missed"},{c:"rgba(255,255,255,0.07)",l:"No data"}].map(({c,l})=>(
+              <div key={l} style={{display:"flex",alignItems:"center",gap:"5px"}}>
+                <div style={{width:"9px",height:"9px",borderRadius:"2px",background:c}}/>
+                <span style={{color:"rgba(255,255,255,0.4)",fontSize:"9px"}}>{l}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* UCEED countdown grid — one square per day until Jan 17 2027 */}
         {(()=>{
           const UCEED_DATE = new Date('2027-01-17T00:00:00');
