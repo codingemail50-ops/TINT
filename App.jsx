@@ -429,6 +429,61 @@ function FlameIcon({streak,size=28}){
   );
 }
 
+// ── UCEED COUNTDOWN ──────────────────────────────────────────────────────────
+function UCEEDCountdown() {
+  const [timeLeft, setTimeLeft] = useState({});
+  useEffect(() => {
+    const target = new Date('2027-01-17T09:00:00+05:30');
+    const update = () => {
+      const now = new Date();
+      const diff = target - now;
+      if(diff <= 0) { setTimeLeft({done:true}); return; }
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const mins = Math.floor((diff % 3600000) / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setTimeLeft({days, hours, mins, secs});
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  if(timeLeft.done) return (
+    <div style={{margin:'0 16px 12px',padding:'12px 16px',borderRadius:14,
+      background:'rgba(34,197,94,0.1)',border:'1.5px solid rgba(34,197,94,0.3)',
+      display:'flex',alignItems:'center',gap:10}}>
+      <span style={{fontSize:24}}>🎉</span>
+      <div><div style={{color:'#4ADE80',fontWeight:800,fontSize:13}}>UCEED 2027</div>
+        <div style={{color:'rgba(255,255,255,0.5)',fontSize:11}}>The day is here!</div></div>
+    </div>
+  );
+
+  const pad = n => String(n).padStart(2,'0');
+  return (
+    <div style={{margin:'0 16px 12px',padding:'12px 16px',borderRadius:14,
+      background:'rgba(251,146,60,0.07)',border:'1.5px solid rgba(251,146,60,0.3)',
+      display:'flex',alignItems:'center',gap:12}}>
+      <span className="hourglass-spin" style={{fontSize:22,flexShrink:0}}>⏳</span>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:'flex',alignItems:'baseline',gap:4,marginBottom:2}}>
+          <span style={{color:'#FB923C',fontSize:11,fontWeight:700,letterSpacing:1,textTransform:'uppercase'}}>UCEED 2027</span>
+        </div>
+        <div style={{display:'flex',alignItems:'baseline',gap:4}}>
+          <span style={{color:'#FED7AA',fontSize:28,fontWeight:900,letterSpacing:-1,lineHeight:1}}>{timeLeft.days ?? '--'}</span>
+          <span style={{color:'rgba(255,255,255,0.4)',fontSize:11,fontWeight:500}}>days</span>
+          <span style={{color:'rgba(255,255,255,0.55)',fontSize:13,fontWeight:600,marginLeft:4,fontVariantNumeric:'tabular-nums'}}>
+            {pad(timeLeft.hours ?? 0)}:{pad(timeLeft.mins ?? 0)}:{pad(timeLeft.secs ?? 0)}
+          </span>
+        </div>
+      </div>
+      <div style={{fontSize:10,color:'rgba(251,146,60,0.6)',textAlign:'right',lineHeight:1.4}}>
+        <div>Jan 17</div><div>2027</div>
+      </div>
+    </div>
+  );
+}
+
 // ── COVER SCREEN ──────────────────────────────────────────────────────────────
 const QUOTES=[
   "The only way to do great work is to love what you do.",
@@ -667,6 +722,139 @@ function OnboardingScreen({onDone}){
   );
 }
 
+// ── APP INTRO ONBOARDING (5-slide) ────────────────────────────────────────────
+const INTRO_SLIDES = [
+  {
+    emoji: "🎯",
+    title: "Welcome to TINT",
+    sub: "Your daily study companion for UCEED, NID, NIFT & JEE. Built for the grind.",
+    extra: null,
+  },
+  {
+    emoji: "📋",
+    title: "Your Daily Tasks",
+    sub: "Each day you get a set of tasks. Complete them all to keep your streak alive. Miss 3 days? The streak resets.",
+    extra: null,
+  },
+  {
+    emoji: "🔥",
+    title: "The Flame",
+    sub: "Your streak lives in the flame. The longer your streak, the more epic the flame becomes — from Spark all the way to Platinum. 9 levels of fire.",
+    extra: "levels",
+  },
+  {
+    emoji: "⏱️",
+    title: "Focus Mode",
+    sub: "Lock in. Set a timer, block distractions, and breathe. Your best work happens in deep focus sessions.",
+    extra: null,
+  },
+  {
+    emoji: "🚀",
+    title: "You're Ready",
+    sub: "UCEED 2027 is counting down. Every day you practice is a day closer to your dream rank. Let's go.",
+    extra: null,
+  },
+];
+
+function AppIntroOnboarding({onDone}) {
+  const [slide, setSlide] = useState(0);
+  const [animKey, setAnimKey] = useState(0);
+
+  const goNext = () => {
+    if(slide === INTRO_SLIDES.length - 1) {
+      localStorage.setItem('tint_intro_done','1');
+      onDone();
+    } else {
+      setSlide(s => s+1);
+      setAnimKey(k => k+1);
+    }
+  };
+  const skip = () => {
+    localStorage.setItem('tint_intro_done','1');
+    onDone();
+  };
+
+  const s = INTRO_SLIDES[slide];
+  const isLast = slide === INTRO_SLIDES.length - 1;
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'#05070F',display:'flex',flexDirection:'column',
+      alignItems:'center',justifyContent:'center',overflow:'hidden',zIndex:500}}>
+      <div className="cover-orb1" style={{opacity:0.4}}/><div className="cover-orb2" style={{opacity:0.3}}/>
+      <div className="grid"/>
+
+      {/* Skip button */}
+      {!isLast && (
+        <button onClick={skip} style={{position:'absolute',top:24,right:20,
+          background:'none',border:'none',color:'rgba(255,255,255,0.35)',
+          fontSize:13,cursor:'pointer',fontFamily:'Inter,sans-serif',letterSpacing:0.3}}>
+          Skip
+        </button>
+      )}
+
+      {/* Slide content */}
+      <div key={animKey} className="ob-slide-enter" style={{
+        width:'100%',maxWidth:400,padding:'0 32px',textAlign:'center',
+        display:'flex',flexDirection:'column',alignItems:'center',gap:0,
+        position:'relative',zIndex:10,
+      }}>
+        {/* Big emoji */}
+        <div className="ob-emoji-pop" style={{fontSize:80,marginBottom:24,lineHeight:1}}>
+          {s.emoji}
+        </div>
+
+        {/* Title */}
+        <h2 style={{color:'#F1F5F9',fontSize:26,fontWeight:900,
+          fontFamily:"'Syne',sans-serif",marginBottom:14,lineHeight:1.2}}>
+          {s.title}
+        </h2>
+
+        {/* Sub */}
+        <p style={{color:'rgba(255,255,255,0.6)',fontSize:15,lineHeight:1.65,marginBottom:24,maxWidth:320}}>
+          {s.sub}
+        </p>
+
+        {/* Levels mini display */}
+        {s.extra === 'levels' && (
+          <div style={{display:'flex',gap:4,flexWrap:'wrap',justifyContent:'center',marginBottom:20,maxWidth:300}}>
+            {FLAME_LEVELS.map((lv,i)=>(
+              <div key={i} style={{
+                padding:'4px 8px',borderRadius:8,fontSize:10,fontWeight:700,
+                background:'rgba(255,102,0,0.1)',border:'1px solid rgba(255,102,0,0.25)',
+                color:'rgba(255,180,80,0.9)',letterSpacing:0.3,
+              }}>{lv.emoji} {lv.name}</div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Progress dots */}
+      <div style={{display:'flex',gap:8,marginTop:40,position:'relative',zIndex:10}}>
+        {INTRO_SLIDES.map((_,i)=>(
+          <div key={i} style={{
+            width:i===slide?20:7,height:7,borderRadius:4,
+            background:i===slide?'#FF6600':'rgba(255,255,255,0.2)',
+            transition:'all 0.3s ease',
+          }}/>
+        ))}
+      </div>
+
+      {/* Next / Done button */}
+      <button onClick={goNext} style={{
+        marginTop:32,padding:'15px 48px',borderRadius:16,border:'none',cursor:'pointer',
+        background:'linear-gradient(135deg,#FF5C00,#FF8C00)',
+        color:'#fff',fontSize:16,fontWeight:800,
+        fontFamily:"'Syne',sans-serif",letterSpacing:0.5,
+        boxShadow:'0 8px 24px rgba(255,92,0,0.4)',
+        position:'relative',zIndex:10,
+        transition:'transform 0.1s ease',
+      }}>
+        {isLast ? "Let's Go 🚀" : "Next →"}
+      </button>
+    </div>
+  );
+}
+
 // ── WEEK BAR — sliding multi-week ────────────────────────────────────────────
 function WeekBar({history,selectedDate,onSelectDate}){
   const today=new Date();
@@ -753,15 +941,56 @@ function WeekBar({history,selectedDate,onSelectDate}){
 }
 
 // ── ALL-DONE POPUP — cinematic flame buildup ──────────────────────────────────
+async function shareStreak(streak, levelName, levelEmoji, userName) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 400; canvas.height = 300;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0,0,400,300);
+    ctx.strokeStyle = '#FF6600';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(6,6,388,288);
+    ctx.fillStyle = '#FF6600';
+    ctx.font = 'bold 28px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('TINT', 200, 50);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 64px system-ui';
+    ctx.fillText(`${streak}`, 200, 150);
+    ctx.font = '20px system-ui';
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText('day streak', 200, 180);
+    ctx.fillStyle = '#FF6600';
+    ctx.font = 'bold 24px system-ui';
+    ctx.fillText(`${levelEmoji} ${levelName}`, 200, 230);
+    ctx.fillStyle = '#64748b';
+    ctx.font = '16px system-ui';
+    ctx.fillText(userName || 'TINT Student', 200, 265);
+    canvas.toBlob(async (blob) => {
+      const file = new File([blob], 'tint-streak.png', {type:'image/png'});
+      if(navigator.share && navigator.canShare({files:[file]})) {
+        await navigator.share({title:`${streak} day streak on TINT!`, files:[file]});
+      } else {
+        const a = document.createElement('a');
+        a.href = canvas.toDataURL();
+        a.download = 'tint-streak.png';
+        a.click();
+      }
+    });
+  } catch(e) { console.log(e); }
+}
+
 function AllDonePopup({streak,userName,onClose}){
   const [phase,setPhase]=useState("spiral");
   useEffect(()=>{
-    const t1=setTimeout(()=>setPhase("burst"),1200);
-    const t2=setTimeout(()=>setPhase("show"),2200);
+    const t1=setTimeout(()=>setPhase("burst"),1500);
+    const t2=setTimeout(()=>setPhase("show"),2500);
     return()=>{clearTimeout(t1);clearTimeout(t2);};
   },[]);
 
   const displayStreak=Math.max(1,streak);
+  const level=getFlameLevel(displayStreak);
   const msg=displayStreak>=14
     ?`${displayStreak} days straight. Elite territory, ${userName}.`
     :displayStreak>=7
@@ -770,75 +999,84 @@ function AllDonePopup({streak,userName,onClose}){
     ?`${displayStreak} days strong. The habit is forming.`
     :`First day done! Come back tomorrow to start your streak.`;
 
-  // 6 small flames spiral in from edges
-  const spiralFlames=Array.from({length:6},(_,i)=>{
-    const angle=(i/6)*360;
-    const dist=phase==='spiral'?130:0;
-    const rot=phase==='spiral'?angle:0;
-    const scale=phase==='spiral'?0.6:1;
-    return{angle,dist,rot,scale,delay:i*0.08};
-  });
+  // Phase 1: 6 small flames fly in from edges
+  const edgePositions=[
+    {x:-140,y:-100},{x:0,y:-140},{x:140,y:-100},
+    {x:140,y:100},{x:0,y:140},{x:-140,y:100},
+  ];
 
   return(
     <div style={{position:"fixed",inset:0,zIndex:300,background:"rgba(4,6,14,0.97)",
       display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
       overflow:"hidden",animation:"fadeIn 0.2s ease forwards"}}>
 
-      {/* Spiral flames converging */}
-      {phase!=='show'&&(
+      {/* Phase 1: flames flying in from edges */}
+      {phase==='spiral'&&(
         <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',pointerEvents:'none'}}>
-          {spiralFlames.map((f,i)=>{
-            const rad=f.angle*Math.PI/180;
-            const x=Math.cos(rad)*f.dist;
-            const y=Math.sin(rad)*f.dist;
-            return(
-              <div key={i} style={{
-                position:'absolute',
-                transform:`translate(${phase==='spiral'?x:0}px,${phase==='spiral'?y:0}px) rotate(${phase==='spiral'?f.angle:0}deg) scale(${phase==='burst'?1.4:0.7})`,
-                transition:`transform ${phase==='spiral'?0.8:0.4}s cubic-bezier(0.22,1,0.36,1) ${f.delay}s, opacity 0.3s ease ${f.delay}s`,
-                opacity:phase==='show'?0:1,
-              }}>
-                <FlameIcon streak={streak} size={phase==='burst'?36:22}/>
-              </div>
-            );
-          })}
+          {edgePositions.map((pos,i)=>(
+            <div key={i} style={{
+              position:'absolute',
+              transform:`translate(${pos.x}px,${pos.y}px) scale(0.8)`,
+              animation:`flamesFlyIn 0.6s ease ${i*0.1}s both`,
+            }}>
+              <FlameIcon streak={streak} size={22}/>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Burst / main content */}
+      {/* Phase 2: center flame burst with glow ring */}
       {phase==='burst'&&(
-        <div style={{
-          display:'flex',flexDirection:'column',alignItems:'center',
-          animation:'contentReveal 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards',
-        }}>
-          <div style={{transform:'scale(2.2)',marginBottom:24}}>
-            <FlameIcon streak={streak} size={48}/>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',position:'relative'}}>
+          {/* Glow ring expanding */}
+          <div style={{
+            position:'absolute',width:80,height:80,borderRadius:'50%',
+            border:'3px solid rgba(255,102,0,0.8)',
+            animation:'glowRingExpand 0.8s ease forwards',
+            pointerEvents:'none',
+          }}/>
+          <div style={{animation:'centerFlameReveal 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards'}}>
+            <FlameIcon streak={streak} size={60}/>
           </div>
         </div>
       )}
 
+      {/* Phase 3: full content */}
       {phase==='show'&&(
         <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'0 32px',textAlign:'center',
-          animation:'contentReveal 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards'}}>
-          <div style={{marginBottom:20}}>
-            <FlameIcon streak={streak} size={72}/>
+          animation:'contentReveal 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards',width:'100%',maxWidth:360}}>
+          <div style={{marginBottom:16}}>
+            <FlameIcon streak={streak} size={80}/>
           </div>
-          <div style={{fontSize:48,fontWeight:900,color:'#fff',letterSpacing:-2,marginBottom:8,lineHeight:1}}>
+          {/* Level badge */}
+          <div style={{fontSize:26,fontWeight:900,color:'#FF6600',marginBottom:4,letterSpacing:0.5}}>
+            {level.emoji} {level.name}
+          </div>
+          <div style={{fontSize:48,fontWeight:900,color:'#fff',letterSpacing:-2,marginBottom:4,lineHeight:1}}>
             {displayStreak}
           </div>
-          <div style={{fontSize:14,color:'rgba(255,255,255,0.5)',letterSpacing:2,textTransform:'uppercase',marginBottom:16}}>
+          <div style={{fontSize:14,color:'rgba(255,255,255,0.5)',letterSpacing:2,textTransform:'uppercase',marginBottom:14}}>
             day streak
           </div>
-          <p style={{fontSize:15,color:'rgba(255,255,255,0.75)',lineHeight:1.6,marginBottom:32,maxWidth:280}}>
+          <p style={{fontSize:15,color:'rgba(255,255,255,0.75)',lineHeight:1.6,marginBottom:28,maxWidth:280}}>
             {msg}
           </p>
-          <button onClick={onClose} style={{
-            padding:'14px 40px',borderRadius:16,border:'none',cursor:'pointer',
-            background:'linear-gradient(135deg,#FF5C00,#FF8C00)',
-            color:'#fff',fontSize:16,fontWeight:700,letterSpacing:0.3,
-            boxShadow:'0 8px 24px rgba(255,92,0,0.4)',
-            animation:'contentReveal 0.4s ease 0.2s both',
-          }}>Keep it going 🔥</button>
+          {/* Two buttons */}
+          <div style={{display:'flex',gap:12,width:'100%'}}>
+            <button onClick={()=>shareStreak(displayStreak,level.name,level.emoji,userName)} style={{
+              flex:1,padding:'13px 0',borderRadius:14,cursor:'pointer',
+              background:'rgba(255,102,0,0.12)',border:'1.5px solid rgba(255,102,0,0.4)',
+              color:'#FB923C',fontSize:15,fontWeight:700,letterSpacing:0.3,
+              fontFamily:'Inter,sans-serif',
+            }}>Share 🔗</button>
+            <button onClick={onClose} style={{
+              flex:1,padding:'13px 0',borderRadius:14,border:'none',cursor:'pointer',
+              background:'linear-gradient(135deg,#FF5C00,#FF8C00)',
+              color:'#fff',fontSize:15,fontWeight:700,letterSpacing:0.3,
+              boxShadow:'0 6px 20px rgba(255,92,0,0.4)',
+              fontFamily:'Inter,sans-serif',
+            }}>Done ✓</button>
+          </div>
         </div>
       )}
     </div>
@@ -908,26 +1146,89 @@ function EditProfileSheet({name,avatar,exams,onSave,onClose}){
 
 // ── FOCUS SCREEN ──────────────────────────────────────────────────────────────
 const FOCUS_APPS=[
-  {id:'whatsapp',name:'WhatsApp',icon:'💬'},
   {id:'instagram',name:'Instagram',icon:'📸'},
   {id:'youtube',name:'YouTube',icon:'▶️'},
   {id:'twitter',name:'X / Twitter',icon:'🐦'},
-  {id:'tiktok',name:'TikTok',icon:'🎵'},
   {id:'snapchat',name:'Snapchat',icon:'👻'},
-  {id:'games',name:'Games',icon:'🎮'},
+  {id:'whatsapp',name:'WhatsApp',icon:'💬'},
+  {id:'reddit',name:'Reddit',icon:'🤖'},
+  {id:'tiktok',name:'TikTok',icon:'🎵'},
   {id:'netflix',name:'Netflix',icon:'🎬'},
+  {id:'games',name:'Games',icon:'🎮'},
 ];
+
+function DistractionBlockSheet({blocked,onToggle,onClose}){
+  return(
+    <div style={{position:'fixed',inset:0,zIndex:400,background:'rgba(0,0,0,0.6)',display:'flex',alignItems:'flex-end'}}>
+      <div className="distraction-sheet" style={{width:'100%',background:'#0F172A',borderRadius:'20px 20px 0 0',
+        border:'1px solid rgba(255,255,255,0.08)',maxHeight:'80vh',overflow:'hidden',display:'flex',flexDirection:'column'}}>
+        {/* Handle */}
+        <div style={{display:'flex',justifyContent:'center',padding:'12px 0 0'}}>
+          <div style={{width:36,height:4,borderRadius:2,background:'rgba(255,255,255,0.15)'}}/>
+        </div>
+        {/* Header */}
+        <div style={{padding:'14px 20px 10px',display:'flex',alignItems:'center',justifyContent:'space-between',
+          borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:800,color:'#fff'}}>🔒 Distraction Block</div>
+            <div style={{fontSize:12,color:'rgba(255,255,255,0.4)',marginTop:2}}>Toggle apps to remember to avoid during focus</div>
+          </div>
+          <button onClick={onClose} style={{background:'rgba(255,255,255,0.07)',border:'none',
+            color:'rgba(255,255,255,0.6)',fontSize:18,cursor:'pointer',borderRadius:8,
+            width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+        </div>
+        {/* App list */}
+        <div style={{overflowY:'auto',padding:'12px 16px 32px'}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+            {FOCUS_APPS.map(app=>{
+              const on=blocked.includes(app.id);
+              return(
+                <button key={app.id} onClick={()=>onToggle(app.id)} style={{
+                  display:'flex',alignItems:'center',gap:10,padding:'12px 14px',
+                  borderRadius:14,border:`1.5px solid ${on?'rgba(239,68,68,0.5)':'rgba(255,255,255,0.1)'}`,
+                  background:on?'rgba(239,68,68,0.08)':'rgba(255,255,255,0.04)',
+                  cursor:'pointer',textAlign:'left',transition:'all 0.15s',
+                }}>
+                  <span style={{fontSize:22}}>{app.icon}</span>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600,color:on?'#FCA5A5':'rgba(255,255,255,0.7)'}}>{app.name}</div>
+                    <div style={{fontSize:10,color:on?'rgba(239,68,68,0.7)':'rgba(255,255,255,0.3)'}}>{on?'blocked':'allowed'}</div>
+                  </div>
+                  <div style={{marginLeft:'auto',width:8,height:8,borderRadius:'50%',background:on?'#EF4444':'rgba(255,255,255,0.15)'}}/>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{marginTop:16,padding:'10px 14px',borderRadius:12,
+            background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.25)',
+            fontSize:12,color:'rgba(255,255,255,0.5)',lineHeight:1.6}}>
+            💡 For real app blocking, use <strong style={{color:'rgba(255,255,255,0.7)'}}>Screen Time</strong> (iPhone) or <strong style={{color:'rgba(255,255,255,0.7)'}}>Digital Wellbeing</strong> (Android).
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
   const [phase,setPhase]=useState('setup'); // 'setup'|'breathe'|'active'|'done'
   const [duration,setDuration]=useState(25);
-  const [blocked,setBlocked]=useState(['instagram','youtube','tiktok']);
+  const [blocked,setBlocked]=useState(()=>{
+    try{const s=localStorage.getItem('tint_blocked_apps');return s?JSON.parse(s):['instagram','youtube','tiktok'];}catch{return['instagram','youtube','tiktok'];}
+  });
+  const [showBlockSheet,setShowBlockSheet]=useState(false);
   const [timeLeft,setTimeLeft]=useState(0);
   const timerRef=useRef(null);
 
-  const toggle=(id)=>setBlocked(b=>b.includes(id)?b.filter(x=>x!==id):[...b,id]);
+  const toggle=(id)=>setBlocked(b=>{
+    const next=b.includes(id)?b.filter(x=>x!==id):[...b,id];
+    localStorage.setItem('tint_blocked_apps',JSON.stringify(next));
+    return next;
+  });
 
-  const startFocus=()=>{ setPhase('breathe'); };
+  const startFocus=()=>{
+    setPhase('breathe');
+  };
 
   useEffect(()=>{
     if(phase!=='breathe')return;
@@ -956,11 +1257,19 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
 
   return(
     <div className="app-screen" style={{background:'#05070F',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      {/* Distraction block sheet */}
+      {showBlockSheet&&<DistractionBlockSheet blocked={blocked} onToggle={toggle} onClose={()=>setShowBlockSheet(false)}/>}
+
       {/* Header */}
       <div style={{padding:'16px 20px 12px',display:'flex',alignItems:'center',gap:12,borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
         <button onClick={onBack} style={{background:'none',border:'none',color:'rgba(255,255,255,0.5)',fontSize:20,cursor:'pointer',padding:4}}>←</button>
         <div style={{fontSize:18,fontWeight:700,color:'#fff',letterSpacing:-0.3}}>Focus Mode</div>
-        <div style={{marginLeft:'auto',fontSize:11,color:'rgba(255,255,255,0.35)',letterSpacing:0.5}}>DEEP WORK</div>
+        <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}}>
+          <div style={{fontSize:11,color:'rgba(255,255,255,0.35)',letterSpacing:0.5}}>DEEP WORK</div>
+          <button onClick={()=>setShowBlockSheet(true)} style={{background:'rgba(255,255,255,0.06)',
+            border:'1px solid rgba(255,255,255,0.1)',borderRadius:8,color:'rgba(255,255,255,0.6)',
+            fontSize:14,cursor:'pointer',padding:'4px 8px',fontFamily:'Inter,sans-serif'}}>⚙️</button>
+        </div>
       </div>
 
       <div style={{flex:1,overflowY:'auto',padding:'0 20px 20px'}}>
@@ -979,32 +1288,24 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
           ))}
         </div>
 
-        {/* App toggles */}
-        <div style={{fontSize:12,color:'rgba(255,255,255,0.4)',letterSpacing:1,textTransform:'uppercase',marginBottom:12}}>Apps to avoid</div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:32}}>
-          {FOCUS_APPS.map(app=>{
-            const on=blocked.includes(app.id);
-            return(
-              <button key={app.id} onClick={()=>toggle(app.id)} style={{
-                display:'flex',alignItems:'center',gap:10,padding:'12px 14px',
-                borderRadius:14,border:`1.5px solid ${on?'rgba(239,68,68,0.5)':'rgba(255,255,255,0.1)'}`,
-                background:on?'rgba(239,68,68,0.08)':'rgba(255,255,255,0.04)',
-                cursor:'pointer',textAlign:'left',transition:'all 0.15s',
-              }}>
-                <span style={{fontSize:22}}>{app.icon}</span>
-                <div>
-                  <div style={{fontSize:13,fontWeight:600,color:on?'#FCA5A5':'rgba(255,255,255,0.7)'}}>{app.name}</div>
-                  <div style={{fontSize:10,color:on?'rgba(239,68,68,0.7)':'rgba(255,255,255,0.3)'}}>{on?'blocked':'allowed'}</div>
-                </div>
-                <div style={{marginLeft:'auto',width:8,height:8,borderRadius:'50%',background:on?'#EF4444':'rgba(255,255,255,0.15)'}}/>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Note */}
-        <div style={{background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.25)',borderRadius:12,padding:'12px 14px',marginBottom:28,fontSize:12,color:'rgba(255,255,255,0.5)',lineHeight:1.6}}>
-          💡 For real app blocking, use <strong style={{color:'rgba(255,255,255,0.7)'}}>Screen Time</strong> (iPhone) or <strong style={{color:'rgba(255,255,255,0.7)'}}>Digital Wellbeing</strong> (Android). This focus screen keeps you accountable in TINT.
+        {/* Distraction block summary */}
+        <div style={{marginBottom:28}}>
+          <button onClick={()=>setShowBlockSheet(true)} style={{
+            width:'100%',display:'flex',alignItems:'center',gap:12,padding:'14px 16px',
+            borderRadius:14,border:'1.5px solid rgba(239,68,68,0.25)',
+            background:'rgba(239,68,68,0.05)',cursor:'pointer',textAlign:'left',
+          }}>
+            <span style={{fontSize:22}}>🔒</span>
+            <div style={{flex:1}}>
+              <div style={{fontSize:14,fontWeight:700,color:'rgba(255,255,255,0.8)'}}>Distraction Block</div>
+              <div style={{fontSize:12,color:'rgba(255,255,255,0.4)',marginTop:2}}>
+                {blocked.length>0
+                  ?`${blocked.length} app${blocked.length>1?'s':''} marked — ${blocked.map(id=>FOCUS_APPS.find(a=>a.id===id)?.name).filter(Boolean).join(', ')}`
+                  :'Tap to configure apps to avoid'}
+              </div>
+            </div>
+            <span style={{fontSize:12,color:'rgba(255,255,255,0.35)'}}>⚙️</span>
+          </button>
         </div>
 
         <button onClick={startFocus} style={{
@@ -1078,8 +1379,17 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
           </div>
 
           <div style={{fontSize:16,color:'rgba(255,255,255,0.7)',marginBottom:8,fontWeight:500}}>Stay locked in 🔒</div>
-          <div style={{fontSize:13,color:'rgba(255,255,255,0.35)',marginBottom:32,textAlign:'center',lineHeight:1.5}}>
-            {blocked.length>0?`Avoiding: ${blocked.map(id=>FOCUS_APPS.find(a=>a.id===id)?.name).filter(Boolean).join(', ')}`:'No apps blocked'}
+          {blocked.length>0?(
+            <div style={{marginBottom:20,padding:'8px 16px',borderRadius:20,
+              background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',
+              fontSize:12,color:'#FCA5A5',fontWeight:600,letterSpacing:0.3}}>
+              🔒 {blocked.length} app{blocked.length>1?'s':''} blocked
+            </div>
+          ):(
+            <div style={{fontSize:13,color:'rgba(255,255,255,0.3)',marginBottom:20}}>No apps blocked</div>
+          )}
+          <div style={{fontSize:11,color:'rgba(255,255,255,0.25)',marginBottom:28,textAlign:'center',lineHeight:1.6,maxWidth:240}}>
+            {blocked.length>0?'Go to Screen Time / Digital Wellbeing to block these apps':''}
           </div>
 
           <button onClick={endFocus} style={{
@@ -1387,6 +1697,9 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
         )}
 
         <MissedTaskAlert history={history} tasks={tasks} onDismiss={()=>{}}/>
+
+        {/* UCEED Countdown */}
+        <UCEEDCountdown/>
 
         {/* Filter + Add */}
         <div style={{padding:"12px 16px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -1890,6 +2203,7 @@ export default function TINT(){
   const [missed,setMissed]        = useState(0);
   const [showEdit,setShowEdit]    = useState(false);
   const [showDev,setShowDev]      = useState(false);
+  const [introDone,setIntroDone]  = useState(()=>!!localStorage.getItem('tint_intro_done'));
 
   const setTasks=upd=>{
     setTasksRaw(prev=>{const next=typeof upd==="function"?upd(prev):upd;save("tint_tasks3",next);return next;});
@@ -1991,9 +2305,10 @@ export default function TINT(){
 
   return(
     <div style={{position:"relative",width:"100%",minHeight:"100vh",minHeight:"100dvh",background:"#05070F"}}>
-      {screen==="cover"      &&<CoverScreen onDone={handleCoverDone}/>}
-      {screen==="onboard"    &&<OnboardingScreen onDone={handleOnboardDone}/>}
-      {screen==="home"       &&<HomeScreen
+      {!introDone&&<AppIntroOnboarding onDone={()=>setIntroDone(true)}/>}
+      {introDone&&screen==="cover"      &&<CoverScreen onDone={handleCoverDone}/>}
+      {introDone&&screen==="onboard"    &&<OnboardingScreen onDone={handleOnboardDone}/>}
+      {introDone&&screen==="home"       &&<HomeScreen
         tasks={activeTasks} setTasks={setTasks}
         streak={streak} missed={missed} rank={rank} isCarrot={isCarrot}
         userName={userName||"Friend"} userAvatar={userAvatar}
@@ -2005,21 +2320,21 @@ export default function TINT(){
         onOpenDev={()=>setShowDev(true)}
         onLogPastDay={handlePastDayLog}
       />}
-      {screen==="focus"      &&<FocusScreen
+      {introDone&&screen==="focus"      &&<FocusScreen
         onBack={()=>setScreen("home")}
         onTasks={()=>setScreen("home")}
         onFocus={()=>{}}
         onProgress={()=>setScreen("progress")}
         onLeaderboard={()=>setScreen("leaderboard")}
       />}
-      {screen==="progress"   &&<ConsistencyScreen
+      {introDone&&screen==="progress"   &&<ConsistencyScreen
         history={history} tasks={activeTasks} streak={streak}
         onBack={()=>setScreen("home")}
         onTasks={()=>setScreen("home")}
         onFocus={()=>setScreen("focus")}
         onLeaderboard={()=>setScreen("leaderboard")}
       />}
-      {screen==="leaderboard"&&<LeaderboardScreen
+      {introDone&&screen==="leaderboard"&&<LeaderboardScreen
         streak={streak} rank={rank}
         userAvatar={userAvatar} userName={userName||"You"}
         onBack={()=>setScreen("home")}
