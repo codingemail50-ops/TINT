@@ -320,6 +320,21 @@ input:focus{outline:none;border-color:rgba(99,102,241,0.6)!important;}
 @keyframes centerFlameReveal{0%{transform:scale(0);opacity:0;}60%{transform:scale(1.2);opacity:1;}100%{transform:scale(1);opacity:1;}}
 @keyframes glowRingExpand{0%{transform:scale(0.5);opacity:0.8;}100%{transform:scale(3.5);opacity:0;}}
 
+/* ── Sandclock focus timer ── */
+@keyframes sandFall{
+  0%{transform:translateY(-8px);opacity:0;}
+  30%{opacity:1;}
+  100%{transform:translateY(24px);opacity:0;}
+}
+@keyframes sandFall2{
+  0%{transform:translateY(-6px);opacity:0;}
+  40%{opacity:0.8;}
+  100%{transform:translateY(20px);opacity:0;}
+}
+.sand-particle{animation:sandFall 1.2s ease-in infinite;}
+.sand-particle2{animation:sandFall2 1.8s ease-in infinite 0.4s;}
+.sand-particle3{animation:sandFall 2.1s ease-in infinite 0.9s;}
+
 /* ── Focus distraction modal ── */
 @keyframes sheetSlideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
 .distraction-sheet{animation:sheetSlideUp 0.35s cubic-bezier(0.22,1,0.36,1) forwards;}
@@ -1362,39 +1377,80 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
       })()}
 
       {phase==='active'&&(
-        <div style={{display:'flex',flexDirection:'column',alignItems:'center',paddingTop:32}}>
-          {/* Big timer */}
-          <div style={{position:'relative',width:200,height:200,marginBottom:32}}>
-            <svg viewBox="0 0 200 200" style={{position:'absolute',inset:0,transform:'rotate(-90deg)'}}>
-              <circle cx="100" cy="100" r="90" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="8"/>
-              <circle cx="100" cy="100" r="90" fill="none" stroke="#6366F1" strokeWidth="8"
-                strokeDasharray={`${2*Math.PI*90}`}
-                strokeDashoffset={`${2*Math.PI*90*(1-pct/100)}`}
-                strokeLinecap="round" style={{transition:'stroke-dashoffset 1s linear'}}/>
-            </svg>
-            <div style={{position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
-              <div style={{fontSize:48,fontWeight:800,color:'#fff',letterSpacing:-2,fontVariantNumeric:'tabular-nums'}}>{mins}:{secs}</div>
-              <div style={{fontSize:12,color:'rgba(255,255,255,0.4)',marginTop:4,letterSpacing:1}}>REMAINING</div>
-            </div>
-          </div>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',paddingTop:28}}>
+          {/* Sandclock */}
+          {(()=>{
+            const topFill = 1 - pct/100; // 1 = full at start, 0 = empty at end
+            const botFill = pct/100;
+            const HG_W=110, HG_H=200;
+            const neckY=HG_H/2, neckR=5;
+            const topH=Math.round(topFill*(neckY-16));
+            const botH=Math.round(botFill*(neckY-16));
+            return(
+              <div style={{position:'relative',width:HG_W,height:HG_H,marginBottom:24}}>
+                <svg width={HG_W} height={HG_H} viewBox={`0 0 ${HG_W} ${HG_H}`}>
+                  {/* Hourglass outline */}
+                  <path d={`M10,0 L${HG_W-10},0 L${HG_W/2+neckR},${neckY} L${HG_W-10},${HG_H} L10,${HG_H} L${HG_W/2-neckR},${neckY} Z`}
+                    fill="rgba(99,102,241,0.06)" stroke="rgba(99,102,241,0.25)" strokeWidth="1.5"/>
+                  {/* Top sand — fills upper triangle */}
+                  {topH>0&&(
+                    <clipPath id="topClip">
+                      <rect x="0" y={neckY-topH} width={HG_W} height={topH}/>
+                    </clipPath>
+                  )}
+                  {topH>0&&(
+                    <path d={`M10,0 L${HG_W-10},0 L${HG_W/2+neckR},${neckY} L${HG_W/2-neckR},${neckY} Z`}
+                      fill="rgba(99,102,241,0.55)" clipPath="url(#topClip)"
+                      style={{transition:'all 1s linear'}}/>
+                  )}
+                  {/* Bottom sand — fills lower triangle */}
+                  {botH>0&&(
+                    <clipPath id="botClip">
+                      <rect x="0" y={HG_H-botH} width={HG_W} height={botH}/>
+                    </clipPath>
+                  )}
+                  {botH>0&&(
+                    <path d={`M${HG_W/2-neckR},${neckY} L${HG_W/2+neckR},${neckY} L${HG_W-10},${HG_H} L10,${HG_H} Z`}
+                      fill="rgba(139,92,246,0.6)" clipPath="url(#botClip)"
+                      style={{transition:'all 1s linear'}}/>
+                  )}
+                  {/* Falling sand particles */}
+                  {topFill>0.02&&<>
+                    <circle className="sand-particle"  cx={HG_W/2-1} cy={neckY} r="1.5" fill="rgba(168,85,247,0.9)"/>
+                    <circle className="sand-particle2" cx={HG_W/2+1} cy={neckY} r="1" fill="rgba(99,102,241,0.8)"/>
+                    <circle className="sand-particle3" cx={HG_W/2}   cy={neckY} r="2" fill="rgba(192,132,252,0.7)"/>
+                  </>}
+                  {/* Neck line */}
+                  <line x1={HG_W/2-neckR} y1={neckY} x2={HG_W/2+neckR} y2={neckY}
+                    stroke="rgba(99,102,241,0.4)" strokeWidth="1"/>
+                </svg>
+                {/* Glow under bottom */}
+                {botFill>0.1&&<div style={{
+                  position:'absolute',bottom:0,left:'20%',right:'20%',height:botFill*40,
+                  background:'radial-gradient(ellipse,rgba(139,92,246,0.35),transparent 70%)',
+                  borderRadius:'50%',pointerEvents:'none',transition:'height 1s linear'
+                }}/>}
+              </div>
+            );
+          })()}
 
-          <div style={{fontSize:16,color:'rgba(255,255,255,0.7)',marginBottom:8,fontWeight:500}}>Stay locked in 🔒</div>
-          {blocked.length>0?(
-            <div style={{marginBottom:20,padding:'8px 16px',borderRadius:20,
-              background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',
-              fontSize:12,color:'#FCA5A5',fontWeight:600,letterSpacing:0.3}}>
+          {/* Time — subtle, not the focus */}
+          <div style={{fontSize:13,color:'rgba(255,255,255,0.25)',letterSpacing:2,marginBottom:6,fontVariantNumeric:'tabular-nums'}}>
+            {mins}:{secs}
+          </div>
+          <div style={{fontSize:15,color:'rgba(255,255,255,0.55)',marginBottom:20,fontWeight:500}}>Stay locked in</div>
+
+          {blocked.length>0&&(
+            <div style={{marginBottom:20,padding:'6px 14px',borderRadius:20,
+              background:'rgba(239,68,68,0.08)',border:'1px solid rgba(239,68,68,0.2)',
+              fontSize:11,color:'#FCA5A5',letterSpacing:0.3}}>
               🔒 {blocked.length} app{blocked.length>1?'s':''} blocked
             </div>
-          ):(
-            <div style={{fontSize:13,color:'rgba(255,255,255,0.3)',marginBottom:20}}>No apps blocked</div>
           )}
-          <div style={{fontSize:11,color:'rgba(255,255,255,0.25)',marginBottom:28,textAlign:'center',lineHeight:1.6,maxWidth:240}}>
-            {blocked.length>0?'Go to Screen Time / Digital Wellbeing to block these apps':''}
-          </div>
 
           <button onClick={endFocus} style={{
-            padding:'12px 32px',borderRadius:14,border:'1.5px solid rgba(239,68,68,0.4)',
-            background:'rgba(239,68,68,0.08)',color:'#FCA5A5',fontSize:14,fontWeight:600,cursor:'pointer',
+            padding:'10px 28px',borderRadius:14,border:'1.5px solid rgba(239,68,68,0.3)',
+            background:'rgba(239,68,68,0.06)',color:'rgba(252,165,165,0.7)',fontSize:13,fontWeight:600,cursor:'pointer',
           }}>End Session</button>
         </div>
       )}
@@ -1990,50 +2046,85 @@ function ConsistencyScreen({history,tasks,streak,onBack,onTasks,onFocus,onLeader
             </div>
           )}
         </div>
-        {/* Month calendar */}
-        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",
-          borderRadius:"18px",padding:"16px",animation:"revealUp 0.5s ease 0.2s both"}}>
-          <p style={{color:"rgba(255,255,255,0.6)",fontSize:"11px",fontWeight:600,marginBottom:"12px",letterSpacing:"0.06em",textTransform:"uppercase"}}>
-            {monthName}
-          </p>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:"4px",marginBottom:"4px"}}>
-            {["M","T","W","T","F","S","S"].map((d,i)=>(
-              <div key={i} style={{textAlign:"center",color:"rgba(255,255,255,0.35)",fontSize:"9px",fontWeight:600,padding:"4px 0"}}>{d}</div>
-            ))}
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:"4px"}}>
-            {Array.from({length:monthOffset},(_,i)=><div key={"e"+i}/>)}
-            {Array.from({length:daysInMonth},(_,i)=>{
-              const dayNum=i+1;
-              const dateStr=`${year}-${String(month+1).padStart(2,"0")}-${String(dayNum).padStart(2,"0")}`;
-              const st=dayStatus(dateStr);
-              const isToday=dateStr===todayStr;
-              const isFuture=new Date(dateStr)>now&&dateStr!==todayStr;
-              return(
-                <div key={dayNum} title={`${dateStr}: ${statusLabel[st]}`} style={{
-                  aspectRatio:"1",borderRadius:"8px",
-                  background:isFuture?"rgba(255,255,255,0.03)":statusColor[st],
-                  border:isToday?"2px solid #818CF8":"1px solid rgba(255,255,255,0.05)",
-                  display:"flex",alignItems:"center",justifyContent:"center",
-                  boxShadow:st==="green"&&!isFuture?"0 0 8px rgba(34,197,94,0.4)":
-                            st==="yellow"&&!isFuture?"0 0 8px rgba(251,191,36,0.3)":
-                            st==="red"&&!isFuture?"0 0 6px rgba(239,68,68,0.3)":"none"}}>
-                  <span style={{fontSize:"9px",
-                    color:isFuture?"rgba(255,255,255,0.12)":st==="none"?"rgba(255,255,255,0.3)":"rgba(0,0,0,0.75)",
-                    fontWeight:700}}>{dayNum}</span>
-                </div>
-              );
-            })}
-          </div>
-          <div style={{display:"flex",gap:"12px",marginTop:"12px",flexWrap:"wrap"}}>
-            {[{c:"#22C55E",l:"All done"},{c:"#FBBF24",l:"Partial"},{c:"#EF4444",l:"Missed"},{c:"rgba(255,255,255,0.07)",l:"No data"}].map(({c,l})=>(
-              <div key={l} style={{display:"flex",alignItems:"center",gap:"5px"}}>
-                <div style={{width:"10px",height:"10px",borderRadius:"3px",background:c}}/>
-                <span style={{color:"rgba(255,255,255,0.45)",fontSize:"10px"}}>{l}</span>
+        {/* UCEED countdown grid — one square per day until Jan 17 2027 */}
+        {(()=>{
+          const UCEED_DATE = new Date('2027-01-17T00:00:00');
+          const todayMid = new Date(todayStr+'T00:00:00');
+          const totalDays = Math.ceil((UCEED_DATE - todayMid)/86400000);
+          const doneCount = Array.from({length:totalDays},(_,i)=>{
+            const d=new Date(todayMid); d.setDate(d.getDate()+i);
+            return dayStatus(d.toISOString().slice(0,10));
+          }).filter(s=>s==='green').length;
+          const pctFilled = totalDays>0?Math.round(doneCount/totalDays*100):0;
+
+          // group into months for labels
+          const months=[];
+          let cur=new Date(todayMid);
+          while(cur<UCEED_DATE){
+            const mLabel=cur.toLocaleString('en-IN',{month:'short',year:'2-digit'});
+            const mStart=new Date(cur);
+            let count=0;
+            const mEnd=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+            while(cur<UCEED_DATE&&cur<mEnd){count++;cur.setDate(cur.getDate()+1);}
+            months.push({label:mLabel,count,startDate:mStart});
+          }
+
+          return(
+            <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",
+              borderRadius:"18px",padding:"16px",animation:"revealUp 0.5s ease 0.2s both"}}>
+              {/* Header */}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:12}}>
+                <p style={{color:"rgba(255,255,255,0.6)",fontSize:"11px",fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase"}}>
+                  UCEED 2027 — {totalDays} days to go
+                </p>
+                <span style={{color:"#22C55E",fontSize:"11px",fontWeight:700}}>{pctFilled}% filled</span>
               </div>
-            ))}
-          </div>
-        </div>
+
+              {/* Month-labelled grid */}
+              {months.map(({label,count,startDate})=>{
+                const days=Array.from({length:count},(_,i)=>{
+                  const d=new Date(startDate); d.setDate(d.getDate()+i);
+                  return d.toISOString().slice(0,10);
+                });
+                return(
+                  <div key={label} style={{marginBottom:8}}>
+                    <div style={{fontSize:"9px",color:"rgba(255,255,255,0.25)",letterSpacing:"0.08em",
+                      textTransform:"uppercase",marginBottom:4}}>{label}</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:"3px"}}>
+                      {days.map(dateStr=>{
+                        const st=dayStatus(dateStr);
+                        const isToday=dateStr===todayStr;
+                        const isFuture=new Date(dateStr+'T00:00:00')>new Date(todayStr+'T00:00:00');
+                        const bg=isFuture?"rgba(255,255,255,0.04)"
+                          :st==="green"?"#22C55E"
+                          :st==="yellow"?"#FBBF24"
+                          :st==="red"?"#EF4444"
+                          :"rgba(255,255,255,0.09)";
+                        return(
+                          <div key={dateStr} title={dateStr} style={{
+                            width:10,height:10,borderRadius:2,background:bg,flexShrink:0,
+                            border:isToday?"1.5px solid #818CF8":"none",
+                            boxShadow:st==="green"&&!isFuture?"0 0 4px rgba(34,197,94,0.5)":"none",
+                          }}/>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Legend */}
+              <div style={{display:"flex",gap:"12px",marginTop:"10px",flexWrap:"wrap"}}>
+                {[{c:"#22C55E",l:"All done"},{c:"#FBBF24",l:"Partial"},{c:"#EF4444",l:"Missed"},{c:"rgba(255,255,255,0.09)",l:"Upcoming"}].map(({c,l})=>(
+                  <div key={l} style={{display:"flex",alignItems:"center",gap:"5px"}}>
+                    <div style={{width:"9px",height:"9px",borderRadius:"2px",background:c}}/>
+                    <span style={{color:"rgba(255,255,255,0.4)",fontSize:"9px"}}>{l}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         {/* Motivational note */}
         <div style={{background:consistency>=70?"rgba(34,197,94,0.07)":"rgba(99,102,241,0.07)",
           border:"1px solid "+(consistency>=70?"rgba(34,197,94,0.2)":"rgba(99,102,241,0.2)"),
