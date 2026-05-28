@@ -313,7 +313,7 @@ input:focus{outline:none;border-color:rgba(99,102,241,0.6)!important;}
 @keyframes slideEnter{from{opacity:0;transform:translateX(60px);}to{opacity:1;transform:translateX(0);}}
 @keyframes slideExit{from{opacity:1;transform:translateX(0);}to{opacity:0;transform:translateX(-60px);}}
 @keyframes emojiPop{0%{transform:scale(0) rotate(-20deg);opacity:0;}60%{transform:scale(1.2) rotate(5deg);opacity:1;}100%{transform:scale(1) rotate(0deg);opacity:1;}}
-@keyframes pixelPop{0%{transform:scale(1.8);opacity:1;}50%{transform:scale(0.9);}100%{transform:scale(0);opacity:0;}}
+@keyframes pixelFade{0%{opacity:1;transform:scale(1.8);}100%{opacity:0;transform:scale(0);}}
 .ob-slide-enter{animation:slideEnter 0.4s cubic-bezier(0.22,1,0.36,1) forwards;}
 .ob-emoji-pop{animation:emojiPop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.2s both;}
 
@@ -431,15 +431,19 @@ const FLAME_FILTERS=[
   'hue-rotate(210deg) saturate(1.2)',              // 21–23 deep blue
   'saturate(0) brightness(1.8) contrast(1.1)',     // 24+   platinum
 ];
-function FlameIcon({streak,size=28}){
+function FlameIcon({streak,pct=50,size=28}){
   const tier=Math.min(Math.floor((streak||0)/3),FLAME_FILTERS.length-1);
-  const h=Math.round(size*1.6);
+  const scaleMul=pct>=70?1.4:pct>=50?1.1:pct>=30?1.0:0.72;
+  const bright=pct>=70?1.35:pct>=50?1.05:pct>=30?0.85:0.55;
+  const w=Math.round(size*scaleMul);
+  const h=Math.round(size*1.6*scaleMul);
   return(
-    <div style={{width:size,height:h,flexShrink:0,overflow:'hidden',borderRadius:'2px'}}>
+    <div style={{width:w,height:h,flexShrink:0,overflow:'hidden',borderRadius:'2px',
+      transition:'width 1s ease,height 1s ease'}}>
       <video
         autoPlay loop muted playsInline
         style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'center 10%',
-                display:'block',filter:FLAME_FILTERS[tier]}}
+                display:'block',filter:`${FLAME_FILTERS[tier]} brightness(${bright})`}}
         src={FIRE_VIDEO_B64}
       />
     </div>
@@ -553,11 +557,11 @@ function CoverScreen({onDone}){
           }}>
             {LETTERS.map((l,i)=>(
               <div key={i} style={{display:"inline-flex",alignItems:"baseline"}}>
-                <span style={{fontFamily:"'Syne',sans-serif",fontWeight:900,color:"#fff",display:"inline-block",
-                  fontSize:settled?"32px":"72px",
+                <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,color:"#fff",display:"inline-block",
+                  fontSize:settled?"36px":"72px",
                   transition:"font-size 1.5s cubic-bezier(0.4,0,0.2,1)",lineHeight:1}}>{l}</span>
-                <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:"32px",
-                  color:"#fff",display:"inline-block",overflow:"hidden",whiteSpace:"nowrap",
+                <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:"36px",
+                  color:"#ffffff",display:"inline-block",overflow:"hidden",whiteSpace:"nowrap",
                   maxWidth:settled?"200px":"0px",opacity:settled?1:0,
                   transition:`max-width 1.4s cubic-bezier(0.22,1,0.36,1) ${i*0.1}s,
                               opacity   1.0s ease                         ${0.1+i*0.1}s`,
@@ -846,7 +850,7 @@ function AppIntroOnboarding({onDone}) {
       </div>
 
       {/* Progress dots */}
-      <div style={{display:'flex',gap:8,position:'absolute',bottom:108,left:'50%',transform:'translateX(-50%)',zIndex:10}}>
+      <div style={{display:'flex',gap:8,marginTop:40,position:'relative',zIndex:10}}>
         {INTRO_SLIDES.map((_,i)=>(
           <div key={i} style={{
             width:i===slide?20:7,height:7,borderRadius:4,
@@ -858,8 +862,7 @@ function AppIntroOnboarding({onDone}) {
 
       {/* Next / Done button */}
       <button onClick={goNext} style={{
-        position:'absolute',bottom:40,left:'50%',transform:'translateX(-50%)',
-        padding:'15px 48px',borderRadius:16,border:'none',cursor:'pointer',
+        marginTop:32,padding:'15px 48px',borderRadius:16,border:'none',cursor:'pointer',
         background:'linear-gradient(135deg,#FF5C00,#FF8C00)',
         color:'#fff',fontSize:16,fontWeight:800,
         fontFamily:"'Syne',sans-serif",letterSpacing:0.5,
@@ -1031,63 +1034,45 @@ function AllDonePopup({streak,pct,userName,history,onClose}){
 
   return(
     <div style={{position:"fixed",inset:0,zIndex:300,overflow:"hidden",background:"#080C14"}}>
-      {/* Vignette fade — app disappears into darkness */}
+      {/* Dark vignette fades in */}
       <div style={{
-        position:"absolute",inset:0,zIndex:1,
-        background:"radial-gradient(ellipse at center, rgba(5,7,14,0.6) 0%, rgba(5,7,14,0.98) 65%)",
+        position:"absolute",inset:0,zIndex:1,pointerEvents:"none",
+        background:"radial-gradient(ellipse at center,rgba(5,7,14,0.5) 0%,rgba(5,7,14,0.98) 70%)",
         opacity:phase==="vignette"?1:0,
-        transition:"opacity 0.5s ease 0.3s",
-        pointerEvents:"none",
+        transition:"opacity 0.5s ease 0.2s",
       }}/>
       {/* Spark flame video */}
-      <video
-        ref={vidRef}
-        muted
-        playsInline
-        autoPlay={false}
+      <video ref={vidRef} muted playsInline autoPlay={false}
         style={{
-          position:"absolute",inset:0,
-          width:"100%",height:"100%",
-          objectFit:"cover",
-          zIndex:2,
+          position:"absolute",inset:0,width:"100%",height:"100%",
+          objectFit:"cover",zIndex:2,
           opacity:phase==="vignette"?0:1,
           transition:"opacity 0.7s ease",
         }}
-        src={SPARK_VIDEO_B64}
-      />
+        src={SPARK_VIDEO_B64}/>
       {/* Content overlay */}
       <div style={{
         position:"absolute",inset:0,zIndex:3,
-        display:"flex",flexDirection:"column",
-        alignItems:"center",justifyContent:"center",
+        display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
         padding:"0 24px",
         opacity:phase==="content"?1:0,
         transition:"opacity 0.7s ease",
         pointerEvents:phase==="content"?"auto":"none",
       }}>
         <div style={{
-          background:"rgba(5,7,14,0.72)",
-          backdropFilter:"blur(24px)",
-          WebkitBackdropFilter:"blur(24px)",
-          borderRadius:24,
-          padding:"32px 28px",
-          width:"100%",maxWidth:320,
-          border:"1px solid rgba(255,255,255,0.1)",
-          boxShadow:"0 8px 60px rgba(0,0,0,0.6)",
+          background:"rgba(5,7,14,0.72)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",
+          borderRadius:24,padding:"32px 28px",width:"100%",maxWidth:320,
+          border:"1px solid rgba(255,255,255,0.1)",boxShadow:"0 8px 60px rgba(0,0,0,0.6)",
           textAlign:"center",
         }}>
           <div style={{fontSize:42,marginBottom:6}}>{level.emoji}</div>
           <div style={{fontSize:18,fontWeight:800,color:todayColor,marginBottom:4,
-            fontFamily:"'Syne',sans-serif",letterSpacing:"-0.02em"}}>{level.name}</div>
+            fontFamily:"'Syne',sans-serif"}}>{level.name}</div>
           <div style={{fontSize:52,fontWeight:900,color:"#fff",letterSpacing:-2,
-            lineHeight:1,marginBottom:4,fontFamily:"'Syne',sans-serif"}}>
-            {displayStreak}
-          </div>
+            lineHeight:1,marginBottom:4,fontFamily:"'Syne',sans-serif"}}>{displayStreak}</div>
           <div style={{fontSize:11,color:"rgba(255,255,255,0.35)",letterSpacing:"0.2em",
             textTransform:"uppercase",marginBottom:14}}>day streak</div>
-          <p style={{fontSize:14,color:"rgba(255,255,255,0.6)",lineHeight:1.6,marginBottom:24}}>
-            {msg}
-          </p>
+          <p style={{fontSize:14,color:"rgba(255,255,255,0.6)",lineHeight:1.6,marginBottom:24}}>{msg}</p>
           <div style={{display:"flex",gap:10}}>
             <button onClick={()=>shareStreak(displayStreak,level.name,level.emoji,userName)} style={{
               flex:1,padding:"12px 0",borderRadius:12,cursor:"pointer",
@@ -1096,8 +1081,7 @@ function AllDonePopup({streak,pct,userName,history,onClose}){
             }}>Share 🔗</button>
             <button onClick={onClose} style={{
               flex:1,padding:"12px 0",borderRadius:12,border:"none",cursor:"pointer",
-              background:todayColor,color:"#000",fontSize:14,fontWeight:700,
-              fontFamily:"Inter,sans-serif",
+              background:todayColor,color:"#000",fontSize:14,fontWeight:700,fontFamily:"Inter,sans-serif",
             }}>Done ✓</button>
           </div>
         </div>
@@ -1238,9 +1222,9 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
   const [phase,setPhase]=useState('setup'); // 'setup'|'breathe'|'active'|'done'
   const saveFocusSession=(mins)=>{
     try{
-      const sessions=JSON.parse(localStorage.getItem('tint_focus_sessions')||'[]');
-      sessions.push({date:new Date().toISOString().slice(0,10),mins});
-      localStorage.setItem('tint_focus_sessions',JSON.stringify(sessions));
+      const prev=JSON.parse(localStorage.getItem('tint_focus_sessions')||'[]');
+      prev.push({date:new Date().toISOString().slice(0,10),mins});
+      localStorage.setItem('tint_focus_sessions',JSON.stringify(prev));
     }catch(e){}
   };
   const [duration,setDuration]=useState(25);
@@ -1276,7 +1260,12 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
     return()=>clearTimeout(timer);
   },[phase,duration]);
 
-  const endFocus=()=>{clearInterval(timerRef.current);setPhase('setup');};
+  const endFocus=()=>{
+    clearInterval(timerRef.current);
+    const elapsed=Math.round((duration*60-timeLeft)/60);
+    if(elapsed>=1)saveFocusSession(elapsed);
+    setPhase('setup');
+  };
 
   useEffect(()=>()=>clearInterval(timerRef.current),[]);
 
@@ -1341,21 +1330,24 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
 
         {(()=>{
           try{
-            const sessions=JSON.parse(localStorage.getItem('tint_focus_sessions')||'[]');
-            const today=new Date().toISOString().slice(0,10);
-            const weekAgo=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
-            const todayMins=sessions.filter(s=>s.date===today).reduce((a,s)=>a+s.mins,0);
-            const weekMins=sessions.filter(s=>s.date>=weekAgo).reduce((a,s)=>a+s.mins,0);
-            const totalMins=sessions.reduce((a,s)=>a+s.mins,0);
-            const fmt=(m)=>m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`;
-            if(totalMins===0)return null;
+            const ss=JSON.parse(localStorage.getItem('tint_focus_sessions')||'[]');
+            const todayStr=new Date().toISOString().slice(0,10);
+            const weekAgoStr=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+            const todayM=ss.filter(s=>s.date===todayStr).reduce((a,s)=>a+s.mins,0);
+            const weekM=ss.filter(s=>s.date>=weekAgoStr).reduce((a,s)=>a+s.mins,0);
+            const allM=ss.reduce((a,s)=>a+s.mins,0);
+            const fmt=m=>m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`;
+            if(allM===0)return null;
             return(
               <div style={{display:'flex',gap:8,marginBottom:20}}>
-                {[{l:'Today',v:fmt(todayMins)},{l:'This Week',v:fmt(weekMins)},{l:'All Time',v:fmt(totalMins)}].map(s=>(
-                  <div key={s.l} style={{flex:1,textAlign:'center',background:'rgba(99,102,241,0.08)',
-                    border:'1px solid rgba(99,102,241,0.15)',borderRadius:12,padding:'10px 4px'}}>
-                    <div style={{color:'#A5B4FC',fontSize:13,fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{s.v}</div>
-                    <div style={{color:'rgba(255,255,255,0.35)',fontSize:9,marginTop:3,textTransform:'uppercase',letterSpacing:0.5}}>{s.l}</div>
+                {[{l:'Today',v:fmt(todayM)},{l:'This Week',v:fmt(weekM)},{l:'All Time',v:fmt(allM)}].map(st=>(
+                  <div key={st.l} style={{flex:1,textAlign:'center',
+                    background:'rgba(99,102,241,0.08)',border:'1px solid rgba(99,102,241,0.15)',
+                    borderRadius:12,padding:'10px 4px'}}>
+                    <div style={{color:'#A5B4FC',fontSize:13,fontWeight:800,
+                      fontFamily:"'Syne',sans-serif"}}>{st.v}</div>
+                    <div style={{color:'rgba(255,255,255,0.35)',fontSize:9,marginTop:3,
+                      textTransform:'uppercase',letterSpacing:0.5}}>{st.l}</div>
                   </div>
                 ))}
               </div>
@@ -1695,9 +1687,9 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
               </p>
             </div>
             {/* Right: flame + level */}
-            <button onClick={handleFlameTap} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"2px",
+            <button onClick={handleFlameTap} style={{display:"flex",alignItems:"center",justifyContent:"center",
               flexShrink:0,background:"transparent",border:"none",cursor:"pointer",padding:"2px 4px"}}>
-              <FlameIcon streak={streak} pct={pct} size={32}/>
+              <FlameIcon streak={streak} pct={pct} size={34}/>
             </button>
           </div>
           <WeekBar history={history} selectedDate={selectedDate} onSelectDate={setSelectedDate}/>
@@ -1709,9 +1701,9 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
             </div>
             <div style={{height:"5px",background:"rgba(255,255,255,0.06)",borderRadius:"100px"}}>
               <div style={{height:"100%",width:pct+"%",
-                background:pct===100?"linear-gradient(90deg,#22C55E,#4ADE80)":pct>=60?"linear-gradient(90deg,#FBBF24,#4ADE80)":pct>=30?"linear-gradient(90deg,#F97316,#FBBF24)":"linear-gradient(90deg,#EF4444,#F97316)",
+                background:pct>=100?"linear-gradient(90deg,#22C55E,#4ADE80)":pct>=60?"linear-gradient(90deg,#EAB308,#4ADE80)":pct>=30?"linear-gradient(90deg,#F97316,#EAB308)":"linear-gradient(90deg,#EF4444,#F97316)",
                 borderRadius:"100px",transition:"width 0.6s cubic-bezier(0.4,0,0.2,1)",
-                boxShadow:pct===100?"0 0 12px rgba(34,197,94,0.6)":pct>=60?"0 0 10px rgba(251,191,36,0.5)":pct>=30?"0 0 10px rgba(249,115,22,0.5)":"0 0 10px rgba(239,68,68,0.4)"}}/>
+                boxShadow:pct>=100?"0 0 12px rgba(34,197,94,0.6)":pct>=60?"0 0 10px rgba(234,179,8,0.5)":pct>=30?"0 0 10px rgba(249,115,22,0.5)":"0 0 10px rgba(239,68,68,0.4)"}}/>
             </div>
           </div>
           {/* Stats row */}
@@ -1793,7 +1785,7 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
         <MissedTaskAlert history={history} tasks={tasks} onDismiss={()=>{}}/>
 
         {/* UCEED Countdown */}
-        <UCEEDCountdown/>
+        {(userExams||[]).includes("UCEED")&&<UCEEDCountdown/>}
 
         {/* Filter + Add */}
         <div style={{padding:"12px 16px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -1842,13 +1834,15 @@ function TaskRow({task,i,onTap,onDelete,isDeleting,onStartDelete,onCancelDelete}
   const done=task.status==="done";
   const cc=CAT_COLORS[task.cat]||CAT_COLORS.theory;
   const pressTimer=useRef(null);
-  const [exiting,setExiting]=useState(false);
+  const [sliding,setSliding]=useState(false);
   const startPress=()=>{pressTimer.current=setTimeout(()=>onStartDelete(task.id),600);};
   const endPress=()=>clearTimeout(pressTimer.current);
   const handleTap=(e)=>{
-    if(!done&&!isDeleting){
-      setExiting(true);
-      setTimeout(()=>onTap(task,e),320);
+    if(isDeleting){onTap(task,e);return;}
+    if(!done){
+      // Slide right before calling onTap
+      setSliding(true);
+      setTimeout(()=>onTap(task,e),300);
     } else {
       onTap(task,e);
     }
@@ -1858,15 +1852,15 @@ function TaskRow({task,i,onTap,onDelete,isDeleting,onStartDelete,onCancelDelete}
       onClick={handleTap}
       onMouseDown={startPress} onMouseUp={endPress} onMouseLeave={endPress}
       onTouchStart={startPress} onTouchEnd={endPress}
-      style={{position:"relative",overflow:"visible",
+      style={{position:"relative",overflow:"hidden",
         background:isDeleting?"rgba(239,68,68,0.1)":done?"rgba(34,197,94,0.06)":"rgba(255,255,255,0.035)",
         border:"1px solid "+(isDeleting?"rgba(239,68,68,0.4)":done?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.07)"),
         borderRadius:"16px",padding:"14px 16px",display:"flex",alignItems:"center",gap:"14px",cursor:"pointer",
-        animation:`slideUp 0.4s cubic-bezier(0.4,0,0.2,1) ${i*0.04}s both`,
+        animation:sliding?"none":`slideUp 0.4s cubic-bezier(0.4,0,0.2,1) ${i*0.04}s both`,
         userSelect:"none",WebkitUserSelect:"none",
-        transform:exiting?"translateX(110%)":"translateX(0)",
-        opacity:exiting?0:1,
-        transition:exiting?"transform 0.32s cubic-bezier(0.4,0,1,1),opacity 0.25s ease":"none",
+        transform:sliding?"translateX(115%)":"translateX(0)",
+        opacity:sliding?0:1,
+        transition:sliding?"transform 0.3s cubic-bezier(0.55,0,1,0.45),opacity 0.2s ease":"none",
       }}>
       {done&&!isDeleting&&<div style={{position:"absolute",inset:0,borderRadius:"16px",
         background:"rgba(34,197,94,0.08)",pointerEvents:"none"}}/>}
@@ -2264,6 +2258,105 @@ function LeaderboardScreen({streak,rank,userAvatar,userName,onBack,onTasks,onFoc
 }
 
 // ── DEV PANEL ─────────────────────────────────────────────────────────────────
+// ── PIXEL DAY INTRO ───────────────────────────────────────────────────────────
+function PixelDayIntro({history,onDone}){
+  const [visible,setVisible]=useState(false);
+  useEffect(()=>{
+    // Fade in immediately
+    const t0=requestAnimationFrame(()=>setVisible(true));
+    // Fade out at 2.8s, remove at 3.5s
+    const t1=setTimeout(()=>setVisible(false),2800);
+    const t2=setTimeout(()=>onDone(),3600);
+    return()=>{cancelAnimationFrame(t0);clearTimeout(t1);clearTimeout(t2);};
+  },[]);
+
+  const todayStr=new Date().toISOString().slice(0,10);
+  const UCEED_MS=new Date('2027-01-17T00:00:00').getTime();
+  const todayMs=new Date(todayStr+'T00:00:00').getTime();
+  const daysLeft=Math.max(1,Math.ceil((UCEED_MS-todayMs)/86400000));
+  const TOTAL=Math.min(daysLeft,600);
+
+  // Yesterday
+  const ydMs=todayMs-86400000;
+  const ydStr=new Date(ydMs).toISOString().slice(0,10);
+  const ydEntry=(history||[]).find(h=>h.date===ydStr);
+  const ydColor=ydEntry?ydEntry.allDone?"#22C55E":ydEntry.pct>=40?"#FBBF24":"#EF4444":null;
+
+  // Grid layout: fill screen width
+  const vw=Math.min(window.innerWidth,440);
+  const COLS=Math.ceil(Math.sqrt(TOTAL*(vw/window.innerHeight||0.55)));
+  const GAP=1;
+  const PIX=Math.floor((vw-16-(COLS-1)*GAP)/COLS);
+
+  // Sort history by date ascending for coloring past pixels
+  const sortedHist=[...(history||[])].sort((a,b)=>a.date.localeCompare(b.date));
+  // How many days have passed (roughly) = total - daysLeft
+  const daysPassed=Math.max(0,TOTAL-daysLeft);
+
+  const getPixelBg=(i)=>{
+    if(i>=daysPassed)return"rgba(255,255,255,0.04)"; // future
+    const h=sortedHist[i];
+    if(!h)return"rgba(255,255,255,0.08)";
+    return h.allDone?"#22C55E":h.pct>=40?"#FBBF24":"#EF4444";
+  };
+  // Yesterday pixel index
+  const ydIdx=daysPassed-1;
+
+  return(
+    <div style={{
+      position:"fixed",inset:0,zIndex:600,background:"#05070F",
+      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+      opacity:visible?1:0,
+      transition:visible?"opacity 0.5s ease":"opacity 0.8s ease",
+      overflow:"hidden",
+    }}>
+      <div style={{
+        display:"grid",
+        gridTemplateColumns:`repeat(${COLS},${PIX}px)`,
+        gap:`${GAP}px`,
+        padding:"8px",
+        maxWidth:"100%",
+      }}>
+        {Array.from({length:TOTAL},(_,i)=>{
+          const isYd=i===ydIdx&&ydColor;
+          return(
+            <div key={i} style={{
+              width:PIX,height:PIX,borderRadius:1,
+              background:isYd?ydColor:getPixelBg(i),
+              opacity:i>=daysPassed?0.25:isYd?1:0.55,
+              transform:isYd?"scale(1.8)":"scale(1)",
+              transition:isYd?"transform 0.4s cubic-bezier(0.34,1.56,0.64,1) 0.3s":"none",
+              boxShadow:isYd?`0 0 8px ${ydColor}`:"none",
+              zIndex:isYd?2:1,
+              position:"relative",
+            }}/>
+          );
+        })}
+      </div>
+      {daysLeft>0&&(
+        <div style={{
+          position:"absolute",bottom:56,left:0,right:0,
+          textAlign:"center",
+          opacity:visible?1:0,
+          transition:"opacity 0.5s ease 0.4s",
+        }}>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.25)",letterSpacing:"0.18em",
+            textTransform:"uppercase",fontFamily:"Inter,sans-serif"}}>
+            {daysLeft} days to UCEED
+          </div>
+          {ydColor&&(
+            <div style={{fontSize:12,color:ydColor,fontWeight:700,marginTop:4,letterSpacing:"0.1em",
+              textShadow:`0 0 10px ${ydColor}40`}}>
+              {ydEntry?.allDone?"Yesterday: complete":`Yesterday: ${ydEntry?.pct||0}%`}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function DevPanel({onClose,tasks,setTasks,history,setHistory,streak,setStreak}){
   const [day,setDay]=useState(()=>load("tint_devday",0));
 
@@ -2307,129 +2400,35 @@ function DevPanel({onClose,tasks,setTasks,history,setHistory,streak,setStreak}){
   };
 
   const resetAll=()=>{localStorage.clear();window.location.reload();};
-  const doneTasks=tasks.filter(t=>t.status==="done").length;
-  const totalTasks=tasks.filter(t=>t.cat!=="health").length;
-
   return(
-    <div style={{position:"fixed",inset:0,zIndex:400,background:"rgba(0,0,0,0.7)",
+    <div style={{position:"fixed",inset:0,zIndex:400,background:"rgba(0,0,0,0.75)",
       display:"flex",alignItems:"center",justifyContent:"center"}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{background:"#0F172A",border:"1px solid rgba(99,102,241,0.5)",
-        borderRadius:"20px",padding:"24px",width:"260px",
+      <div style={{background:"#0F172A",border:"1px solid rgba(99,102,241,0.4)",
+        borderRadius:"20px",padding:"28px 24px",width:"240px",
         boxShadow:"0 20px 60px rgba(0,0,0,0.8)"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}}>
-          <span style={{color:"#818CF8",fontSize:"14px",fontWeight:700,letterSpacing:"0.05em",fontFamily:"'Syne',sans-serif"}}>DEV MODE</span>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"22px"}}>
+          <span style={{color:"#818CF8",fontSize:"13px",fontWeight:700,letterSpacing:"0.08em",
+            fontFamily:"'Syne',sans-serif",textTransform:"uppercase"}}>Developer</span>
           <button onClick={onClose} style={{background:"rgba(255,255,255,0.07)",border:"none",
-            borderRadius:"50%",width:"28px",height:"28px",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:"16px"}}>×</button>
+            borderRadius:"50%",width:"28px",height:"28px",color:"rgba(255,255,255,0.6)",
+            cursor:"pointer",fontSize:"16px"}}>×</button>
         </div>
         <button onClick={advanceDay} style={{width:"100%",
           background:"linear-gradient(135deg,rgba(99,102,241,0.5),rgba(139,92,246,0.4))",
-          border:"1px solid rgba(99,102,241,0.5)",borderRadius:"12px",padding:"14px",
+          border:"1px solid rgba(99,102,241,0.45)",borderRadius:"14px",padding:"15px",
           color:"#C7D2FE",fontSize:"14px",fontWeight:800,cursor:"pointer",
           fontFamily:"'Syne',sans-serif",marginBottom:"10px",
-          boxShadow:"0 4px 16px rgba(99,102,241,0.3)"}}>
+          boxShadow:"0 4px 16px rgba(99,102,241,0.3)",letterSpacing:"0.03em"}}>
           Next Day →
         </button>
         <button onClick={resetAll} style={{width:"100%",
-          background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",
-          borderRadius:"12px",padding:"14px",color:"#F87171",fontSize:"14px",
-          fontWeight:700,cursor:"pointer",fontFamily:"'Syne',sans-serif"}}>
+          background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.3)",
+          borderRadius:"14px",padding:"15px",color:"#F87171",fontSize:"14px",
+          fontWeight:700,cursor:"pointer",fontFamily:"'Syne',sans-serif",letterSpacing:"0.03em"}}>
           Reset Data
         </button>
       </div>
-    </div>
-  );
-}
-
-
-// ── PIXEL INTRO (daily reality check) ────────────────────────────────────────
-function PixelDayIntro({history,onDone}){
-  const [phase,setPhase]=useState("show"); // show→fade→done
-  const [opacity,setOpacity]=useState(0);
-
-  const todayStr=new Date().toISOString().slice(0,10);
-  const UCEED=new Date('2027-01-17T00:00:00');
-  const todayMid=new Date(todayStr+'T00:00:00');
-  const daysLeft=Math.max(1,Math.ceil((UCEED-todayMid)/86400000));
-
-  // Yesterday
-  const yd=new Date(todayMid);yd.setDate(yd.getDate()-1);
-  const ydStr=yd.toISOString().slice(0,10);
-  const ydEntry=history.find(h=>h.date===ydStr);
-  const ydColor=ydEntry?ydEntry.allDone?"#22C55E":ydEntry.pct>=40?"#FBBF24":"#EF4444":null;
-
-  // Grid sizing
-  const TOTAL=Math.min(daysLeft,500);
-  const cols=Math.ceil(Math.sqrt(TOTAL*1.6));
-  const rows=Math.ceil(TOTAL/cols);
-  // pixel size to fill screen
-  const pixW=Math.floor(Math.min(window.innerWidth,420)/cols)-1;
-  const pixH=pixW;
-
-  useEffect(()=>{
-    // Fade in
-    setTimeout(()=>setOpacity(1),50);
-    // Hold then fade out
-    const t1=setTimeout(()=>setOpacity(0),2800);
-    const t2=setTimeout(()=>onDone(),3500);
-    return()=>{clearTimeout(t1);clearTimeout(t2);};
-  },[]);
-
-  // Which pixel index is "yesterday"
-  const ydIdx=TOTAL-daysLeft; // days elapsed = total - days remaining (approx)
-
-  return(
-    <div style={{
-      position:"fixed",inset:0,zIndex:600,background:"#05070F",
-      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-      opacity,transition:opacity===0?"opacity 0.7s ease":"opacity 0.5s ease",
-      overflow:"hidden",
-    }}>
-      <div style={{
-        display:"grid",
-        gridTemplateColumns:`repeat(${cols}, ${pixW}px)`,
-        gap:"1px",
-        padding:"8px",
-      }}>
-        {Array.from({length:TOTAL},(_,i)=>{
-          const isYd=i===ydIdx&&ydColor;
-          const elapsed=TOTAL-daysLeft;
-          const isPast=i<elapsed;
-          const histIdx=i-(elapsed-history.length);
-          const hEntry=histIdx>=0&&histIdx<history.length?history.slice().sort((a,b)=>a.date.localeCompare(b.date))[histIdx]:null;
-          const bg=isYd?ydColor
-            :isPast&&hEntry?hEntry.allDone?"#22C55E":hEntry.pct>=40?"#FBBF24":"#EF4444"
-            :isPast?"rgba(255,255,255,0.07)"
-            :"rgba(255,255,255,0.03)";
-          return(
-            <div key={i} style={{
-              width:pixW,height:pixH,borderRadius:1,background:bg,
-              opacity:isYd?1:isPast?0.7:0.4,
-              transition:isYd?"opacity 0.5s ease,transform 0.5s ease":"none",
-              transform:"scale(1)",
-              animation:isYd?"pixelPop 0.6s ease forwards 0.3s":"none",
-            }}/>
-          );
-        })}
-      </div>
-      {ydColor&&(
-        <div style={{
-          position:"absolute",bottom:60,left:"50%",transform:"translateX(-50%)",
-          textAlign:"center",
-          opacity,transition:"opacity 0.5s ease",
-        }}>
-          <div style={{
-            fontSize:11,color:ydColor,fontWeight:700,letterSpacing:"0.15em",
-            textTransform:"uppercase",fontFamily:"Inter,sans-serif",
-            textShadow:`0 0 12px ${ydColor}`,
-          }}>
-            {ydEntry?.allDone?"Yesterday: All done":"Yesterday: "+ydEntry?.pct+"%"}
-          </div>
-          <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:4,letterSpacing:"0.1em"}}>
-            {daysLeft} days to UCEED
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -2451,7 +2450,9 @@ export default function TINT(){
   const [showDev,setShowDev]      = useState(false);
   const [introDone,setIntroDone]  = useState(()=>!!localStorage.getItem('tint_intro_done'));
   const [showPixelIntro,setShowPixelIntro]=useState(false);
-  const pixelShownRef=useRef(false);
+  const pixelShownThisSession=useRef(false);
+  const swipeTX=useRef(0);
+  const swipeTY=useRef(0);
 
   const setTasks=upd=>{
     setTasksRaw(prev=>{const next=typeof upd==="function"?upd(prev):upd;save("tint_tasks3",next);return next;});
@@ -2498,7 +2499,13 @@ export default function TINT(){
   const isCarrot=rank<100;
 
   const handleCoverDone=()=>{
-    if(load("tint_onboarded",false)){setScreen("home");}else{setScreen("onboard");}
+    if(load("tint_onboarded",false)){
+      setScreen("home");
+      if(!pixelShownThisSession.current){
+        pixelShownThisSession.current=true;
+        setTimeout(()=>setShowPixelIntro(true),200);
+      }
+    } else {setScreen("onboard");}
   };
   const handleOnboardDone=({name,avatar,email,exams,tasks:newTasks})=>{
     setUserName(name);save("tint_name",name);
@@ -2551,25 +2558,19 @@ export default function TINT(){
 
   const activeTasks=tasks||EXAM_TASKS.UCEED.map((t,i)=>({...t,id:i+1,status:"upcoming"}));
 
-  const touchStartX=useRef(0);
-  const touchStartY=useRef(0);
-  const SCREENS_ORDER=["leaderboard","home","progress"];
-  const handleSwipeStart=(e)=>{
-    touchStartX.current=e.touches[0].clientX;
-    touchStartY.current=e.touches[0].clientY;
-  };
-  const handleSwipeEnd=(e)=>{
-    const dx=e.changedTouches[0].clientX-touchStartX.current;
-    const dy=e.changedTouches[0].clientY-touchStartY.current;
-    if(Math.abs(dx)>Math.abs(dy)*1.5&&Math.abs(dx)>50){
-      const cur=SCREENS_ORDER.indexOf(screen);
-      if(cur===-1)return;
-      if(dx<0&&cur<SCREENS_ORDER.length-1)setScreen(SCREENS_ORDER[cur+1]);
-      if(dx>0&&cur>0)setScreen(SCREENS_ORDER[cur-1]);
-    }
+  const SWIPE_SCREENS=["leaderboard","home","progress"];
+  const onSwipeStart=(e)=>{swipeTX.current=e.touches[0].clientX;swipeTY.current=e.touches[0].clientY;};
+  const onSwipeEnd=(e)=>{
+    if(!SWIPE_SCREENS.includes(screen))return;
+    const dx=e.changedTouches[0].clientX-swipeTX.current;
+    const dy=e.changedTouches[0].clientY-swipeTY.current;
+    if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.2)return; // too short or mostly vertical
+    const idx=SWIPE_SCREENS.indexOf(screen);
+    if(dx<0&&idx<SWIPE_SCREENS.length-1)setScreen(SWIPE_SCREENS[idx+1]);
+    if(dx>0&&idx>0)setScreen(SWIPE_SCREENS[idx-1]);
   };
   return(
-    <div onTouchStart={handleSwipeStart} onTouchEnd={handleSwipeEnd}
+    <div onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd}
       style={{position:"relative",width:"100%",minHeight:"100vh",minHeight:"100dvh",background:"#05070F"}}>
       {!introDone&&<AppIntroOnboarding onDone={()=>setIntroDone(true)}/>}
       {showPixelIntro&&<PixelDayIntro history={history} onDone={()=>setShowPixelIntro(false)}/>}
