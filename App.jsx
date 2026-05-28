@@ -313,7 +313,6 @@ input:focus{outline:none;border-color:rgba(99,102,241,0.6)!important;}
 @keyframes slideEnter{from{opacity:0;transform:translateX(60px);}to{opacity:1;transform:translateX(0);}}
 @keyframes slideExit{from{opacity:1;transform:translateX(0);}to{opacity:0;transform:translateX(-60px);}}
 @keyframes emojiPop{0%{transform:scale(0) rotate(-20deg);opacity:0;}60%{transform:scale(1.2) rotate(5deg);opacity:1;}100%{transform:scale(1) rotate(0deg);opacity:1;}}
-@keyframes pixelFade{0%{opacity:1;transform:scale(1.8);}100%{opacity:0;transform:scale(0);}}
 .ob-slide-enter{animation:slideEnter 0.4s cubic-bezier(0.22,1,0.36,1) forwards;}
 .ob-emoji-pop{animation:emojiPop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.2s both;}
 
@@ -433,17 +432,19 @@ const FLAME_FILTERS=[
 ];
 function FlameIcon({streak,pct=50,size=28}){
   const tier=Math.min(Math.floor((streak||0)/3),FLAME_FILTERS.length-1);
-  const scaleMul=pct>=70?1.4:pct>=50?1.1:pct>=30?1.0:0.72;
-  const bright=pct>=70?1.35:pct>=50?1.05:pct>=30?0.85:0.55;
-  const w=Math.round(size*scaleMul);
-  const h=Math.round(size*1.6*scaleMul);
+  // Behavior — scale and glow react to daily completion %
+  const sc=pct>=100?1.5:pct>=70?1.25:pct>=40?1.0:pct>=20?0.8:0.6;
+  const br=pct>=100?1.5:pct>=70?1.25:pct>=40?1.0:pct>=20?0.75:0.45;
+  const h=Math.round(size*1.6);
   return(
-    <div style={{width:w,height:h,flexShrink:0,overflow:'hidden',borderRadius:'2px',
-      transition:'width 1s ease,height 1s ease'}}>
+    <div style={{width:size,height:h,flexShrink:0,overflow:'visible',borderRadius:'2px',
+      transform:`scale(${sc})`,transformOrigin:'center bottom',
+      transition:'transform 1.4s cubic-bezier(0.34,1.2,0.64,1)',
+      filter:pct>=70?`drop-shadow(0 0 ${Math.round(pct/10)}px rgba(255,120,0,0.5))`:'none'}}>
       <video
         autoPlay loop muted playsInline
         style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'center 10%',
-                display:'block',filter:`${FLAME_FILTERS[tier]} brightness(${bright})`}}
+                display:'block',filter:`${FLAME_FILTERS[tier]} brightness(${br})`}}
         src={FIRE_VIDEO_B64}
       />
     </div>
@@ -558,9 +559,9 @@ function CoverScreen({onDone}){
             {LETTERS.map((l,i)=>(
               <div key={i} style={{display:"inline-flex",alignItems:"baseline"}}>
                 <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,color:"#fff",display:"inline-block",
-                  fontSize:settled?"36px":"72px",
+                  fontSize:settled?"38px":"72px",
                   transition:"font-size 1.5s cubic-bezier(0.4,0,0.2,1)",lineHeight:1}}>{l}</span>
-                <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:"36px",
+                <span style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:"38px",
                   color:"#ffffff",display:"inline-block",overflow:"hidden",whiteSpace:"nowrap",
                   maxWidth:settled?"200px":"0px",opacity:settled?1:0,
                   transition:`max-width 1.4s cubic-bezier(0.22,1,0.36,1) ${i*0.1}s,
@@ -1009,80 +1010,71 @@ function AllDonePopup({streak,pct,userName,history,onClose}){
   const displayStreak=Math.max(1,streak);
   const level=getFlameLevel(displayStreak);
   const msg=allDone
-    ?displayStreak>=7?`${displayStreak} days 🔥 You're on fire.`:`Day done. Come back tomorrow.`
-    :partial?`${pct}% complete. Better than nothing.`
-    :`Rough day. Tomorrow's a fresh start.`;
-
+    ?displayStreak>=7?`${displayStreak} days. You're still here.`:`Day done. See you tomorrow.`
+    :partial?`${pct}% complete. Something is better than nothing.`
+    :`Rough day. Tomorrow is a blank slate.`;
   const [phase,setPhase]=useState("vignette");
   const vidRef=useRef(null);
-
   useEffect(()=>{
-    const t1=setTimeout(()=>setPhase("flame"),900);
-    const t2=setTimeout(()=>setPhase("content"),2600);
+    const t1=setTimeout(()=>setPhase("flame"),800);
+    const t2=setTimeout(()=>setPhase("content"),2500);
     return()=>{clearTimeout(t1);clearTimeout(t2);};
   },[]);
-
   useEffect(()=>{
     if(phase==="flame"&&vidRef.current){
       vidRef.current.muted=false;
       vidRef.current.play().catch(()=>{
-        vidRef.current.muted=true;
-        vidRef.current.play().catch(()=>{});
+        if(vidRef.current){vidRef.current.muted=true;vidRef.current.play().catch(()=>{});}
       });
     }
   },[phase]);
-
   return(
     <div style={{position:"fixed",inset:0,zIndex:300,overflow:"hidden",background:"#080C14"}}>
-      {/* Dark vignette fades in */}
+      {/* Vignette — screen dims before flame appears */}
       <div style={{
         position:"absolute",inset:0,zIndex:1,pointerEvents:"none",
-        background:"radial-gradient(ellipse at center,rgba(5,7,14,0.5) 0%,rgba(5,7,14,0.98) 70%)",
+        background:"radial-gradient(ellipse at center,rgba(5,7,14,0.4) 0%,rgba(5,7,14,0.97) 65%)",
         opacity:phase==="vignette"?1:0,
-        transition:"opacity 0.5s ease 0.2s",
+        transition:"opacity 0.6s ease 0.1s",
       }}/>
-      {/* Spark flame video */}
+      {/* Flame ring video */}
       <video ref={vidRef} muted playsInline autoPlay={false}
         style={{
-          position:"absolute",inset:0,width:"100%",height:"100%",
-          objectFit:"cover",zIndex:2,
-          opacity:phase==="vignette"?0:1,
-          transition:"opacity 0.7s ease",
+          position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",
+          zIndex:2,opacity:phase==="vignette"?0:1,transition:"opacity 0.8s ease",
         }}
         src={SPARK_VIDEO_B64}/>
       {/* Content overlay */}
       <div style={{
-        position:"absolute",inset:0,zIndex:3,
-        display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-        padding:"0 24px",
-        opacity:phase==="content"?1:0,
-        transition:"opacity 0.7s ease",
+        position:"absolute",inset:0,zIndex:3,display:"flex",flexDirection:"column",
+        alignItems:"center",justifyContent:"center",padding:"0 24px",
+        opacity:phase==="content"?1:0,transition:"opacity 0.7s ease",
         pointerEvents:phase==="content"?"auto":"none",
       }}>
         <div style={{
-          background:"rgba(5,7,14,0.72)",backdropFilter:"blur(24px)",WebkitBackdropFilter:"blur(24px)",
-          borderRadius:24,padding:"32px 28px",width:"100%",maxWidth:320,
-          border:"1px solid rgba(255,255,255,0.1)",boxShadow:"0 8px 60px rgba(0,0,0,0.6)",
-          textAlign:"center",
+          background:"rgba(5,7,14,0.68)",backdropFilter:"blur(28px)",
+          WebkitBackdropFilter:"blur(28px)",borderRadius:24,padding:"36px 28px",
+          width:"100%",maxWidth:320,border:"1px solid rgba(255,255,255,0.08)",
+          boxShadow:"0 8px 60px rgba(0,0,0,0.7)",textAlign:"center",
         }}>
-          <div style={{fontSize:42,marginBottom:6}}>{level.emoji}</div>
-          <div style={{fontSize:18,fontWeight:800,color:todayColor,marginBottom:4,
-            fontFamily:"'Syne',sans-serif"}}>{level.name}</div>
-          <div style={{fontSize:52,fontWeight:900,color:"#fff",letterSpacing:-2,
+          <div style={{fontSize:40,marginBottom:8}}>{level.emoji}</div>
+          <div style={{fontSize:17,fontWeight:800,color:todayColor,marginBottom:4,
+            fontFamily:"'Syne',sans-serif",letterSpacing:"-0.01em"}}>{level.name}</div>
+          <div style={{fontSize:54,fontWeight:900,color:"#fff",letterSpacing:-2,
             lineHeight:1,marginBottom:4,fontFamily:"'Syne',sans-serif"}}>{displayStreak}</div>
-          <div style={{fontSize:11,color:"rgba(255,255,255,0.35)",letterSpacing:"0.2em",
-            textTransform:"uppercase",marginBottom:14}}>day streak</div>
-          <p style={{fontSize:14,color:"rgba(255,255,255,0.6)",lineHeight:1.6,marginBottom:24}}>{msg}</p>
+          <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",letterSpacing:"0.25em",
+            textTransform:"uppercase",marginBottom:16}}>day streak</div>
+          <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",lineHeight:1.7,marginBottom:28}}>{msg}</p>
           <div style={{display:"flex",gap:10}}>
             <button onClick={()=>shareStreak(displayStreak,level.name,level.emoji,userName)} style={{
               flex:1,padding:"12px 0",borderRadius:12,cursor:"pointer",
-              background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",
-              color:"rgba(255,255,255,0.6)",fontSize:14,fontWeight:600,fontFamily:"Inter,sans-serif",
-            }}>Share 🔗</button>
+              background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",
+              color:"rgba(255,255,255,0.5)",fontSize:13,fontWeight:600,fontFamily:"Inter,sans-serif",
+            }}>Share</button>
             <button onClick={onClose} style={{
               flex:1,padding:"12px 0",borderRadius:12,border:"none",cursor:"pointer",
-              background:todayColor,color:"#000",fontSize:14,fontWeight:700,fontFamily:"Inter,sans-serif",
-            }}>Done ✓</button>
+              background:todayColor,color:"#000",fontSize:13,fontWeight:800,fontFamily:"Inter,sans-serif",
+            }}>Done</button>
           </div>
         </div>
       </div>
@@ -1262,8 +1254,8 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
 
   const endFocus=()=>{
     clearInterval(timerRef.current);
-    const elapsed=Math.round((duration*60-timeLeft)/60);
-    if(elapsed>=1)saveFocusSession(elapsed);
+    const elapsedMins=Math.round((duration*60-timeLeft)/60);
+    if(elapsedMins>=1)saveFocusSession(elapsedMins);
     setPhase('setup');
   };
 
@@ -1331,22 +1323,22 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
         {(()=>{
           try{
             const ss=JSON.parse(localStorage.getItem('tint_focus_sessions')||'[]');
-            const todayStr=new Date().toISOString().slice(0,10);
-            const weekAgoStr=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
-            const todayM=ss.filter(s=>s.date===todayStr).reduce((a,s)=>a+s.mins,0);
-            const weekM=ss.filter(s=>s.date>=weekAgoStr).reduce((a,s)=>a+s.mins,0);
+            const tod=new Date().toISOString().slice(0,10);
+            const wk=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+            const todM=ss.filter(s=>s.date===tod).reduce((a,s)=>a+s.mins,0);
+            const wkM=ss.filter(s=>s.date>=wk).reduce((a,s)=>a+s.mins,0);
             const allM=ss.reduce((a,s)=>a+s.mins,0);
-            const fmt=m=>m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`;
             if(allM===0)return null;
+            const fmt=m=>m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`;
             return(
               <div style={{display:'flex',gap:8,marginBottom:20}}>
-                {[{l:'Today',v:fmt(todayM)},{l:'This Week',v:fmt(weekM)},{l:'All Time',v:fmt(allM)}].map(st=>(
+                {[{l:'Today',v:fmt(todM)},{l:'This Week',v:fmt(wkM)},{l:'All Time',v:fmt(allM)}].map(st=>(
                   <div key={st.l} style={{flex:1,textAlign:'center',
-                    background:'rgba(99,102,241,0.08)',border:'1px solid rgba(99,102,241,0.15)',
+                    background:'rgba(99,102,241,0.07)',border:'1px solid rgba(99,102,241,0.13)',
                     borderRadius:12,padding:'10px 4px'}}>
                     <div style={{color:'#A5B4FC',fontSize:13,fontWeight:800,
                       fontFamily:"'Syne',sans-serif"}}>{st.v}</div>
-                    <div style={{color:'rgba(255,255,255,0.35)',fontSize:9,marginTop:3,
+                    <div style={{color:'rgba(255,255,255,0.3)',fontSize:9,marginTop:3,
                       textTransform:'uppercase',letterSpacing:0.5}}>{st.l}</div>
                   </div>
                 ))}
@@ -1602,6 +1594,7 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
   const [showAdd,setShowAdd]=useState(false);
   const [deletingId,setDeletingId]=useState(null);
   const [showAllDone,setShowAllDone]=useState(false);
+  const [exitingId,setExitingId]=useState(null);
   const [flameTaps,setFlameTaps]=useState(0);
   const flameTapTimer=useRef(null);
 
@@ -1627,14 +1620,22 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
   const tap=(task,e)=>{
     if(task.id===deletingId){setDeletingId(null);return;}
     if(task.status==="missed"){setRedFlash(true);setTimeout(()=>setRedFlash(false),500);return;}
+    if(task.status==="done"){
+      // Undo: instant
+      setTasks(prev=>prev.map(t=>t.id===task.id?{...t,status:"upcoming"}:t));
+      return;
+    }
+    // Marking done: slide right first, then update
     const rect=e.currentTarget.getBoundingClientRect();
     const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
-    if(task.status!=="done"){
-      const id=Date.now();
-      setConfettis(p=>[...p,{id,x:cx,y:cy}]);
-      setTimeout(()=>setConfettis(p=>p.filter(c=>c.id!==id)),1200);
-    }
-    setTasks(prev=>prev.map(t=>t.id===task.id?{...t,status:t.status==="done"?"upcoming":"done"}:t));
+    const id=Date.now();
+    setConfettis(p=>[...p,{id,x:cx,y:cy}]);
+    setTimeout(()=>setConfettis(p=>p.filter(c=>c.id!==id)),1200);
+    setExitingId(task.id);
+    setTimeout(()=>{
+      setTasks(prev=>prev.map(t=>t.id===task.id?{...t,status:"done"}:t));
+      setExitingId(null);
+    },380);
   };
 
   const deleteTask=id=>setTasks(prev=>prev.filter(t=>t.id!==id));
@@ -1643,7 +1644,7 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
     ?tasks.filter(t=>t.status==="done")
     :filter==="todo"
     ?tasks.filter(t=>t.status==="upcoming")
-    :tasks.filter(t=>t.status!=="done");
+    :tasks.filter(t=>t.status!=="done"||t.id===exitingId);
   const today=new Date().toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"long"});
 
   // 5 quick taps on flame opens dev mode
@@ -1688,8 +1689,9 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
             </div>
             {/* Right: flame + level */}
             <button onClick={handleFlameTap} style={{display:"flex",alignItems:"center",justifyContent:"center",
-              flexShrink:0,background:"transparent",border:"none",cursor:"pointer",padding:"2px 4px"}}>
-              <FlameIcon streak={streak} pct={pct} size={34}/>
+              flexShrink:0,background:"transparent",border:"none",cursor:"pointer",
+              padding:"2px 4px",overflow:"visible"}}>
+              <FlameIcon streak={streak} pct={pct} size={30}/>
             </button>
           </div>
           <WeekBar history={history} selectedDate={selectedDate} onSelectDate={setSelectedDate}/>
@@ -1701,9 +1703,9 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
             </div>
             <div style={{height:"5px",background:"rgba(255,255,255,0.06)",borderRadius:"100px"}}>
               <div style={{height:"100%",width:pct+"%",
-                background:pct>=100?"linear-gradient(90deg,#22C55E,#4ADE80)":pct>=60?"linear-gradient(90deg,#EAB308,#4ADE80)":pct>=30?"linear-gradient(90deg,#F97316,#EAB308)":"linear-gradient(90deg,#EF4444,#F97316)",
+                background:pct>=100?"linear-gradient(90deg,#22C55E,#4ADE80)":pct>=65?"linear-gradient(90deg,#EAB308,#4ADE80)":pct>=35?"linear-gradient(90deg,#F97316,#EAB308)":"linear-gradient(90deg,#EF4444,#F97316)",
                 borderRadius:"100px",transition:"width 0.6s cubic-bezier(0.4,0,0.2,1)",
-                boxShadow:pct>=100?"0 0 12px rgba(34,197,94,0.6)":pct>=60?"0 0 10px rgba(234,179,8,0.5)":pct>=30?"0 0 10px rgba(249,115,22,0.5)":"0 0 10px rgba(239,68,68,0.4)"}}/>
+                boxShadow:pct>=100?"0 0 12px rgba(34,197,94,0.6)":pct>=65?"0 0 10px rgba(234,179,8,0.5)":pct>=35?"0 0 10px rgba(249,115,22,0.5)":"0 0 10px rgba(239,68,68,0.45)"}}/>
             </div>
           </div>
           {/* Stats row */}
@@ -1816,6 +1818,7 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
             <TaskRow key={task.id} task={task} i={i}
               onTap={tap} onDelete={deleteTask}
               isDeleting={deletingId===task.id}
+              isExiting={task.id===exitingId}
               onStartDelete={id=>setDeletingId(id)}
               onCancelDelete={()=>setDeletingId(null)}/>
           ))}
@@ -1830,37 +1833,28 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
 }
 
 // ── TASK ROW ──────────────────────────────────────────────────────────────────
-function TaskRow({task,i,onTap,onDelete,isDeleting,onStartDelete,onCancelDelete}){
+function TaskRow({task,i,onTap,onDelete,isDeleting,onStartDelete,onCancelDelete,isExiting}){
   const done=task.status==="done";
   const cc=CAT_COLORS[task.cat]||CAT_COLORS.theory;
   const pressTimer=useRef(null);
-  const [sliding,setSliding]=useState(false);
   const startPress=()=>{pressTimer.current=setTimeout(()=>onStartDelete(task.id),600);};
   const endPress=()=>clearTimeout(pressTimer.current);
-  const handleTap=(e)=>{
-    if(isDeleting){onTap(task,e);return;}
-    if(!done){
-      // Slide right before calling onTap
-      setSliding(true);
-      setTimeout(()=>onTap(task,e),300);
-    } else {
-      onTap(task,e);
-    }
-  };
   return(
     <div className={"task-card"+(isDeleting?" shaking":"")}
-      onClick={handleTap}
+      onClick={e=>onTap(task,e)}
       onMouseDown={startPress} onMouseUp={endPress} onMouseLeave={endPress}
       onTouchStart={startPress} onTouchEnd={endPress}
       style={{position:"relative",overflow:"hidden",
         background:isDeleting?"rgba(239,68,68,0.1)":done?"rgba(34,197,94,0.06)":"rgba(255,255,255,0.035)",
         border:"1px solid "+(isDeleting?"rgba(239,68,68,0.4)":done?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.07)"),
         borderRadius:"16px",padding:"14px 16px",display:"flex",alignItems:"center",gap:"14px",cursor:"pointer",
-        animation:sliding?"none":`slideUp 0.4s cubic-bezier(0.4,0,0.2,1) ${i*0.04}s both`,
+        animation:isExiting?"none":`slideUp 0.4s cubic-bezier(0.4,0,0.2,1) ${i*0.04}s both`,
         userSelect:"none",WebkitUserSelect:"none",
-        transform:sliding?"translateX(115%)":"translateX(0)",
-        opacity:sliding?0:1,
-        transition:sliding?"transform 0.3s cubic-bezier(0.55,0,1,0.45),opacity 0.2s ease":"none",
+        transform:isExiting?"translateX(105%) scale(0.92)":"translateX(0) scale(1)",
+        opacity:isExiting?0:1,
+        transition:isExiting
+          ?"transform 0.35s cubic-bezier(0.55,0,0.8,0.45),opacity 0.28s ease"
+          :"none",
       }}>
       {done&&!isDeleting&&<div style={{position:"absolute",inset:0,borderRadius:"16px",
         background:"rgba(34,197,94,0.08)",pointerEvents:"none"}}/>}
@@ -2258,100 +2252,90 @@ function LeaderboardScreen({streak,rank,userAvatar,userName,onBack,onTasks,onFoc
 }
 
 // ── DEV PANEL ─────────────────────────────────────────────────────────────────
-// ── PIXEL DAY INTRO ───────────────────────────────────────────────────────────
+// ── PIXEL DAY INTRO ────────────────────────────────────────────────────────────
 function PixelDayIntro({history,onDone}){
-  const [visible,setVisible]=useState(false);
+  const [show,setShow]=useState(false);
   useEffect(()=>{
-    // Fade in immediately
-    const t0=requestAnimationFrame(()=>setVisible(true));
-    // Fade out at 2.8s, remove at 3.5s
-    const t1=setTimeout(()=>setVisible(false),2800);
-    const t2=setTimeout(()=>onDone(),3600);
-    return()=>{cancelAnimationFrame(t0);clearTimeout(t1);clearTimeout(t2);};
+    const r=requestAnimationFrame(()=>setTimeout(()=>setShow(true),30));
+    const t1=setTimeout(()=>setShow(false),2600);
+    const t2=setTimeout(()=>onDone(),3400);
+    return()=>{cancelAnimationFrame(r);clearTimeout(t1);clearTimeout(t2);};
   },[]);
 
   const todayStr=new Date().toISOString().slice(0,10);
-  const UCEED_MS=new Date('2027-01-17T00:00:00').getTime();
-  const todayMs=new Date(todayStr+'T00:00:00').getTime();
-  const daysLeft=Math.max(1,Math.ceil((UCEED_MS-todayMs)/86400000));
-  const TOTAL=Math.min(daysLeft,600);
+  const UCEED_T=new Date('2027-01-17T00:00:00').getTime();
+  const today_T=new Date(todayStr+'T00:00:00').getTime();
+  const daysLeft=Math.max(1,Math.ceil((UCEED_T-today_T)/86400000));
+  const TOTAL=Math.min(daysLeft,560);
 
   // Yesterday
-  const ydMs=todayMs-86400000;
-  const ydStr=new Date(ydMs).toISOString().slice(0,10);
+  const yd_T=today_T-86400000;
+  const ydStr=new Date(yd_T).toISOString().slice(0,10);
   const ydEntry=(history||[]).find(h=>h.date===ydStr);
   const ydColor=ydEntry?ydEntry.allDone?"#22C55E":ydEntry.pct>=40?"#FBBF24":"#EF4444":null;
 
-  // Grid layout: fill screen width
-  const vw=Math.min(window.innerWidth,440);
-  const COLS=Math.ceil(Math.sqrt(TOTAL*(vw/window.innerHeight||0.55)));
+  // Grid — fill screen width
+  const VW=Math.min(typeof window!=="undefined"?window.innerWidth:390,440);
+  const COLS=Math.ceil(Math.sqrt(TOTAL*(VW/(typeof window!=="undefined"?window.innerHeight:844)||0.5)));
   const GAP=1;
-  const PIX=Math.floor((vw-16-(COLS-1)*GAP)/COLS);
+  const PIX=Math.max(3,Math.floor((VW-20-(COLS-1)*GAP)/COLS));
 
-  // Sort history by date ascending for coloring past pixels
-  const sortedHist=[...(history||[])].sort((a,b)=>a.date.localeCompare(b.date));
-  // How many days have passed (roughly) = total - daysLeft
+  // Sort history ascending
+  const hist=[...(history||[])].sort((a,b)=>a.date.localeCompare(b.date));
   const daysPassed=Math.max(0,TOTAL-daysLeft);
-
-  const getPixelBg=(i)=>{
-    if(i>=daysPassed)return"rgba(255,255,255,0.04)"; // future
-    const h=sortedHist[i];
-    if(!h)return"rgba(255,255,255,0.08)";
-    return h.allDone?"#22C55E":h.pct>=40?"#FBBF24":"#EF4444";
-  };
-  // Yesterday pixel index
   const ydIdx=daysPassed-1;
+
+  const getBg=(i)=>{
+    if(i>=daysPassed)return"rgba(255,255,255,0.035)";
+    const h=hist[i];
+    if(!h)return"rgba(255,255,255,0.07)";
+    return h.allDone?"rgba(34,197,94,0.7)":h.pct>=40?"rgba(251,191,36,0.65)":"rgba(239,68,68,0.6)";
+  };
 
   return(
     <div style={{
       position:"fixed",inset:0,zIndex:600,background:"#05070F",
       display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
-      opacity:visible?1:0,
-      transition:visible?"opacity 0.5s ease":"opacity 0.8s ease",
+      opacity:show?1:0,
+      transition:show?"opacity 0.5s ease":"opacity 0.9s ease",
       overflow:"hidden",
     }}>
       <div style={{
         display:"grid",
         gridTemplateColumns:`repeat(${COLS},${PIX}px)`,
-        gap:`${GAP}px`,
-        padding:"8px",
-        maxWidth:"100%",
+        gap:`${GAP}px`,padding:"10px",
       }}>
         {Array.from({length:TOTAL},(_,i)=>{
           const isYd=i===ydIdx&&ydColor;
           return(
             <div key={i} style={{
               width:PIX,height:PIX,borderRadius:1,
-              background:isYd?ydColor:getPixelBg(i),
-              opacity:i>=daysPassed?0.25:isYd?1:0.55,
-              transform:isYd?"scale(1.8)":"scale(1)",
-              transition:isYd?"transform 0.4s cubic-bezier(0.34,1.56,0.64,1) 0.3s":"none",
-              boxShadow:isYd?`0 0 8px ${ydColor}`:"none",
-              zIndex:isYd?2:1,
-              position:"relative",
+              background:isYd?ydColor:getBg(i),
+              opacity:isYd?1:i>=daysPassed?0.3:0.6,
+              transform:isYd?`scale(2)`:"scale(1)",
+              transition:isYd?"transform 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.2s":"none",
+              boxShadow:isYd?`0 0 6px ${ydColor}80`:"none",
+              position:"relative",zIndex:isYd?2:1,
             }}/>
           );
         })}
       </div>
-      {daysLeft>0&&(
-        <div style={{
-          position:"absolute",bottom:56,left:0,right:0,
-          textAlign:"center",
-          opacity:visible?1:0,
-          transition:"opacity 0.5s ease 0.4s",
-        }}>
-          <div style={{fontSize:11,color:"rgba(255,255,255,0.25)",letterSpacing:"0.18em",
-            textTransform:"uppercase",fontFamily:"Inter,sans-serif"}}>
-            {daysLeft} days to UCEED
-          </div>
-          {ydColor&&(
-            <div style={{fontSize:12,color:ydColor,fontWeight:700,marginTop:4,letterSpacing:"0.1em",
-              textShadow:`0 0 10px ${ydColor}40`}}>
-              {ydEntry?.allDone?"Yesterday: complete":`Yesterday: ${ydEntry?.pct||0}%`}
-            </div>
-          )}
+      <div style={{
+        position:"absolute",bottom:52,textAlign:"center",
+        opacity:show?1:0,transition:"opacity 0.5s ease 0.3s",
+        pointerEvents:"none",
+      }}>
+        <div style={{fontSize:10,color:"rgba(255,255,255,0.2)",letterSpacing:"0.2em",
+          textTransform:"uppercase",fontFamily:"Inter,sans-serif"}}>
+          {daysLeft} days remaining
         </div>
-      )}
+        {ydColor&&(
+          <div style={{fontSize:11,color:ydColor,fontWeight:600,marginTop:5,
+            letterSpacing:"0.08em",textShadow:`0 0 12px ${ydColor}60`}}>
+            {ydEntry?.allDone?"Yesterday · complete":`Yesterday · ${ydEntry?.pct||0}%`}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -2401,31 +2385,33 @@ function DevPanel({onClose,tasks,setTasks,history,setHistory,streak,setStreak}){
 
   const resetAll=()=>{localStorage.clear();window.location.reload();};
   return(
-    <div style={{position:"fixed",inset:0,zIndex:400,background:"rgba(0,0,0,0.75)",
+    <div style={{position:"fixed",inset:0,zIndex:400,background:"rgba(0,0,0,0.8)",
       display:"flex",alignItems:"center",justifyContent:"center"}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{background:"#0F172A",border:"1px solid rgba(99,102,241,0.4)",
-        borderRadius:"20px",padding:"28px 24px",width:"240px",
-        boxShadow:"0 20px 60px rgba(0,0,0,0.8)"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"22px"}}>
-          <span style={{color:"#818CF8",fontSize:"13px",fontWeight:700,letterSpacing:"0.08em",
-            fontFamily:"'Syne',sans-serif",textTransform:"uppercase"}}>Developer</span>
-          <button onClick={onClose} style={{background:"rgba(255,255,255,0.07)",border:"none",
-            borderRadius:"50%",width:"28px",height:"28px",color:"rgba(255,255,255,0.6)",
-            cursor:"pointer",fontSize:"16px"}}>×</button>
+      <div style={{background:"#0A0D1A",border:"1px solid rgba(99,102,241,0.3)",
+        borderRadius:20,padding:"28px 22px",width:230,
+        boxShadow:"0 20px 60px rgba(0,0,0,0.9)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <span style={{color:"rgba(129,140,248,0.9)",fontSize:12,fontWeight:700,
+            letterSpacing:"0.12em",fontFamily:"'Syne',sans-serif",textTransform:"uppercase"}}>
+            Developer
+          </span>
+          <button onClick={onClose} style={{background:"rgba(255,255,255,0.06)",border:"none",
+            borderRadius:"50%",width:28,height:28,color:"rgba(255,255,255,0.5)",
+            cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>
         </div>
         <button onClick={advanceDay} style={{width:"100%",
-          background:"linear-gradient(135deg,rgba(99,102,241,0.5),rgba(139,92,246,0.4))",
-          border:"1px solid rgba(99,102,241,0.45)",borderRadius:"14px",padding:"15px",
-          color:"#C7D2FE",fontSize:"14px",fontWeight:800,cursor:"pointer",
-          fontFamily:"'Syne',sans-serif",marginBottom:"10px",
-          boxShadow:"0 4px 16px rgba(99,102,241,0.3)",letterSpacing:"0.03em"}}>
+          background:"linear-gradient(135deg,rgba(99,102,241,0.4),rgba(139,92,246,0.35))",
+          border:"1px solid rgba(99,102,241,0.4)",borderRadius:14,padding:15,
+          color:"#C7D2FE",fontSize:14,fontWeight:800,cursor:"pointer",
+          fontFamily:"'Syne',sans-serif",marginBottom:10,letterSpacing:"0.04em",
+          boxShadow:"0 4px 16px rgba(99,102,241,0.25)"}}>
           Next Day →
         </button>
         <button onClick={resetAll} style={{width:"100%",
-          background:"rgba(239,68,68,0.07)",border:"1px solid rgba(239,68,68,0.3)",
-          borderRadius:"14px",padding:"15px",color:"#F87171",fontSize:"14px",
-          fontWeight:700,cursor:"pointer",fontFamily:"'Syne',sans-serif",letterSpacing:"0.03em"}}>
+          background:"rgba(239,68,68,0.06)",border:"1px solid rgba(239,68,68,0.25)",
+          borderRadius:14,padding:15,color:"rgba(248,113,113,0.9)",fontSize:14,
+          fontWeight:700,cursor:"pointer",fontFamily:"'Syne',sans-serif",letterSpacing:"0.04em"}}>
           Reset Data
         </button>
       </div>
@@ -2450,9 +2436,8 @@ export default function TINT(){
   const [showDev,setShowDev]      = useState(false);
   const [introDone,setIntroDone]  = useState(()=>!!localStorage.getItem('tint_intro_done'));
   const [showPixelIntro,setShowPixelIntro]=useState(false);
-  const pixelShownThisSession=useRef(false);
-  const swipeTX=useRef(0);
-  const swipeTY=useRef(0);
+  const pixelShownRef=useRef(false);
+  const swX=useRef(0);const swY=useRef(0);
 
   const setTasks=upd=>{
     setTasksRaw(prev=>{const next=typeof upd==="function"?upd(prev):upd;save("tint_tasks3",next);return next;});
@@ -2501,9 +2486,9 @@ export default function TINT(){
   const handleCoverDone=()=>{
     if(load("tint_onboarded",false)){
       setScreen("home");
-      if(!pixelShownThisSession.current){
-        pixelShownThisSession.current=true;
-        setTimeout(()=>setShowPixelIntro(true),200);
+      if(!pixelShownRef.current){
+        pixelShownRef.current=true;
+        setTimeout(()=>setShowPixelIntro(true),150);
       }
     } else {setScreen("onboard");}
   };
@@ -2558,19 +2543,19 @@ export default function TINT(){
 
   const activeTasks=tasks||EXAM_TASKS.UCEED.map((t,i)=>({...t,id:i+1,status:"upcoming"}));
 
-  const SWIPE_SCREENS=["leaderboard","home","progress"];
-  const onSwipeStart=(e)=>{swipeTX.current=e.touches[0].clientX;swipeTY.current=e.touches[0].clientY;};
-  const onSwipeEnd=(e)=>{
-    if(!SWIPE_SCREENS.includes(screen))return;
-    const dx=e.changedTouches[0].clientX-swipeTX.current;
-    const dy=e.changedTouches[0].clientY-swipeTY.current;
-    if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.2)return; // too short or mostly vertical
-    const idx=SWIPE_SCREENS.indexOf(screen);
-    if(dx<0&&idx<SWIPE_SCREENS.length-1)setScreen(SWIPE_SCREENS[idx+1]);
-    if(dx>0&&idx>0)setScreen(SWIPE_SCREENS[idx-1]);
+  const NAV_SCREENS=["leaderboard","home","progress"];
+  const onTS=(e)=>{swX.current=e.touches[0].clientX;swY.current=e.touches[0].clientY;};
+  const onTE=(e)=>{
+    if(!NAV_SCREENS.includes(screen))return;
+    const dx=e.changedTouches[0].clientX-swX.current;
+    const dy=e.changedTouches[0].clientY-swY.current;
+    if(Math.abs(dx)<55||Math.abs(dx)<Math.abs(dy)*1.3)return;
+    const idx=NAV_SCREENS.indexOf(screen);
+    if(dx<0&&idx<NAV_SCREENS.length-1)setScreen(NAV_SCREENS[idx+1]);
+    else if(dx>0&&idx>0)setScreen(NAV_SCREENS[idx-1]);
   };
   return(
-    <div onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd}
+    <div onTouchStart={onTS} onTouchEnd={onTE}
       style={{position:"relative",width:"100%",minHeight:"100vh",minHeight:"100dvh",background:"#05070F"}}>
       {!introDone&&<AppIntroOnboarding onDone={()=>setIntroDone(true)}/>}
       {showPixelIntro&&<PixelDayIntro history={history} onDone={()=>setShowPixelIntro(false)}/>}
