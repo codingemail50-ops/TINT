@@ -313,6 +313,7 @@ input:focus{outline:none;border-color:rgba(99,102,241,0.6)!important;}
 @keyframes slideEnter{from{opacity:0;transform:translateX(60px);}to{opacity:1;transform:translateX(0);}}
 @keyframes slideExit{from{opacity:1;transform:translateX(0);}to{opacity:0;transform:translateX(-60px);}}
 @keyframes emojiPop{0%{transform:scale(0) rotate(-20deg);opacity:0;}60%{transform:scale(1.2) rotate(5deg);opacity:1;}100%{transform:scale(1) rotate(0deg);opacity:1;}}
+@keyframes pixelPop{0%{transform:scale(1.8);opacity:1;}50%{transform:scale(0.9);}100%{transform:scale(0);opacity:0;}}
 .ob-slide-enter{animation:slideEnter 0.4s cubic-bezier(0.22,1,0.36,1) forwards;}
 .ob-emoji-pop{animation:emojiPop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.2s both;}
 
@@ -526,7 +527,7 @@ function CoverScreen({onDone}){
     return()=>[t1,t2,t3,t4].forEach(clearTimeout);
   },[]);
   const LETTERS=["T","I","N","T"];
-  const RESTS  =["here","s","o","omorrow"];
+  const RESTS  =["HERE","S","O","OMORROW"];
   const spinning=phase==="spin";
   const settled =phase==="done"||phase==="quote";
   const showQ   =phase==="quote";
@@ -548,16 +549,16 @@ function CoverScreen({onDone}){
             display:"inline-flex",alignItems:"baseline",
             gap:settled?"10px":spinning?"8px":"3px",
             transition:"gap 1.6s cubic-bezier(0.4,0,0.2,1)",
-            animation:spinning?"containerSpin 1.6s linear forwards":"none",
+            animation:"none",
           }}>
             {LETTERS.map((l,i)=>(
               <div key={i} style={{display:"inline-flex",alignItems:"baseline"}}>
-                <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,color:"#fff",display:"inline-block",
-                  fontSize:(spinning||settled)?"26px":"68px",
+                <span style={{fontFamily:"'Syne',sans-serif",fontWeight:900,color:"#fff",display:"inline-block",
+                  fontSize:settled?"32px":"72px",
                   transition:"font-size 1.5s cubic-bezier(0.4,0,0.2,1)",lineHeight:1}}>{l}</span>
-                <span style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:"26px",
-                  color:"#F1F5F9",display:"inline-block",overflow:"hidden",whiteSpace:"nowrap",
-                  maxWidth:(spinning||settled)?"200px":"0px",opacity:(spinning||settled)?1:0,
+                <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:"32px",
+                  color:"#fff",display:"inline-block",overflow:"hidden",whiteSpace:"nowrap",
+                  maxWidth:settled?"200px":"0px",opacity:settled?1:0,
                   transition:`max-width 1.4s cubic-bezier(0.22,1,0.36,1) ${i*0.1}s,
                               opacity   1.0s ease                         ${0.1+i*0.1}s`,
                   lineHeight:1}}>{RESTS[i]}</span>
@@ -845,7 +846,7 @@ function AppIntroOnboarding({onDone}) {
       </div>
 
       {/* Progress dots */}
-      <div style={{display:'flex',gap:8,marginTop:40,position:'relative',zIndex:10}}>
+      <div style={{display:'flex',gap:8,position:'absolute',bottom:108,left:'50%',transform:'translateX(-50%)',zIndex:10}}>
         {INTRO_SLIDES.map((_,i)=>(
           <div key={i} style={{
             width:i===slide?20:7,height:7,borderRadius:4,
@@ -857,7 +858,8 @@ function AppIntroOnboarding({onDone}) {
 
       {/* Next / Done button */}
       <button onClick={goNext} style={{
-        marginTop:32,padding:'15px 48px',borderRadius:16,border:'none',cursor:'pointer',
+        position:'absolute',bottom:40,left:'50%',transform:'translateX(-50%)',
+        padding:'15px 48px',borderRadius:16,border:'none',cursor:'pointer',
         background:'linear-gradient(135deg,#FF5C00,#FF8C00)',
         color:'#fff',fontSize:16,fontWeight:800,
         fontFamily:"'Syne',sans-serif",letterSpacing:0.5,
@@ -1234,6 +1236,13 @@ function DistractionBlockSheet({blocked,onToggle,onClose}){
 
 function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
   const [phase,setPhase]=useState('setup'); // 'setup'|'breathe'|'active'|'done'
+  const saveFocusSession=(mins)=>{
+    try{
+      const sessions=JSON.parse(localStorage.getItem('tint_focus_sessions')||'[]');
+      sessions.push({date:new Date().toISOString().slice(0,10),mins});
+      localStorage.setItem('tint_focus_sessions',JSON.stringify(sessions));
+    }catch(e){}
+  };
   const [duration,setDuration]=useState(25);
   const [blocked,setBlocked]=useState(()=>{
     try{const s=localStorage.getItem('tint_blocked_apps');return s?JSON.parse(s):['instagram','youtube','tiktok'];}catch{return['instagram','youtube','tiktok'];}
@@ -1259,7 +1268,7 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
       setPhase('active');
       timerRef.current=setInterval(()=>{
         setTimeLeft(p=>{
-          if(p<=1){clearInterval(timerRef.current);setPhase('done');return 0;}
+          if(p<=1){clearInterval(timerRef.current);saveFocusSession(duration);setPhase('done');return 0;}
           return p-1;
         });
       },1000);
@@ -1330,6 +1339,29 @@ function FocusScreen({onBack,onTasks,onProgress,onLeaderboard}){
           </button>
         </div>
 
+        {(()=>{
+          try{
+            const sessions=JSON.parse(localStorage.getItem('tint_focus_sessions')||'[]');
+            const today=new Date().toISOString().slice(0,10);
+            const weekAgo=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+            const todayMins=sessions.filter(s=>s.date===today).reduce((a,s)=>a+s.mins,0);
+            const weekMins=sessions.filter(s=>s.date>=weekAgo).reduce((a,s)=>a+s.mins,0);
+            const totalMins=sessions.reduce((a,s)=>a+s.mins,0);
+            const fmt=(m)=>m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`;
+            if(totalMins===0)return null;
+            return(
+              <div style={{display:'flex',gap:8,marginBottom:20}}>
+                {[{l:'Today',v:fmt(todayMins)},{l:'This Week',v:fmt(weekMins)},{l:'All Time',v:fmt(totalMins)}].map(s=>(
+                  <div key={s.l} style={{flex:1,textAlign:'center',background:'rgba(99,102,241,0.08)',
+                    border:'1px solid rgba(99,102,241,0.15)',borderRadius:12,padding:'10px 4px'}}>
+                    <div style={{color:'#A5B4FC',fontSize:13,fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{s.v}</div>
+                    <div style={{color:'rgba(255,255,255,0.35)',fontSize:9,marginTop:3,textTransform:'uppercase',letterSpacing:0.5}}>{s.l}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          }catch(e){return null;}
+        })()}
         <button onClick={startFocus} style={{
           width:'100%',padding:'16px',borderRadius:16,border:'none',cursor:'pointer',
           background:'linear-gradient(135deg,#6366F1,#8B5CF6)',
@@ -1570,7 +1602,7 @@ function BottomNav({active,onTasks,onFocus,onProgress,onLeaderboard}){
 }
 
 // ── HOME SCREEN ───────────────────────────────────────────────────────────────
-function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,history,
+function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,history,userExams,
   onFocus,onProgress,onLeaderboard,onEditProfile,onOpenDev,onLogPastDay}){
   const [confettis,setConfettis]=useState([]);
   const [redFlash,setRedFlash]=useState(false);
@@ -1665,13 +1697,7 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
             {/* Right: flame + level */}
             <button onClick={handleFlameTap} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"2px",
               flexShrink:0,background:"transparent",border:"none",cursor:"pointer",padding:"2px 4px"}}>
-              <FlameIcon streak={streak} size={30}/>
-              <span style={{color:fs.c2,fontSize:"10px",fontWeight:700,
-                textShadow:`0 0 8px ${fs.glow}`}}>{streak}🔥</span>
-              <span style={{color:fs.c2,fontSize:"8px",fontWeight:600,opacity:0.85,maxWidth:"50px",
-                textAlign:"center",lineHeight:1,letterSpacing:"0.02em"}}>
-                {getFlameLevel(streak).name}
-              </span>
+              <FlameIcon streak={streak} pct={pct} size={32}/>
             </button>
           </div>
           <WeekBar history={history} selectedDate={selectedDate} onSelectDate={setSelectedDate}/>
@@ -1683,9 +1709,9 @@ function HomeScreen({tasks,setTasks,streak,rank,isCarrot,userName,userAvatar,his
             </div>
             <div style={{height:"5px",background:"rgba(255,255,255,0.06)",borderRadius:"100px"}}>
               <div style={{height:"100%",width:pct+"%",
-                background:pct===100?"linear-gradient(90deg,#22C55E,#4ADE80)":"linear-gradient(90deg,#6366F1,#818CF8)",
+                background:pct===100?"linear-gradient(90deg,#22C55E,#4ADE80)":pct>=60?"linear-gradient(90deg,#FBBF24,#4ADE80)":pct>=30?"linear-gradient(90deg,#F97316,#FBBF24)":"linear-gradient(90deg,#EF4444,#F97316)",
                 borderRadius:"100px",transition:"width 0.6s cubic-bezier(0.4,0,0.2,1)",
-                boxShadow:pct===100?"0 0 12px rgba(34,197,94,0.6)":"0 0 10px rgba(99,102,241,0.4)"}}/>
+                boxShadow:pct===100?"0 0 12px rgba(34,197,94,0.6)":pct>=60?"0 0 10px rgba(251,191,36,0.5)":pct>=30?"0 0 10px rgba(249,115,22,0.5)":"0 0 10px rgba(239,68,68,0.4)"}}/>
             </div>
           </div>
           {/* Stats row */}
@@ -1816,11 +1842,20 @@ function TaskRow({task,i,onTap,onDelete,isDeleting,onStartDelete,onCancelDelete}
   const done=task.status==="done";
   const cc=CAT_COLORS[task.cat]||CAT_COLORS.theory;
   const pressTimer=useRef(null);
+  const [exiting,setExiting]=useState(false);
   const startPress=()=>{pressTimer.current=setTimeout(()=>onStartDelete(task.id),600);};
   const endPress=()=>clearTimeout(pressTimer.current);
+  const handleTap=(e)=>{
+    if(!done&&!isDeleting){
+      setExiting(true);
+      setTimeout(()=>onTap(task,e),320);
+    } else {
+      onTap(task,e);
+    }
+  };
   return(
     <div className={"task-card"+(isDeleting?" shaking":"")}
-      onClick={e=>onTap(task,e)}
+      onClick={handleTap}
       onMouseDown={startPress} onMouseUp={endPress} onMouseLeave={endPress}
       onTouchStart={startPress} onTouchEnd={endPress}
       style={{position:"relative",overflow:"visible",
@@ -1828,7 +1863,11 @@ function TaskRow({task,i,onTap,onDelete,isDeleting,onStartDelete,onCancelDelete}
         border:"1px solid "+(isDeleting?"rgba(239,68,68,0.4)":done?"rgba(34,197,94,0.2)":"rgba(255,255,255,0.07)"),
         borderRadius:"16px",padding:"14px 16px",display:"flex",alignItems:"center",gap:"14px",cursor:"pointer",
         animation:`slideUp 0.4s cubic-bezier(0.4,0,0.2,1) ${i*0.04}s both`,
-        userSelect:"none",WebkitUserSelect:"none"}}>
+        userSelect:"none",WebkitUserSelect:"none",
+        transform:exiting?"translateX(110%)":"translateX(0)",
+        opacity:exiting?0:1,
+        transition:exiting?"transform 0.32s cubic-bezier(0.4,0,1,1),opacity 0.25s ease":"none",
+      }}>
       {done&&!isDeleting&&<div style={{position:"absolute",inset:0,borderRadius:"16px",
         background:"rgba(34,197,94,0.08)",pointerEvents:"none"}}/>}
       <div style={{width:"42px",height:"42px",borderRadius:"13px",flexShrink:0,
@@ -2276,47 +2315,121 @@ function DevPanel({onClose,tasks,setTasks,history,setHistory,streak,setStreak}){
       display:"flex",alignItems:"center",justifyContent:"center"}}
       onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
       <div style={{background:"#0F172A",border:"1px solid rgba(99,102,241,0.5)",
-        borderRadius:"20px",padding:"24px",width:"280px",
+        borderRadius:"20px",padding:"24px",width:"260px",
         boxShadow:"0 20px 60px rgba(0,0,0,0.8)"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}>
-          <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-            <span style={{fontSize:"18px"}}>⚙️</span>
-            <span style={{color:"#818CF8",fontSize:"14px",fontWeight:700,letterSpacing:"0.05em",fontFamily:"'Syne',sans-serif"}}>DEV MODE</span>
-          </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"20px"}}>
+          <span style={{color:"#818CF8",fontSize:"14px",fontWeight:700,letterSpacing:"0.05em",fontFamily:"'Syne',sans-serif"}}>DEV MODE</span>
           <button onClick={onClose} style={{background:"rgba(255,255,255,0.07)",border:"none",
             borderRadius:"50%",width:"28px",height:"28px",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:"16px"}}>×</button>
         </div>
-        <div style={{background:"rgba(99,102,241,0.1)",border:"1px solid rgba(99,102,241,0.2)",
-          borderRadius:"12px",padding:"12px",marginBottom:"14px",textAlign:"center"}}>
-          <p style={{color:"rgba(255,255,255,0.45)",fontSize:"10px",marginBottom:"4px",textTransform:"uppercase",letterSpacing:"0.08em"}}>Simulated days</p>
-          <p style={{color:"#A5B4FC",fontSize:"28px",fontWeight:800,fontFamily:"'Syne',sans-serif"}}>{day}</p>
-          <p style={{color:"rgba(255,255,255,0.4)",fontSize:"11px",marginTop:4}}>
-            {doneTasks}/{totalTasks} tasks done today
-          </p>
-        </div>
-        {/* Seen — saves current state, closes */}
-        <button onClick={markSeen} style={{width:"100%",
-          background:"rgba(34,197,94,0.1)",border:"1px solid rgba(34,197,94,0.35)",
-          borderRadius:"12px",padding:"12px",color:"#4ADE80",fontSize:"13px",
-          fontWeight:700,cursor:"pointer",fontFamily:"'Syne',sans-serif",marginBottom:"8px"}}>
-          ✓ Seen (save today's progress)
-        </button>
-        {/* Next Day — saves today + advances */}
         <button onClick={advanceDay} style={{width:"100%",
           background:"linear-gradient(135deg,rgba(99,102,241,0.5),rgba(139,92,246,0.4))",
-          border:"1px solid rgba(99,102,241,0.5)",borderRadius:"12px",padding:"12px",
-          color:"#C7D2FE",fontSize:"13px",fontWeight:800,cursor:"pointer",
+          border:"1px solid rgba(99,102,241,0.5)",borderRadius:"12px",padding:"14px",
+          color:"#C7D2FE",fontSize:"14px",fontWeight:800,cursor:"pointer",
           fontFamily:"'Syne',sans-serif",marginBottom:"10px",
           boxShadow:"0 4px 16px rgba(99,102,241,0.3)"}}>
-          Next Day → (saves + resets tasks)
+          Next Day →
         </button>
         <button onClick={resetAll} style={{width:"100%",
           background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)",
-          borderRadius:"12px",padding:"12px",color:"#F87171",fontSize:"13px",
+          borderRadius:"12px",padding:"14px",color:"#F87171",fontSize:"14px",
           fontWeight:700,cursor:"pointer",fontFamily:"'Syne',sans-serif"}}>
-          Reset All Data
+          Reset Data
         </button>
       </div>
+    </div>
+  );
+}
+
+
+// ── PIXEL INTRO (daily reality check) ────────────────────────────────────────
+function PixelDayIntro({history,onDone}){
+  const [phase,setPhase]=useState("show"); // show→fade→done
+  const [opacity,setOpacity]=useState(0);
+
+  const todayStr=new Date().toISOString().slice(0,10);
+  const UCEED=new Date('2027-01-17T00:00:00');
+  const todayMid=new Date(todayStr+'T00:00:00');
+  const daysLeft=Math.max(1,Math.ceil((UCEED-todayMid)/86400000));
+
+  // Yesterday
+  const yd=new Date(todayMid);yd.setDate(yd.getDate()-1);
+  const ydStr=yd.toISOString().slice(0,10);
+  const ydEntry=history.find(h=>h.date===ydStr);
+  const ydColor=ydEntry?ydEntry.allDone?"#22C55E":ydEntry.pct>=40?"#FBBF24":"#EF4444":null;
+
+  // Grid sizing
+  const TOTAL=Math.min(daysLeft,500);
+  const cols=Math.ceil(Math.sqrt(TOTAL*1.6));
+  const rows=Math.ceil(TOTAL/cols);
+  // pixel size to fill screen
+  const pixW=Math.floor(Math.min(window.innerWidth,420)/cols)-1;
+  const pixH=pixW;
+
+  useEffect(()=>{
+    // Fade in
+    setTimeout(()=>setOpacity(1),50);
+    // Hold then fade out
+    const t1=setTimeout(()=>setOpacity(0),2800);
+    const t2=setTimeout(()=>onDone(),3500);
+    return()=>{clearTimeout(t1);clearTimeout(t2);};
+  },[]);
+
+  // Which pixel index is "yesterday"
+  const ydIdx=TOTAL-daysLeft; // days elapsed = total - days remaining (approx)
+
+  return(
+    <div style={{
+      position:"fixed",inset:0,zIndex:600,background:"#05070F",
+      display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+      opacity,transition:opacity===0?"opacity 0.7s ease":"opacity 0.5s ease",
+      overflow:"hidden",
+    }}>
+      <div style={{
+        display:"grid",
+        gridTemplateColumns:`repeat(${cols}, ${pixW}px)`,
+        gap:"1px",
+        padding:"8px",
+      }}>
+        {Array.from({length:TOTAL},(_,i)=>{
+          const isYd=i===ydIdx&&ydColor;
+          const elapsed=TOTAL-daysLeft;
+          const isPast=i<elapsed;
+          const histIdx=i-(elapsed-history.length);
+          const hEntry=histIdx>=0&&histIdx<history.length?history.slice().sort((a,b)=>a.date.localeCompare(b.date))[histIdx]:null;
+          const bg=isYd?ydColor
+            :isPast&&hEntry?hEntry.allDone?"#22C55E":hEntry.pct>=40?"#FBBF24":"#EF4444"
+            :isPast?"rgba(255,255,255,0.07)"
+            :"rgba(255,255,255,0.03)";
+          return(
+            <div key={i} style={{
+              width:pixW,height:pixH,borderRadius:1,background:bg,
+              opacity:isYd?1:isPast?0.7:0.4,
+              transition:isYd?"opacity 0.5s ease,transform 0.5s ease":"none",
+              transform:"scale(1)",
+              animation:isYd?"pixelPop 0.6s ease forwards 0.3s":"none",
+            }}/>
+          );
+        })}
+      </div>
+      {ydColor&&(
+        <div style={{
+          position:"absolute",bottom:60,left:"50%",transform:"translateX(-50%)",
+          textAlign:"center",
+          opacity,transition:"opacity 0.5s ease",
+        }}>
+          <div style={{
+            fontSize:11,color:ydColor,fontWeight:700,letterSpacing:"0.15em",
+            textTransform:"uppercase",fontFamily:"Inter,sans-serif",
+            textShadow:`0 0 12px ${ydColor}`,
+          }}>
+            {ydEntry?.allDone?"Yesterday: All done":"Yesterday: "+ydEntry?.pct+"%"}
+          </div>
+          <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:4,letterSpacing:"0.1em"}}>
+            {daysLeft} days to UCEED
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2337,6 +2450,8 @@ export default function TINT(){
   const [showEdit,setShowEdit]    = useState(false);
   const [showDev,setShowDev]      = useState(false);
   const [introDone,setIntroDone]  = useState(()=>!!localStorage.getItem('tint_intro_done'));
+  const [showPixelIntro,setShowPixelIntro]=useState(false);
+  const pixelShownRef=useRef(false);
 
   const setTasks=upd=>{
     setTasksRaw(prev=>{const next=typeof upd==="function"?upd(prev):upd;save("tint_tasks3",next);return next;});
@@ -2436,16 +2551,35 @@ export default function TINT(){
 
   const activeTasks=tasks||EXAM_TASKS.UCEED.map((t,i)=>({...t,id:i+1,status:"upcoming"}));
 
+  const touchStartX=useRef(0);
+  const touchStartY=useRef(0);
+  const SCREENS_ORDER=["leaderboard","home","progress"];
+  const handleSwipeStart=(e)=>{
+    touchStartX.current=e.touches[0].clientX;
+    touchStartY.current=e.touches[0].clientY;
+  };
+  const handleSwipeEnd=(e)=>{
+    const dx=e.changedTouches[0].clientX-touchStartX.current;
+    const dy=e.changedTouches[0].clientY-touchStartY.current;
+    if(Math.abs(dx)>Math.abs(dy)*1.5&&Math.abs(dx)>50){
+      const cur=SCREENS_ORDER.indexOf(screen);
+      if(cur===-1)return;
+      if(dx<0&&cur<SCREENS_ORDER.length-1)setScreen(SCREENS_ORDER[cur+1]);
+      if(dx>0&&cur>0)setScreen(SCREENS_ORDER[cur-1]);
+    }
+  };
   return(
-    <div style={{position:"relative",width:"100%",minHeight:"100vh",minHeight:"100dvh",background:"#05070F"}}>
+    <div onTouchStart={handleSwipeStart} onTouchEnd={handleSwipeEnd}
+      style={{position:"relative",width:"100%",minHeight:"100vh",minHeight:"100dvh",background:"#05070F"}}>
       {!introDone&&<AppIntroOnboarding onDone={()=>setIntroDone(true)}/>}
+      {showPixelIntro&&<PixelDayIntro history={history} onDone={()=>setShowPixelIntro(false)}/>}
       {introDone&&screen==="cover"      &&<CoverScreen onDone={handleCoverDone}/>}
       {introDone&&screen==="onboard"    &&<OnboardingScreen onDone={handleOnboardDone}/>}
       {introDone&&screen==="home"       &&<HomeScreen
         tasks={activeTasks} setTasks={setTasks}
         streak={streak} missed={missed} rank={rank} isCarrot={isCarrot}
         userName={userName||"Friend"} userAvatar={userAvatar}
-        history={history}
+        history={history} userExams={userExams}
         onFocus={()=>setScreen("focus")}
         onProgress={()=>setScreen("progress")}
         onLeaderboard={()=>setScreen("leaderboard")}
