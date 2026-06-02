@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>UCEED Wall Preview</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:#0d0d10;overflow:hidden;font-family:system-ui}
+
+#stage{
+  position:fixed;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  background:#0d0d10;
+}
+
+/* ── Tile base ── */
+.tile{
+  aspect-ratio:1;
+  border-radius:16%;
+  background:
+    radial-gradient(circle at 46% 38%,
+      rgba(255,255,255,0.30) 0%,
+      rgba(255,255,255,0.10) 24%,
+      rgba(255,255,255,0.02) 52%,
+      transparent 68%),
+    linear-gradient(155deg,#484848 0%,#2e2e30 42%,#1e1e20 72%,#141416 100%);
+  box-shadow:
+    0 4px 12px rgba(0,0,0,0.9),
+    0 1px 3px rgba(0,0,0,0.7),
+    inset 0 1px 0 rgba(255,255,255,0.17),
+    inset 0 -2px 0 rgba(0,0,0,0.55),
+    inset -1px 0 0 rgba(0,0,0,0.25),
+    inset 1px 0 0 rgba(255,255,255,0.06);
+  border:1px solid rgba(255,255,255,0.07);
+  will-change:transform,opacity;
+}
+.tile.past{visibility:hidden}
+.tile.exam{
+  background:
+    radial-gradient(circle at 46% 38%,
+      rgba(253,212,60,0.90) 0%,
+      rgba(253,180,20,0.50) 35%,
+      rgba(251,140,0,0.12) 60%,
+      transparent 75%),
+    linear-gradient(155deg,#4a3800 0%,#2c2000 55%,#1a1200 100%);
+  box-shadow:
+    0 4px 14px rgba(0,0,0,0.85),
+    0 0 18px rgba(253,180,20,0.45),
+    0 0 40px rgba(253,180,20,0.18),
+    inset 0 1px 0 rgba(255,210,60,0.35),
+    inset 0 -2px 0 rgba(0,0,0,0.5);
+  border:1px solid rgba(253,180,20,0.45);
+}
+.tile.yest{
+  background:
+    radial-gradient(circle at 46% 38%,
+      var(--yc) 0%,
+      color-mix(in srgb,var(--yc) 70%,transparent) 30%,
+      color-mix(in srgb,var(--yc) 15%,transparent) 58%,
+      transparent 72%),
+    linear-gradient(155deg,#484848 0%,#2e2e30 42%,#1e1e20 100%);
+  border:1px solid color-mix(in srgb,var(--yc) 60%,transparent);
+  animation:tileGlow 1.4s ease-in-out infinite;
+}
+
+/* ── Grid container ── */
+#grid-wrap{
+  width:100%;max-width:420px;position:relative;
+}
+#grid{
+  display:grid;
+  grid-template-columns:repeat(10,1fr);
+  gap:4px;
+  padding:0 14px;
+}
+
+/* ── Zoom overlay ── */
+#zoom-tile{
+  position:fixed;
+  border-radius:16%;
+  pointer-events:none;
+  z-index:20;
+  will-change:transform,opacity;
+  display:none;
+}
+
+/* ── Checkmark ── */
+#check{
+  position:fixed;
+  pointer-events:none;
+  z-index:21;
+  display:none;
+  transform:translate(-50%,-50%) scale(0);
+  opacity:0;
+}
+
+/* ── Particles ── */
+#particles{position:fixed;inset:0;pointer-events:none;z-index:19;overflow:hidden}
+.particle{
+  position:absolute;
+  border-radius:50%;
+  pointer-events:none;
+}
+
+/* ── Label ── */
+#label{
+  position:fixed;bottom:40px;left:0;right:0;text-align:center;
+  font-size:12px;color:rgba(255,255,255,0.3);letter-spacing:1px;
+  font-family:system-ui;
+}
+
+/* ── Keyframes ── */
+@keyframes scatterIn{
+  from{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0.3) rotate(var(--rot));}
+  60%{opacity:1;}
+  to{opacity:1;transform:translate(0,0) scale(1) rotate(0deg);}
+}
+@keyframes scatterOut{
+  from{opacity:1;transform:translate(0,0) scale(1) rotate(0deg);}
+  to{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0.25) rotate(var(--rot));}
+}
+@keyframes tileGlow{
+  0%,100%{
+    box-shadow:
+      0 0 10px color-mix(in srgb,var(--yc) 55%,transparent),
+      0 0 24px color-mix(in srgb,var(--yc) 30%,transparent),
+      inset 0 1px 0 rgba(255,255,255,0.1);
+  }
+  50%{
+    box-shadow:
+      0 0 22px color-mix(in srgb,var(--yc) 85%,transparent),
+      0 0 50px color-mix(in srgb,var(--yc) 55%,transparent),
+      0 0 80px color-mix(in srgb,var(--yc) 22%,transparent),
+      inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+}
+@keyframes breathe{
+  0%,100%{transform:scale(1);}
+  50%{transform:scale(1.012);}
+}
+@keyframes zoomIn{
+  0%{transform:translate(-50%,-50%) scale(1);}
+  65%{transform:translate(-50%,-50%) scale(3.7);}
+  100%{transform:translate(-50%,-50%) scale(3.4);}
+}
+@keyframes implode{
+  0%{transform:translate(-50%,-50%) scale(3.4);opacity:1;filter:blur(0);}
+  30%{transform:translate(-50%,-50%) scale(4.2);opacity:0.85;filter:blur(2px);}
+  100%{transform:translate(-50%,-50%) scale(0);opacity:0;filter:blur(18px);}
+}
+@keyframes checkIn{
+  0%{transform:translate(-50%,-50%) scale(0);opacity:0;}
+  55%{transform:translate(-50%,-50%) scale(1.2);opacity:1;}
+  75%{transform:translate(-50%,-50%) scale(0.92);}
+  100%{transform:translate(-50%,-50%) scale(1.05);opacity:1;}
+}
+@keyframes checkOut{
+  0%{transform:translate(-50%,-50%) scale(1.05);opacity:1;}
+  100%{transform:translate(-50%,-50%) scale(3.2);opacity:0;}
+}
+@keyframes particleFly{
+  0%{opacity:1;transform:translate(-50%,-50%) scale(1);}
+  100%{opacity:0;transform:translate(calc(-50% + var(--px)),calc(-50% + var(--py))) scale(0);}
+}
+@keyframes stageFadeOut{
+  to{opacity:0;}
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="grid-wrap">
+    <div id="grid"></div>
+  </div>
+  <div id="zoom-tile"></div>
+  <div id="check">
+    <svg id="check-svg" viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="46" fill="rgba(34,197,94,0.12)" stroke="#22C55E" stroke-width="4"/>
+      <polyline points="22,50 42,70 78,30" fill="none" stroke="#22C55E" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div id="particles"></div>
+  <div id="label">TAP TO RESTART</div>
+</div>
+
+<script>
+const TOTAL = 140, COLS = 10;
+// Simulate: 23 days elapsed (22 past tiles, tile 22 = yesterday)
+const ELAPSED = 23;
+const Y_IDX = Math.max(0, ELAPSED - 1); // yesterday = tile 22
+const YEST_COLOR = "#22C55E"; // green (all done yesterday)
+
+const grid = document.getElementById('grid');
+const stage = document.getElementById('stage');
+const zoomEl = document.getElementById('zoom-tile');
+const checkEl = document.getElementById('check');
+const partContainer = document.getElementById('particles');
+
+// Build tiles
+const tiles = [];
+const offsets = Array.from({length: TOTAL}, () => ({
+  tx: (Math.random() - 0.5) * 360 + 'px',
+  ty: (Math.random() - 0.5) * 560 + 'px',
+  rot: (Math.random() - 0.5) * 40 + 'deg'
+}));
+
+for (let i = 0; i < TOTAL; i++) {
+  const el = document.createElement('div');
+  el.className = 'tile';
+  el.style.setProperty('--tx', offsets[i].tx);
+  el.style.setProperty('--ty', offsets[i].ty);
+  el.style.setProperty('--rot', offsets[i].rot);
+  el.style.setProperty('--yc', YEST_COLOR);
+
+  if (i < Y_IDX) el.classList.add('past');
+  else if (i === Y_IDX) el.classList.add('yest');
+  else if (i === 139) el.classList.add('exam');
+
+  grid.appendChild(el);
+  tiles.push(el);
+}
+
+let timers = [];
+const T = (fn, ms) => timers.push(setTimeout(fn, ms));
+const clearAll = () => { timers.forEach(clearTimeout); timers = []; };
+
+function burst(cx, cy) {
+  partContainer.innerHTML = '';
+  for (let i = 0; i < 28; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const a = (i / 28) * Math.PI * 2 + Math.random() * 0.4;
+    const d = 45 + Math.random() * 110;
+    const s = 2 + Math.random() * 6;
+    const colors = [YEST_COLOR, '#fff', '#aaffcc'];
+    p.style.cssText = `
+      width:${s}px;height:${s}px;
+      left:${cx}px;top:${cy}px;
+      background:${colors[i%colors.length]};
+      box-shadow:0 0 6px ${YEST_COLOR},0 0 14px ${YEST_COLOR}88;
+      --px:${Math.cos(a)*d}px;--py:${Math.sin(a)*d}px;
+      animation:particleFly 1.1s ease-out ${Math.random()*120}ms both;
+    `;
+    partContainer.appendChild(p);
+  }
+}
+
+function run() {
+  clearAll();
+  partContainer.innerHTML = '';
+  zoomEl.style.display = 'none';
+  checkEl.style.display = 'none';
+  stage.style.animation = '';
+  stage.style.opacity = '1';
+
+  // Reset tiles
+  tiles.forEach((el, i) => {
+    el.style.animation = 'none';
+    el.style.opacity = i < Y_IDX ? '0' : '1';
+    if (i < Y_IDX) el.style.visibility = 'hidden';
+    else el.style.visibility = '';
+    void el.offsetWidth;
+  });
+
+  // ── PHASE 1: Scatter IN (0–2.2s) ──
+  tiles.forEach((el, i) => {
+    if (i < Y_IDX) return;
+    const delay = Math.random() * 700;
+    el.style.animation = `scatterIn 0.55s cubic-bezier(0.22,1,0.36,1) ${delay}ms both`;
+  });
+
+  // ── PHASE 2: Breathe (2.2s) ──
+  T(() => {
+    document.getElementById('grid-wrap').style.animation = 'breathe 3s ease-in-out infinite';
+  }, 2200);
+
+  // ── PHASE 3: Zoom tile (5.0s) ──
+  T(() => {
+    const yestEl = tiles[Y_IDX];
+    if (!yestEl) return;
+    const r = yestEl.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+
+    // Style zoom tile
+    zoomEl.style.cssText = `
+      display:block;
+      left:${cx}px; top:${cy}px;
+      width:${r.width}px; height:${r.height}px;
+      background:
+        radial-gradient(circle at 46% 38%,${YEST_COLOR} 0%,${YEST_COLOR}cc 22%,${YEST_COLOR}44 55%,transparent 72%),
+        linear-gradient(155deg,#484848,#1e1e20);
+      border:1.5px solid ${YEST_COLOR};
+      box-shadow:0 0 40px ${YEST_COLOR},0 0 80px ${YEST_COLOR}88;
+      transform-origin:center center;
+      animation:zoomIn 1.5s cubic-bezier(0.25,0.46,0.45,0.94) forwards;
+    `;
+    // Hide the actual tile
+    yestEl.style.opacity = '0';
+    yestEl.style.animation = 'none';
+
+    document.getElementById('grid-wrap').style.animation = 'none';
+
+    // Checkmark at 5.5s
+    T(() => {
+      const size = r.width * 3.3;
+      checkEl.style.cssText = `
+        display:block;
+        left:${cx}px; top:${cy}px;
+        width:${size}px; height:${size}px;
+        animation:checkIn 0.52s cubic-bezier(0.34,1.5,0.64,1) forwards;
+      `;
+      checkEl.querySelector('#check-svg').style.filter = `drop-shadow(0 0 10px ${YEST_COLOR}) drop-shadow(0 0 28px ${YEST_COLOR}88)`;
+      checkEl.querySelector('circle').setAttribute('stroke', YEST_COLOR);
+      checkEl.querySelector('polyline').setAttribute('stroke', YEST_COLOR);
+    }, 500);
+
+    // Checkmark out at 6.3s
+    T(() => {
+      checkEl.style.animation = 'checkOut 0.45s ease-in forwards';
+    }, 1300);
+
+    // Implode at 6.8s
+    T(() => {
+      zoomEl.style.animation = 'implode 0.65s ease-in forwards';
+      burst(cx, cy);
+    }, 1800);
+
+    // Scatter OUT at 7.6s
+    T(() => {
+      zoomEl.style.display = 'none';
+      partContainer.innerHTML = '';
+      tiles[Y_IDX].style.visibility = 'hidden';
+      tiles[Y_IDX].style.opacity = '0';
+      tiles.forEach((el, i) => {
+        if (i <= Y_IDX) return;
+        el.style.animation = `scatterOut 0.45s ease-in ${Math.random() * 350}ms both`;
+      });
+    }, 2600);
+
+    // Fade stage at 8.4s
+    T(() => {
+      stage.style.animation = 'stageFadeOut 0.8s ease forwards';
+    }, 3400);
+
+    // Reset at 9.5s
+    T(() => run(), 4500);
+
+  }, 5000);
+}
+
+// Kick off
+run();
+stage.addEventListener('click', run);
+</script>
+</body>
+</html>
