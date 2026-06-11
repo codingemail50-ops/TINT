@@ -330,7 +330,7 @@ export default function OnboardingScreen({ onComplete: _onComplete }: Onboarding
               }}
             >
               <span style={{ fontSize: 18 }}>G</span>
-              {loading ? 'Redirecting...' : 'Continue with Google'}
+              {loading ? 'Redirecting...' : 'Sign up with Google'}
             </button>
 
             <p style={{ fontSize: 12, color: '#6060A0', textAlign: 'center', maxWidth: 280 }}>

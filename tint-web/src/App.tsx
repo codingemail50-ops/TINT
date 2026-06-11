@@ -5,12 +5,13 @@ import type { AppState, UserProfile } from './utils/storage'
 import { getUser, saveAppState } from './utils/storage'
 import { checkUserExists, saveNewUserToSupabase, loadUserFromSupabase, syncAppStateToSupabase } from './utils/supabaseStorage'
 import SplashScreen from './screens/SplashScreen'
+import AuthScreen from './screens/AuthScreen'
 import OnboardingScreen from './screens/OnboardingScreen'
 import TodoScreen from './screens/TodoScreen'
 import ProductivityScreen from './screens/ProductivityScreen'
 import LeaderboardScreen from './screens/LeaderboardScreen'
 
-type Screen = 'splash' | 'onboarding' | 'todo' | 'productivity' | 'leaderboard'
+type Screen = 'splash' | 'auth' | 'onboarding' | 'todo' | 'productivity' | 'leaderboard'
 type MainTab = 'todo' | 'productivity' | 'leaderboard'
 
 const DEFAULT_APP_STATE: AppState = {
@@ -66,7 +67,7 @@ export default function App() {
         setShowTabs(true)
         setScreen('todo')
       } else {
-        setScreen('onboarding')
+        setScreen('auth')
       }
     })()
   }, [])
@@ -118,13 +119,19 @@ export default function App() {
           </motion.div>
         )}
 
+        {screen === 'auth' && (
+          <motion.div key="auth" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <AuthScreen onSignUp={() => setScreen('onboarding')} />
+          </motion.div>
+        )}
+
         {screen === 'onboarding' && (
           <motion.div key="onboarding" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <OnboardingScreen onComplete={handleOnboardingComplete} />
           </motion.div>
         )}
 
-        {screen !== 'splash' && screen !== 'onboarding' && (
+        {screen !== 'splash' && screen !== 'auth' && screen !== 'onboarding' && (
           <motion.div
             key={screen}
             initial={{ opacity: 0, y: 8 }}
@@ -138,7 +145,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Bottom tab bar */}
-      {showTabs && screen !== 'splash' && screen !== 'onboarding' && (
+      {showTabs && screen !== 'splash' && screen !== 'auth' && screen !== 'onboarding' && (
         <div
           style={{
             position: 'fixed',

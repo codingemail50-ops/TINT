@@ -123,7 +123,7 @@ export default function LeaderboardCard({ entry, rank, isUser, index }: Leaderbo
       </div>
 
       {/* Consistency */}
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+      <div style={{ textAlign: 'right', flexShrink: 0, minWidth: 64 }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: '#F0F0FF' }}>{entry.consistency}%</div>
         <div style={{ fontSize: 10, color: '#6060A0' }}>consistency</div>
       </div>
