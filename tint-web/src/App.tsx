@@ -15,13 +15,19 @@ type Screen = 'splash' | 'auth' | 'onboarding' | 'todo' | 'productivity' | 'lead
 type MainTab = 'todo' | 'productivity' | 'leaderboard'
 
 const DEFAULT_APP_STATE: AppState = {
-  user: { name: '', avatar: '🎯', examTypes: [], createdAt: '' },
+  user: { name: '', avatar: '⭐', examTypes: [], createdAt: '' },
   streak: 0,
   longestStreak: 0,
   lastActiveDate: '',
   history: [],
   totalTasksCompleted: 0,
 }
+
+const TAB_ITEMS: { id: MainTab; label: string; emoji: string }[] = [
+  { id: 'todo', label: 'Tasks', emoji: '📋' },
+  { id: 'productivity', label: 'Progress', emoji: '📈' },
+  { id: 'leaderboard', label: 'Board', emoji: '🏆' },
+]
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('splash')
@@ -37,7 +43,6 @@ export default function App() {
       if (session) {
         userIdRef.current = session.user.id
 
-        // Check for pending profile from onboarding redirect
         const pendingRaw = sessionStorage.getItem('tint_pending_profile')
         if (pendingRaw) {
           try {
@@ -47,7 +52,7 @@ export default function App() {
               await saveNewUserToSupabase(session.user.id, session.user.email || '', pending)
             }
           } catch {
-            // ignore parse errors
+            // ignore
           }
           sessionStorage.removeItem('tint_pending_profile')
         }
@@ -61,7 +66,6 @@ export default function App() {
         }
       }
 
-      // Fallback to localStorage
       const localUser = getUser()
       if (localUser) {
         setShowTabs(true)
@@ -73,7 +77,7 @@ export default function App() {
   }, [])
 
   const handleOnboardingComplete = useCallback((_profile: UserProfile) => {
-    // kept for type compat - onboarding now uses OAuth redirect
+    // onboarding uses OAuth redirect
   }, [])
 
   const handleStateChange = useCallback((newState: AppState) => {
@@ -84,31 +88,21 @@ export default function App() {
     }
   }, [])
 
-  const TAB_ITEMS: { id: MainTab; label: string; emoji: string }[] = [
-    { id: 'todo', label: 'Today', emoji: '📋' },
-    { id: 'productivity', label: 'Progress', emoji: '📊' },
-    { id: 'leaderboard', label: 'Rank', emoji: '🏆' },
-  ]
-
-  const tabToScreen = (tab: MainTab): Screen => tab
-
   const handleTabPress = (tab: MainTab) => {
     setActiveTab(tab)
-    setScreen(tabToScreen(tab))
+    setScreen(tab)
   }
 
   const renderScreen = () => {
     switch (screen) {
-      case 'todo':
-        return <TodoScreen appState={appState} onStateChange={handleStateChange} />
-      case 'productivity':
-        return <ProductivityScreen appState={appState} />
-      case 'leaderboard':
-        return <LeaderboardScreen appState={appState} />
-      default:
-        return null
+      case 'todo': return <TodoScreen appState={appState} onStateChange={handleStateChange} />
+      case 'productivity': return <ProductivityScreen appState={appState} />
+      case 'leaderboard': return <LeaderboardScreen appState={appState} />
+      default: return null
     }
   }
+
+  const isMain = screen !== 'splash' && screen !== 'auth' && screen !== 'onboarding'
 
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', position: 'relative', minHeight: '100dvh' }}>
@@ -131,7 +125,7 @@ export default function App() {
           </motion.div>
         )}
 
-        {screen !== 'splash' && screen !== 'auth' && screen !== 'onboarding' && (
+        {isMain && (
           <motion.div
             key={screen}
             initial={{ opacity: 0, y: 8 }}
@@ -144,9 +138,10 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Bottom tab bar */}
-      {showTabs && screen !== 'splash' && screen !== 'auth' && screen !== 'onboarding' && (
+      {/* Bottom nav — matches original */}
+      {showTabs && isMain && (
         <div
+          className="nav-safe"
           style={{
             position: 'fixed',
             bottom: 0,
@@ -154,11 +149,11 @@ export default function App() {
             transform: 'translateX(-50%)',
             width: '100%',
             maxWidth: 480,
-            background: '#0F0F1A',
-            borderTop: '1px solid #1E1E35',
             display: 'flex',
+            borderTop: '1px solid rgba(255,255,255,0.07)',
+            background: 'rgba(5,7,15,0.97)',
+            backdropFilter: 'blur(20px)',
             zIndex: 500,
-            paddingBottom: 'env(safe-area-inset-bottom, 0)',
           }}
         >
           {TAB_ITEMS.map((tab) => {
@@ -169,43 +164,31 @@ export default function App() {
                 onClick={() => handleTabPress(tab.id)}
                 style={{
                   flex: 1,
-                  padding: '10px 0 12px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: 3,
-                  position: 'relative',
+                  background: 'none',
+                  border: 'none',
                   cursor: 'pointer',
-                  transition: 'opacity 0.15s',
+                  padding: '8px 0',
+                  color: isActive ? '#fff' : 'rgba(255,255,255,0.38)',
                 }}
               >
-                {isActive && (
-                  <motion.div
-                    layoutId="tab-indicator"
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: '20%',
-                      right: '20%',
-                      height: 2,
-                      background: '#7C3AED',
-                      borderRadius: '0 0 2px 2px',
-                    }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  />
-                )}
-                <span style={{ fontSize: 20 }}>{tab.emoji}</span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    color: isActive ? '#7C3AED' : '#6060A0',
-                    letterSpacing: '0.03em',
-                    transition: 'color 0.15s',
-                  }}
-                >
-                  {tab.label}
-                </span>
+                <div style={{
+                  width: isActive ? 40 : 28,
+                  height: 28,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 14,
+                  background: isActive ? 'rgba(99,102,241,0.35)' : 'none',
+                  transition: 'all 0.2s',
+                }}>
+                  <span style={{ fontSize: 18 }}>{tab.emoji}</span>
+                </div>
+                <span style={{ fontSize: 10, fontWeight: isActive ? 700 : 500, letterSpacing: 0.3 }}>{tab.label}</span>
               </button>
             )
           })}

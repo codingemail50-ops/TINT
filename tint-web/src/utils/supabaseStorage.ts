@@ -33,6 +33,7 @@ export async function saveNewUserToSupabase(
       longest_streak: 0,
       last_active_date: '',
       total_tasks_completed: 0,
+      consistency_score: 0,
       history: [],
     })
   } catch {
@@ -68,11 +69,9 @@ export async function loadUserFromSupabase(userId: string): Promise<AppState | n
       totalTasksCompleted: (data.total_tasks_completed as number) || 0,
     }
 
-    // Sync to localStorage
     saveUser(profile)
     saveAppState(appState)
 
-    // Restore today's tasks if available
     const today = new Date().toISOString().split('T')[0]
     const todayRecord = history.find((h: DayRecord) => h.date === today)
     if (todayRecord) {
@@ -90,6 +89,10 @@ export async function syncAppStateToSupabase(
   state: AppState
 ): Promise<void> {
   try {
+    const totalDays = state.history.length
+    const perfectDays = state.history.filter((h) => h.consistency >= 100).length
+    const consistencyScore = totalDays > 0 ? Math.round((perfectDays / totalDays) * 100) : 0
+
     await supabase.from('user_data').upsert({
       id: userId,
       name: state.user.name,
@@ -99,9 +102,36 @@ export async function syncAppStateToSupabase(
       longest_streak: state.longestStreak,
       last_active_date: state.lastActiveDate,
       total_tasks_completed: state.totalTasksCompleted,
+      consistency_score: consistencyScore,
       history: state.history,
     })
   } catch {
     // ignore
+  }
+}
+
+export interface LeaderboardRow {
+  id: string
+  name: string
+  avatar: string
+  streak: number
+  consistency_score: number
+  isYou?: boolean
+  rank?: number
+}
+
+export async function loadLeaderboard(): Promise<LeaderboardRow[]> {
+  try {
+    const { data, error } = await supabase
+      .from('user_data')
+      .select('id, name, avatar, streak, consistency_score')
+      .order('consistency_score', { ascending: false })
+      .order('streak', { ascending: false })
+      .order('name', { ascending: true })
+      .limit(50)
+    if (error || !data) return []
+    return data as LeaderboardRow[]
+  } catch {
+    return []
   }
 }

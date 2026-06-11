@@ -1,180 +1,148 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { AppState } from '../utils/storage'
-import type { LeaderboardEntry } from '../data/leaderboard'
-import { MOCK_LEADERBOARD } from '../data/leaderboard'
-import LeaderboardCard from '../components/LeaderboardCard'
+import { loadLeaderboard, type LeaderboardRow } from '../utils/supabaseStorage'
+import { supabase } from '../lib/supabase'
 
 interface LeaderboardScreenProps {
   appState: AppState
 }
 
-const EXAM_FILTERS = ['ALL', 'JEE', 'UCEED', 'NID', 'NIFT']
-const EXAM_COLORS: Record<string, string> = {
-  JEE: '#7C3AED',
-  UCEED: '#0EA5E9',
-  NID: '#EC4899',
-  NIFT: '#F59E0B',
-}
+const MEDALS = ['🥇', '🥈', '🥉']
 
 export default function LeaderboardScreen({ appState }: LeaderboardScreenProps) {
-  const [filter, setFilter] = useState('ALL')
+  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly')
+  const [rows, setRows] = useState<LeaderboardRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [myId, setMyId] = useState<string | null>(null)
 
-  // Build user entry
-  const userExam = appState.user.examTypes[0] || 'JEE'
-  const history7 = appState.history.slice(-7)
-  const userConsistency = history7.length > 0
-    ? Math.round(history7.reduce((s, d) => s + d.consistency, 0) / history7.length)
-    : 0
+  useEffect(() => {
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setMyId(session.user.id)
+    })
+  }, [])
 
-  const userEntry: LeaderboardEntry = {
-    id: 'user',
-    name: appState.user.name,
-    avatar: appState.user.avatar,
-    exam: userExam,
-    streak: appState.streak,
-    consistency: userConsistency,
-    totalTasks: appState.totalTasksCompleted,
-  }
+  useEffect(() => {
+    setLoading(true)
+    void loadLeaderboard().then((data) => {
+      setRows(data)
+      setLoading(false)
+    })
+  }, [])
 
-  // Combine and filter
-  const allEntries = [...MOCK_LEADERBOARD, userEntry]
-  const filtered = filter === 'ALL' ? allEntries : allEntries.filter((e) => e.exam === filter)
+  const totalDays = appState.history.length
+  const perfectDays = appState.history.filter((h) => h.consistency >= 100).length
+  const myConsistency = totalDays > 0 ? Math.round((perfectDays / totalDays) * 100) : 0
 
-  // Sort by consistency desc
-  const sorted = [...filtered].sort((a, b) => b.consistency - a.consistency || b.streak - a.streak)
+  const allRows: LeaderboardRow[] = rows.some((r) => r.id === myId)
+    ? rows
+    : [
+        ...rows,
+        {
+          id: myId || 'me',
+          name: appState.user.name || 'You',
+          avatar: appState.user.avatar,
+          streak: appState.streak,
+          consistency_score: myConsistency,
+        },
+      ]
 
-  // Top 3 and rest
-  const top3 = sorted.slice(0, 3)
-  const rest = sorted.slice(3)
+  const sorted = [...allRows]
+    .sort((a, b) => b.consistency_score - a.consistency_score || b.streak - a.streak || (a.name || '').localeCompare(b.name || ''))
+    .map((r, i) => ({ ...r, rank: i + 1, isYou: r.id === myId }))
 
-  const getPodiumOrder = () => {
-    // Podium: 2nd, 1st, 3rd
-    if (top3.length < 3) return top3.map((e, i) => ({ entry: e, rank: i + 1 }))
-    return [
-      { entry: top3[1], rank: 2 },
-      { entry: top3[0], rank: 1 },
-      { entry: top3[2], rank: 3 },
-    ]
-  }
-
-  const podiumHeights: Record<number, number> = { 1: 90, 2: 70, 3: 55 }
-  const podiumColors: Record<number, string> = { 1: '#F59E0B', 2: '#A0A0C0', 3: '#CD7C4E' }
+  const myRank = sorted.find((r) => r.isYou)?.rank ?? 0
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#080810', padding: '16px 16px 88px' }}>
-      <div className="bebas" style={{ fontSize: 28, color: '#7C3AED', marginBottom: 16, letterSpacing: '0.05em' }}>
-        LEADERBOARD
-      </div>
-
-      {/* Filter tabs */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 20, overflowX: 'auto' }}>
-        {EXAM_FILTERS.map((f) => {
-          const color = f === 'ALL' ? '#7C3AED' : EXAM_COLORS[f]
-          return (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              style={{
-                flexShrink: 0,
-                padding: '7px 14px',
-                borderRadius: 20,
-                background: filter === f ? (f === 'ALL' ? '#7C3AED' : color) : 'transparent',
-                color: filter === f ? '#F0F0FF' : '#A0A0C0',
-                fontSize: 12,
-                fontWeight: 600,
-                border: `1px solid ${filter === f ? (f === 'ALL' ? '#7C3AED' : color) : '#1E1E35'}`,
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-            >
-              {f}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Podium */}
-      {top3.length >= 2 && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'center',
-            gap: 8,
-            marginBottom: 24,
-            padding: '0 8px',
-          }}
-        >
-          {getPodiumOrder().map(({ entry, rank }) => {
-            const isUser = entry.id === 'user'
-            const examColor = EXAM_COLORS[entry.exam] || '#7C3AED'
-            const podH = podiumHeights[rank] || 55
-            const medalColor = podiumColors[rank] || '#A0A0C0'
-
-            return (
-              <div
-                key={entry.id}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, maxWidth: 110 }}
+    <div
+      className="app-screen"
+      style={{ display: 'flex', flexDirection: 'column', background: '#080C14', fontFamily: 'Inter,sans-serif', overflow: 'hidden' }}
+    >
+      {/* Header */}
+      <div style={{ background: 'linear-gradient(180deg,#0D1321,#080C14)', padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h1 style={{ color: '#F1F5F9', fontSize: 22, fontWeight: 800, fontFamily: "'Syne',sans-serif" }}>Leaderboard</h1>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 3 }}>Ranked by Consistency Score</p>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['daily', 'weekly', 'monthly'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                style={{
+                  padding: '5px 14px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  background: period === p ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.06)',
+                  color: period === p ? '#C7D2FE' : 'rgba(255,255,255,0.35)',
+                  fontFamily: "'Syne',sans-serif",
+                  border: 'none',
+                }}
               >
-                <div style={{ fontSize: 24, marginBottom: 4 }}>{entry.avatar}</div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: isUser ? '#7C3AED' : '#A0A0C0',
-                    textAlign: 'center',
-                    marginBottom: 2,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    width: '100%',
-                  }}
-                >
-                  {entry.name}
-                  {isUser && ' 👤'}
-                </div>
-                <div style={{ fontSize: 11, color: '#6060A0', marginBottom: 4 }}>
-                  {entry.consistency}%
-                </div>
-                <div
-                  style={{
-                    width: '100%',
-                    height: podH,
-                    background: `${examColor}22`,
-                    border: `2px solid ${medalColor}`,
-                    borderRadius: '8px 8px 0 0',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    justifyContent: 'center',
-                    paddingTop: 8,
-                  }}
-                >
-                  <span style={{ fontSize: rank === 1 ? 20 : 16 }}>
-                    {rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉'}
-                  </span>
-                </div>
-              </div>
-            )
-          })}
+                {p.charAt(0).toUpperCase() + p.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
-      )}
-
-      {/* Rest of the list */}
-      <div>
-        {rest.map((entry, i) => (
-          <LeaderboardCard
-            key={entry.id}
-            entry={entry}
-            rank={i + 4}
-            isUser={entry.id === 'user'}
-            index={i}
-          />
-        ))}
-        {sorted.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: '#6060A0', fontSize: 14 }}>
-            No entries for this filter
+        {myRank > 0 && (
+          <div style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.25)', borderRadius: 12, padding: '8px 14px', marginTop: 12, textAlign: 'center' }}>
+            <p style={{ color: '#FBBF24', fontSize: 18, fontWeight: 800, fontFamily: "'Syne',sans-serif" }}>#{myRank}</p>
+            <p style={{ color: 'rgba(251,191,36,0.5)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Your Rank</p>
           </div>
         )}
+      </div>
+
+      {/* List */}
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as never, padding: '12px 16px 32px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {loading ? (
+          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13, marginTop: 40 }}>Loading...</p>
+        ) : sorted.map((u, i) => {
+          const isTop = i < 3
+          const isYou = u.isYou
+          return (
+            <div
+              key={u.id}
+              className="rank-row"
+              style={{
+                animationDelay: `${i * 0.045}s`,
+                background: isYou ? 'rgba(99,102,241,0.1)' : isTop ? 'rgba(251,191,36,0.05)' : 'rgba(255,255,255,0.03)',
+                border: '1px solid ' + (isYou ? 'rgba(99,102,241,0.3)' : isTop ? 'rgba(251,191,36,0.15)' : 'rgba(255,255,255,0.06)'),
+                borderRadius: 16,
+                padding: '14px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+              }}
+            >
+              <div style={{ width: 28, textAlign: 'center', flexShrink: 0 }}>
+                {isTop
+                  ? <span style={{ fontSize: 18 }}>{MEDALS[i]}</span>
+                  : <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: 600 }}>#{i + 1}</span>
+                }
+              </div>
+              <div style={{ width: 38, height: 38, borderRadius: 12, flexShrink: 0, background: isYou ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                {u.avatar}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ color: isYou ? '#A5B4FC' : '#E2E8F0', fontSize: 14, fontWeight: isYou ? 700 : 500, fontFamily: isYou ? "'Syne',sans-serif" : 'Inter,sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {u.name}{isYou ? ' (you)' : ''}
+                </p>
+                <div style={{ display: 'flex', gap: 8, marginTop: 3, alignItems: 'center' }}>
+                  <span style={{ color: '#FB923C', fontSize: 11 }}>🔥 {u.streak}d</span>
+                  <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10 }}>·</span>
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>{u.consistency_score}% consistent</span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <p style={{ color: i < 3 ? '#FBBF24' : i < 10 ? '#4ADE80' : 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: 800, fontFamily: "'Syne',sans-serif" }}>#{u.rank}</p>
+                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Score</p>
+              </div>
+            </div>
+          )
+        })}
+        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.15)', fontSize: 11, paddingTop: 8 }}>Rankings update daily based on task completion</p>
       </div>
     </div>
   )
