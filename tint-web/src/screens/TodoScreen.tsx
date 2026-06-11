@@ -9,7 +9,6 @@ import Confetti from '../components/Confetti'
 interface TodoScreenProps {
   appState: AppState
   onStateChange: (s: AppState) => void
-  onSignOut?: () => void
 }
 
 const CATEGORIES = [
@@ -37,7 +36,7 @@ function getDateStrings(count: number): { date: string; label: string; isToday: 
   return result
 }
 
-export default function TodoScreen({ appState, onStateChange, onSignOut }: TodoScreenProps) {
+export default function TodoScreen({ appState, onStateChange }: TodoScreenProps) {
   const today = new Date().toISOString().split('T')[0]
   const [selectedDate, setSelectedDate] = useState(today)
   const [tasks, setTasks] = useState<Task[]>([])
@@ -173,27 +172,8 @@ export default function TodoScreen({ appState, onStateChange, onSignOut }: TodoS
               {completedCount}/{tasks.length} completed · {consistency}%
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontSize: 13, color: '#A0A0C0' }}>
-              {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-            </div>
-            {onSignOut && (
-              <button
-                onClick={onSignOut}
-                title="Sign out"
-                style={{
-                  background: 'none',
-                  border: '1px solid #1E1E35',
-                  borderRadius: 6,
-                  padding: '4px 8px',
-                  fontSize: 11,
-                  color: '#6060A0',
-                  cursor: 'pointer',
-                }}
-              >
-                Sign out
-              </button>
-            )}
+          <div style={{ fontSize: 13, color: '#A0A0C0' }}>
+            {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
           </div>
         </div>
 
