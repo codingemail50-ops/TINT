@@ -48,6 +48,7 @@ export default function TodoScreen({ appState, onStateChange }: TodoScreenProps)
   const [newDuration, setNewDuration] = useState(30)
   const [newCategory, setNewCategory] = useState('Other')
   const [newRepeat, setNewRepeat] = useState(false)
+  const [filter, setFilter] = useState<'all' | 'todo' | 'done'>('all')
 
   const dates = getDateStrings(15)
   const isToday = selectedDate === today
@@ -160,7 +161,7 @@ export default function TodoScreen({ appState, onStateChange }: TodoScreenProps)
             {/* Avatar */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, flexShrink: 0, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 14, padding: '6px 8px' }}>
               <span style={{ fontSize: 22, lineHeight: 1 }}>{appState.user.avatar || '⭐'}</span>
-              <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 8, fontWeight: 600, letterSpacing: '0.05em' }}>ME</span>
+              <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 8, fontWeight: 600, letterSpacing: '0.05em' }}>EDIT</span>
             </div>
             {/* Title */}
             <div style={{ flex: 1, textAlign: 'center' }}>
@@ -184,10 +185,10 @@ export default function TodoScreen({ appState, onStateChange }: TodoScreenProps)
               <div style={{
                 height: '100%',
                 width: `${pct}%`,
-                background: pct === 100 ? 'linear-gradient(90deg,#22C55E,#4ADE80)' : 'linear-gradient(90deg,#6366F1,#818CF8)',
+                background: pct >= 100 ? 'linear-gradient(90deg,#22C55E,#4ADE80)' : pct >= 65 ? 'linear-gradient(90deg,#EAB308,#4ADE80)' : pct >= 35 ? 'linear-gradient(90deg,#F97316,#EAB308)' : 'linear-gradient(90deg,#EF4444,#F97316)',
                 borderRadius: 100,
                 transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)',
-                boxShadow: pct === 100 ? '0 0 12px rgba(34,197,94,0.6)' : '0 0 10px rgba(99,102,241,0.4)',
+                boxShadow: pct >= 100 ? '0 0 12px rgba(34,197,94,0.6)' : pct >= 65 ? '0 0 10px rgba(234,179,8,0.5)' : pct >= 35 ? '0 0 10px rgba(249,115,22,0.5)' : '0 0 10px rgba(239,68,68,0.45)',
               }} />
             </div>
           </div>
@@ -195,15 +196,28 @@ export default function TodoScreen({ appState, onStateChange }: TodoScreenProps)
           {/* Stats */}
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             {[
-              { l: 'Done', v: completedCount, c: '#4ADE80', bg: 'rgba(34,197,94,0.1)' },
-              { l: 'Total', v: tasks.length, c: 'rgba(255,255,255,0.7)', bg: 'rgba(255,255,255,0.04)' },
-              { l: 'Streak', v: appState.streak + 'd', c: '#FB923C', bg: 'rgba(249,115,22,0.1)' },
+              { l: 'Done',   v: completedCount,           c: '#4ADE80', bg: 'rgba(34,197,94,0.1)' },
+              { l: 'Left',   v: tasks.length - completedCount, c: '#818CF8', bg: 'rgba(99,102,241,0.1)' },
+              { l: 'Streak', v: appState.streak + 'd',    c: '#FB923C', bg: 'rgba(0,0,0,0.2)' },
             ].map((s) => (
               <div key={s.l} style={{ flex: 1, textAlign: 'center', background: s.bg, borderRadius: 10, padding: '8px 4px' }}>
                 <p style={{ color: s.c, fontSize: 15, fontWeight: 800, fontFamily: "'Syne',sans-serif" }}>{s.v}</p>
-                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>{s.l}</p>
+                <p style={{ color: s.c, fontSize: 9, fontWeight: 600, opacity: 0.7, textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginTop: 2 }}>{s.l}</p>
               </div>
             ))}
+            {/* Water-fill Today% */}
+            <div style={{ flex: 1, textAlign: 'center', background: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: '8px 4px', position: 'relative', overflow: 'hidden', minHeight: 52 }}>
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                height: `${pct}%`,
+                background: pct === 100 ? 'rgba(34,197,94,0.28)' : 'rgba(99,102,241,0.22)',
+                transition: 'height 0.9s cubic-bezier(0.4,0,0.2,1)',
+                borderRadius: pct > 95 ? 10 : '0 0 10px 10px',
+                animation: 'waterRise 2.2s ease-in-out infinite',
+              }} />
+              <p style={{ position: 'relative', zIndex: 1, color: pct === 100 ? '#4ADE80' : '#818CF8', fontSize: 15, fontWeight: 800, fontFamily: "'Syne',sans-serif" }}>{pct}%</p>
+              <p style={{ position: 'relative', zIndex: 1, color: pct === 100 ? '#4ADE80' : '#818CF8', fontSize: 9, fontWeight: 600, opacity: 0.7, textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginTop: 2 }}>Today</p>
+            </div>
           </div>
         </div>
 
@@ -231,6 +245,30 @@ export default function TodoScreen({ appState, onStateChange }: TodoScreenProps)
           ))}
         </div>
 
+        {/* Filter + Add */}
+        <div style={{ padding: '12px 16px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {([['all', 'All'], ['todo', 'To do'], ['done', 'Done']] as const).map(([f, l]) => (
+              <button key={f} onClick={() => setFilter(f)} style={{
+                padding: '6px 14px', borderRadius: 100, border: 'none', cursor: 'pointer',
+                fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
+                background: filter === f ? '#6366F1' : 'rgba(255,255,255,0.07)',
+                color: filter === f ? '#fff' : 'rgba(255,255,255,0.55)',
+                boxShadow: filter === f ? '0 0 14px rgba(99,102,241,0.4)' : 'none',
+                transition: 'all 0.2s',
+              }}>{l}</button>
+            ))}
+          </div>
+          {isToday && (
+            <button onClick={() => setShowAddModal(true)} style={{
+              padding: '6px 14px', borderRadius: 100, border: '1px solid rgba(99,102,241,0.35)',
+              cursor: 'pointer', fontSize: 11, fontWeight: 700,
+              background: 'rgba(99,102,241,0.12)', color: '#A5B4FC', fontFamily: 'Inter,sans-serif',
+            }}>+ Add</button>
+          )}
+        </div>
+        <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, paddingLeft: 18, paddingTop: 6, paddingBottom: 2 }}>Hold a task to remove it</p>
+
         {/* Task list */}
         <div style={{ padding: '4px 16px 100px' }}>
           {tasks.length === 0 ? (
@@ -238,46 +276,20 @@ export default function TodoScreen({ appState, onStateChange }: TodoScreenProps)
               <div style={{ fontSize: 32 }}>📭</div>
               <div style={{ marginTop: 8, fontSize: 14 }}>{isToday ? 'No tasks yet' : 'No data for this day'}</div>
             </div>
-          ) : tasks.map((task, i) => (
+          ) : tasks
+            .filter((t) => filter === 'done' ? t.completed : filter === 'todo' ? !t.completed : true)
+            .map((task, i) => (
             <TaskItem
               key={task.id}
               task={task}
               index={i}
               onToggle={handleToggle}
               onDelete={handleDelete}
-              onLongPress={isToday ? (t) => setShowEditModal(t) : undefined}
               readOnly={!isToday}
             />
           ))}
         </div>
       </div>
-
-      {/* FAB */}
-      {isToday && (
-        <button
-          onClick={() => setShowAddModal(true)}
-          style={{
-            position: 'fixed',
-            bottom: 88,
-            right: 20,
-            width: 52,
-            height: 52,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg,rgba(99,102,241,0.6),rgba(139,92,246,0.5))',
-            border: '1px solid rgba(99,102,241,0.5)',
-            color: '#E0E7FF',
-            fontSize: 24,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(99,102,241,0.4)',
-            cursor: 'pointer',
-            zIndex: 100,
-          }}
-        >
-          +
-        </button>
-      )}
 
       {/* Add Task Modal */}
       {showAddModal && (

@@ -10,9 +10,10 @@ import OnboardingScreen from './screens/OnboardingScreen'
 import TodoScreen from './screens/TodoScreen'
 import ProductivityScreen from './screens/ProductivityScreen'
 import LeaderboardScreen from './screens/LeaderboardScreen'
+import FocusScreen from './screens/FocusScreen'
 
-type Screen = 'splash' | 'auth' | 'onboarding' | 'todo' | 'productivity' | 'leaderboard'
-type MainTab = 'todo' | 'productivity' | 'leaderboard'
+type Screen = 'splash' | 'auth' | 'onboarding' | 'todo' | 'focus' | 'productivity' | 'leaderboard'
+type MainTab = 'todo' | 'focus' | 'productivity' | 'leaderboard'
 
 const DEFAULT_APP_STATE: AppState = {
   user: { name: '', avatar: '⭐', examTypes: [], createdAt: '' },
@@ -25,6 +26,7 @@ const DEFAULT_APP_STATE: AppState = {
 
 const TAB_ITEMS: { id: MainTab; label: string; emoji: string }[] = [
   { id: 'todo', label: 'Tasks', emoji: '📋' },
+  { id: 'focus', label: 'Focus', emoji: '⚡' },
   { id: 'productivity', label: 'Progress', emoji: '📈' },
   { id: 'leaderboard', label: 'Board', emoji: '🏆' },
 ]
@@ -96,6 +98,7 @@ export default function App() {
   const renderScreen = () => {
     switch (screen) {
       case 'todo': return <TodoScreen appState={appState} onStateChange={handleStateChange} />
+      case 'focus': return <FocusScreen />
       case 'productivity': return <ProductivityScreen appState={appState} />
       case 'leaderboard': return <LeaderboardScreen appState={appState} />
       default: return null

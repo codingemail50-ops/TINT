@@ -1,26 +1,36 @@
-import { motion } from 'framer-motion'
 import type { Task } from '../data/examPresets'
+import { useRef } from 'react'
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'Math': '#7C3AED',
-  'Physics': '#0EA5E9',
-  'Chemistry': '#10B981',
-  'PYQs': '#F59E0B',
-  'Revision': '#6060A0',
-  'Drawing': '#EC4899',
-  'Visual Design': '#0EA5E9',
-  'Spatial': '#8B5CF6',
-  'Design Theory': '#F59E0B',
-  'Portfolio': '#10B981',
-  'Studio Drawing': '#EC4899',
-  'Memory Drawing': '#F97316',
-  'Design Aptitude': '#8B5CF6',
-  'Design History': '#6B7280',
-  'Creative Exploration': '#10B981',
-  'Fashion Illustration': '#F59E0B',
-  'Creative Ability': '#EC4899',
-  'General Ability': '#0EA5E9',
-  'Situation Test': '#F97316',
+const CAT_STYLES: Record<string, { bg: string; border: string; text: string }> = {
+  Math:                  { bg: 'rgba(99,102,241,0.15)',  border: 'rgba(99,102,241,0.35)',  text: '#818CF8' },
+  Physics:               { bg: 'rgba(56,189,248,0.12)',  border: 'rgba(56,189,248,0.3)',   text: '#38BDF8' },
+  Chemistry:             { bg: 'rgba(34,197,94,0.12)',   border: 'rgba(34,197,94,0.3)',    text: '#4ADE80' },
+  PYQs:                  { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)',   text: '#FBBF24' },
+  Revision:              { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)',   text: '#FBBF24' },
+  Drawing:               { bg: 'rgba(139,92,246,0.15)',  border: 'rgba(139,92,246,0.35)',  text: '#A78BFA' },
+  'Visual Design':       { bg: 'rgba(56,189,248,0.12)',  border: 'rgba(56,189,248,0.3)',   text: '#38BDF8' },
+  Spatial:               { bg: 'rgba(99,102,241,0.15)',  border: 'rgba(99,102,241,0.35)',  text: '#818CF8' },
+  'Design Theory':       { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)',   text: '#FBBF24' },
+  Portfolio:             { bg: 'rgba(139,92,246,0.15)',  border: 'rgba(139,92,246,0.35)',  text: '#A78BFA' },
+  'Studio Drawing':      { bg: 'rgba(139,92,246,0.15)',  border: 'rgba(139,92,246,0.35)',  text: '#A78BFA' },
+  'Memory Drawing':      { bg: 'rgba(249,115,22,0.12)',  border: 'rgba(249,115,22,0.3)',   text: '#FB923C' },
+  'Design Aptitude':     { bg: 'rgba(56,189,248,0.12)',  border: 'rgba(56,189,248,0.3)',   text: '#38BDF8' },
+  'Design History':      { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)',   text: '#FBBF24' },
+  'Creative Exploration':{ bg: 'rgba(34,197,94,0.12)',   border: 'rgba(34,197,94,0.3)',    text: '#4ADE80' },
+  'Fashion Illustration':{ bg: 'rgba(249,115,22,0.12)',  border: 'rgba(249,115,22,0.3)',   text: '#FB923C' },
+  'Creative Ability':    { bg: 'rgba(139,92,246,0.15)',  border: 'rgba(139,92,246,0.35)',  text: '#A78BFA' },
+  'General Ability':     { bg: 'rgba(56,189,248,0.12)',  border: 'rgba(56,189,248,0.3)',   text: '#38BDF8' },
+  'Situation Test':      { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)',   text: '#FBBF24' },
+  Other:                 { bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.3)',  text: '#94A3B8' },
+}
+
+const CAT_EMOJIS: Record<string, string> = {
+  Math: '🔢', Physics: '⚛️', Chemistry: '🧪', PYQs: '📓', Revision: '📏',
+  Drawing: '✏️', 'Visual Design': '🎨', Spatial: '🧩', 'Design Theory': '💡',
+  Portfolio: '🖌️', 'Studio Drawing': '✏️', 'Memory Drawing': '🎭',
+  'Design Aptitude': '📐', 'Design History': '📷', 'Creative Exploration': '🌿',
+  'Fashion Illustration': '🎭', 'Creative Ability': '🎨', 'General Ability': '📓',
+  'Situation Test': '🎯', Other: '📋',
 }
 
 interface TaskItemProps {
@@ -28,119 +38,92 @@ interface TaskItemProps {
   index: number
   onToggle: (id: string) => void
   onDelete?: (id: string) => void
-  onLongPress?: (task: Task) => void
   readOnly?: boolean
 }
 
-export default function TaskItem({ task, index, onToggle, onDelete, onLongPress, readOnly }: TaskItemProps) {
-  const catColor = CATEGORY_COLORS[task.category] || '#7C3AED'
+export default function TaskItem({ task, index, onToggle, onDelete, readOnly }: TaskItemProps) {
+  const cc = CAT_STYLES[task.category] || CAT_STYLES.Other
+  const emoji = CAT_EMOJIS[task.category] || '📋'
+  const done = !!task.completed
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const startPress = () => {
+    if (readOnly || !onDelete || !task.isCustom) return
+    pressTimer.current = setTimeout(() => onDelete(task.id), 600)
+  }
+  const endPress = () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current)
+  }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      transition={{ delay: index * 0.05, duration: 0.25 }}
-      onContextMenu={(e) => {
-        e.preventDefault()
-        if (onLongPress) onLongPress(task)
-      }}
+    <div
+      onClick={() => !readOnly && onToggle(task.id)}
+      onMouseDown={startPress}
+      onMouseUp={endPress}
+      onMouseLeave={endPress}
+      onTouchStart={startPress}
+      onTouchEnd={endPress}
       style={{
+        position: 'relative',
+        overflow: 'hidden',
+        background: done ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.035)',
+        border: '1px solid ' + (done ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.07)'),
+        borderRadius: 16,
+        padding: '14px 16px',
         display: 'flex',
         alignItems: 'center',
-        gap: 12,
-        padding: '12px 14px',
-        background: '#0F0F1A',
-        borderRadius: 12,
-        border: '1px solid #1E1E35',
-        marginBottom: 8,
-        opacity: readOnly && !task.completed ? 0.5 : 1,
+        gap: 14,
         cursor: readOnly ? 'default' : 'pointer',
+        animation: `slideUp 0.4s cubic-bezier(0.4,0,0.2,1) ${index * 0.04}s both`,
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
       }}
     >
-      {/* Checkbox */}
-      <button
-        onClick={() => !readOnly && onToggle(task.id)}
-        style={{
-          width: 24,
-          height: 24,
-          borderRadius: 6,
-          border: `2px solid ${task.completed ? catColor : '#3A3A5C'}`,
-          background: task.completed ? catColor : 'transparent',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          transition: 'all 0.2s',
-          cursor: readOnly ? 'default' : 'pointer',
-        }}
-        disabled={readOnly}
-      >
-        {task.completed && (
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
-      </button>
-
+      {done && (
+        <div style={{ position: 'absolute', inset: 0, borderRadius: 16, background: 'rgba(34,197,94,0.08)', pointerEvents: 'none' }} />
+      )}
+      {/* Emoji icon */}
+      <div style={{
+        width: 42, height: 42, borderRadius: 13, flexShrink: 0,
+        background: cc.bg, border: '1px solid ' + cc.border,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+      }}>
+        {emoji}
+      </div>
       {/* Content */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span
-            style={{
-              fontSize: 15,
-              fontWeight: 500,
-              color: task.completed ? '#6060A0' : '#F0F0FF',
-              textDecoration: task.completed ? 'line-through' : 'none',
-              transition: 'all 0.2s',
-            }}
-          >
-            {task.title}
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: catColor,
-              background: `${catColor}22`,
-              padding: '2px 6px',
-              borderRadius: 4,
-            }}
-          >
+        <p style={{
+          fontSize: 14, fontWeight: 600,
+          color: done ? 'rgba(74,222,128,0.7)' : '#E2E8F0',
+          fontFamily: 'Inter,sans-serif',
+          textDecoration: done ? 'line-through' : 'none',
+          textDecorationColor: 'rgba(74,222,128,0.5)',
+        }}>
+          {task.title}
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+          <span style={{
+            background: cc.bg, color: cc.text, fontSize: 9, fontWeight: 700,
+            padding: '2px 7px', borderRadius: 100, textTransform: 'uppercase' as const,
+            letterSpacing: '0.05em', border: '1px solid ' + cc.border,
+          }}>
             {task.category}
           </span>
-          <span style={{ fontSize: 11, color: '#6060A0' }}>
-            {task.duration}m
-          </span>
-          {task.repeat && (
-            <span style={{ fontSize: 11, color: '#6060A0' }}>↻</span>
-          )}
+          <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>⏱ {task.duration}m</span>
+          {task.repeat && <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10 }}>🔁</span>}
         </div>
       </div>
-
-      {/* Delete button for custom tasks */}
-      {task.isCustom && onDelete && !readOnly && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(task.id) }}
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 6,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#6060A0',
-            flexShrink: 0,
-            transition: 'color 0.2s',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = '#EF4444')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = '#6060A0')}
-        >
-          ✕
-        </button>
-      )}
-    </motion.div>
+      {/* Circle checkbox */}
+      <div style={{
+        width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+        background: done ? '#22C55E' : 'transparent',
+        border: '2px solid ' + (done ? '#22C55E' : 'rgba(255,255,255,0.18)'),
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'all 0.25s ease',
+        boxShadow: done ? '0 0 10px rgba(34,197,94,0.5)' : 'none',
+      }}>
+        {done && <span style={{ color: '#fff', fontSize: 13, fontWeight: 800 }}>✓</span>}
+      </div>
+    </div>
   )
 }
