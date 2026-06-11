@@ -84,6 +84,16 @@ export default function App() {
     }
   }, [])
 
+  const handleSignOut = useCallback(() => {
+    void (async () => {
+      await supabase.auth.signOut()
+      userIdRef.current = null
+      setAppState(DEFAULT_APP_STATE)
+      setShowTabs(false)
+      setScreen('auth')
+    })()
+  }, [])
+
   const TAB_ITEMS: { id: MainTab; label: string; emoji: string }[] = [
     { id: 'todo', label: 'Today', emoji: '📋' },
     { id: 'productivity', label: 'Progress', emoji: '📊' },
@@ -100,7 +110,7 @@ export default function App() {
   const renderScreen = () => {
     switch (screen) {
       case 'todo':
-        return <TodoScreen appState={appState} onStateChange={handleStateChange} />
+        return <TodoScreen appState={appState} onStateChange={handleStateChange} onSignOut={handleSignOut} />
       case 'productivity':
         return <ProductivityScreen appState={appState} />
       case 'leaderboard':
