@@ -1,12 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Typography } from '../constants/theme';
 import { SplashScreen } from '../screens/SplashScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { TodoScreen } from '../screens/TodoScreen';
 import { ProductivityScreen } from '../screens/ProductivityScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
-import { StorageService, AppState } from '../utils/storage';
+import { StorageService, AppState, UserProfile } from '../utils/storage';
+import { supabase } from '../lib/supabase';
+import {
+  loadUserFromSupabase,
+  syncAppStateToSupabase,
+  saveNewUserToSupabase,
+  checkUserExists,
+} from '../utils/supabaseStorage';
 
 type Screen = 'splash' | 'onboarding' | 'todo' | 'productivity' | 'leaderboard';
 
@@ -26,38 +34,76 @@ export const AppNavigator: React.FC = () => {
     history: [],
     totalTasksCompleted: 0,
   });
-  const tabFadeAnim = React.useRef(new Animated.Value(0)).current;
+  const [showTabs, setShowTabs] = useState(false);
+  const tabFadeAnim = useRef(new Animated.Value(0)).current;
+  const userIdRef = useRef<string | null>(null);
 
-  const loadState = async () => {
-    const state = await StorageService.getAppState();
-    setAppState(state);
-  };
+  const handleSplashFinish = (_hasUser: boolean) => {
+    void (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
 
-  const handleSplashFinish = (hasUser: boolean) => {
-    loadState().then(() => {
-      setScreen(hasUser ? 'todo' : 'onboarding');
-      if (hasUser) {
-        Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+        if (session) {
+          userIdRef.current = session.user.id;
+
+          // Check for pending profile from OAuth redirect (stored in AsyncStorage)
+          const pendingRaw = await AsyncStorage.getItem('tint_pending_profile');
+          if (pendingRaw) {
+            const profile = JSON.parse(pendingRaw) as UserProfile;
+            const exists = await checkUserExists(session.user.id);
+            if (!exists) {
+              await saveNewUserToSupabase(session.user.id, session.user.email ?? '', profile);
+            }
+            await AsyncStorage.removeItem('tint_pending_profile');
+          }
+
+          const loaded = await loadUserFromSupabase(session.user.id);
+          if (loaded) {
+            setAppState(loaded);
+            setShowTabs(true);
+            setScreen('todo');
+            Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('[AppNavigator] Supabase session check failed:', err);
       }
-    });
+
+      // No session or no user data — fall back to local storage
+      const state = await StorageService.getAppState();
+      setAppState(state);
+      const user = await StorageService.getUser();
+      if (user) {
+        setShowTabs(true);
+        setScreen('todo');
+        Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+      } else {
+        setScreen('onboarding');
+      }
+    })();
   };
 
   const handleOnboardingComplete = () => {
-    loadState().then(() => {
+    StorageService.getAppState().then(state => {
+      setAppState(state);
+      setShowTabs(true);
       setScreen('todo');
       Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     });
   };
 
   const handleStateChange = (newState: AppState) => {
+    StorageService.saveAppState(newState);
     setAppState(newState);
+    if (userIdRef.current) {
+      void syncAppStateToSupabase(userIdRef.current, newState);
+    }
   };
 
   const navigateTo = (s: Screen) => {
     setScreen(s);
   };
-
-  const showTabs = screen !== 'splash' && screen !== 'onboarding';
 
   return (
     <View style={styles.root}>

@@ -1,19 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, Animated, KeyboardAvoidingView, Platform, FlatList, Dimensions,
+  Animated, KeyboardAvoidingView, Platform, FlatList, Dimensions, ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Colors, Spacing, BorderRadius } from '../constants/theme';
 import { EXAM_TYPES, ExamType, AVATARS } from '../data/examPresets';
 import { StorageService } from '../utils/storage';
 import { useHaptics } from '../hooks/useHaptics';
+import { supabase } from '../lib/supabase';
 
 const { width: W } = Dimensions.get('window');
 const AVATAR_CELL = 72;
 
-const STEPS = ['Avatar', 'Name', 'Exams'];
+const STEPS = ['Avatar', 'Name', 'Exams', 'Sign in'];
 
 interface Props { onComplete: () => void }
 
@@ -23,6 +25,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
   const [name, setName]         = useState('');
   const [nameError, setNameError] = useState('');
   const [selectedExams, setSelectedExams] = useState<Set<ExamType>>(new Set());
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const fadeAnim  = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -88,6 +91,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
   const canProceed = () => {
     if (step === 1) return name.trim().length >= 2;
     if (step === 2) return selectedExams.size > 0;
+    if (step === 3) return false;
     return true;
   };
 
@@ -95,7 +99,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
     buttonPress();
     if (step === 1 && name.trim().length < 2) { setNameError('Need at least 2 characters.'); return; }
     setNameError('');
-    if (step === STEPS.length - 1) { handleFinish(); return; }
+    if (step >= STEPS.length - 1) return;
     transitionTo(step + 1);
   };
 
@@ -114,14 +118,34 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
     onComplete();
   };
 
+  const handleGoogleSignIn = async () => {
+    if (googleLoading) return;
+    buttonPress();
+    setGoogleLoading(true);
+    try {
+      const pending = {
+        name: name.trim(),
+        avatar,
+        examTypes: Array.from(selectedExams),
+        createdAt: new Date().toISOString(),
+      };
+      await AsyncStorage.setItem('tint_pending_profile', JSON.stringify(pending));
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: 'tint://auth/callback' },
+      });
+    } catch (err) {
+      console.error('[Onboarding] Google sign-in error:', err);
+      setGoogleLoading(false);
+    }
+  };
+
   // ── Renderers ──────────────────────────────────────────
   const renderAvatarStep = () => (
     <View style={stepS.container}>
       <Text style={stepS.stepNum}>01</Text>
       <Text style={stepS.title}>Who are you?</Text>
       <Text style={stepS.sub}>Pick your identity — this is how you appear on TINT.</Text>
-
-      {/* Big preview */}
       <View style={avatarS.previewArea}>
         <Animated.View style={[avatarS.glowRing, {
           opacity:   avatarGlow.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.85] }),
@@ -133,8 +157,6 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
           <Text style={avatarS.previewEmoji}>{avatar}</Text>
         </Animated.View>
       </View>
-
-      {/* Horizontal sliding carousel */}
       <FlatList
         data={AVATARS}
         horizontal
@@ -194,7 +216,6 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
       <Text style={stepS.sub}>
         Select all that apply — we'll build a combined daily plan tailored to your goals.
       </Text>
-
       <View style={examS.grid}>
         {EXAM_TYPES.map(exam => {
           const checked = selectedExams.has(exam.id);
@@ -208,8 +229,6 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
               <Text style={examS.emoji}>{exam.emoji}</Text>
               <Text style={[examS.label, checked && { color: exam.color }]}>{exam.label}</Text>
               <Text style={examS.desc}>{exam.description}</Text>
-
-              {/* Checkbox */}
               <View style={[examS.checkbox, checked && { backgroundColor: exam.color, borderColor: exam.color }]}>
                 {checked && <Text style={examS.checkmark}>✓</Text>}
               </View>
@@ -217,7 +236,6 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
           );
         })}
       </View>
-
       {selectedExams.size > 1 && (
         <View style={examS.comboNote}>
           <Text style={examS.comboText}>
@@ -228,9 +246,48 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
     </View>
   );
 
-  const CONTENT = [renderAvatarStep, renderNameStep, renderExamsStep];
+  const renderGoogleStep = () => (
+    <View style={[stepS.container, googleS.container]}>
+      <Text style={stepS.stepNum}>04</Text>
+      <View style={googleS.avatarWrap}>
+        <View style={googleS.avatarCircle}>
+          <Text style={googleS.avatarEmoji}>{avatar}</Text>
+        </View>
+      </View>
+      <Text style={googleS.nameText}>{name}</Text>
+      <View style={googleS.badgeRow}>
+        {Array.from(selectedExams).map(exam => {
+          const examType = EXAM_TYPES.find(e => e.id === exam);
+          if (!examType) return null;
+          return (
+            <View key={exam} style={[googleS.badge, { backgroundColor: examType.color + '22', borderColor: examType.color + '55' }]}>
+              <Text style={[googleS.badgeText, { color: examType.color }]}>{examType.emoji} {examType.label}</Text>
+            </View>
+          );
+        })}
+      </View>
+      <Text style={googleS.subtitle}>Your progress syncs across all devices</Text>
+      <TouchableOpacity
+        style={[googleS.googleBtn, googleLoading && { opacity: 0.7 }]}
+        onPress={handleGoogleSignIn}
+        disabled={googleLoading}
+        activeOpacity={0.85}
+      >
+        {googleLoading ? (
+          <ActivityIndicator color="#444" size="small" />
+        ) : (
+          <>
+            <Text style={googleS.googleLogo}>🔵</Text>
+            <Text style={googleS.googleText}>Continue with Google</Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
 
-  const ctaLabel = step === 0 ? `Lock in as ${avatar}  →` : step === 2 ? 'Start grinding →' : 'Continue →';
+  const CONTENT = [renderAvatarStep, renderNameStep, renderExamsStep, renderGoogleStep];
+
+  const ctaLabel = step === 0 ? `Lock in as ${avatar}  →` : step === 2 ? 'Next →' : 'Continue →';
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -238,8 +295,6 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
         <StatusBar style="light" />
         <LinearGradient colors={['#040010', '#09001A', '#07070E']} style={StyleSheet.absoluteFill} />
         <View style={styles.bgOrb} />
-
-        {/* Header */}
         <View style={styles.header}>
           <View style={styles.progressTrack}>
             <Animated.View style={[styles.progressFill, {
@@ -255,45 +310,49 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
             ))}
           </View>
         </View>
-
-        {/* Content */}
         <Animated.View style={[styles.content, {
           opacity:   fadeAnim,
           transform: [{ translateX: slideAnim }],
         }]}>
           {CONTENT[step]()}
         </Animated.View>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          {step > 0 && (
+        {step < 3 && (
+          <View style={styles.footer}>
+            {step > 0 && (
+              <TouchableOpacity style={styles.backBtn} onPress={() => { buttonPress(); transitionTo(step - 1); }}>
+                <Text style={styles.backText}>← Back</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[styles.nextBtn, !canProceed() && styles.nextBtnDisabled]}
+              onPress={handleNext}
+              disabled={!canProceed()}
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={canProceed() ? ['#A78BFA', '#7C3AED'] : [Colors.surfaceElevated, Colors.surfaceElevated]}
+                style={styles.nextGradient}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              >
+                <Text style={[styles.nextText, !canProceed() && { color: Colors.textMuted }]}>
+                  {ctaLabel}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+        {step === 3 && (
+          <View style={styles.footer}>
             <TouchableOpacity style={styles.backBtn} onPress={() => { buttonPress(); transitionTo(step - 1); }}>
               <Text style={styles.backText}>← Back</Text>
             </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={[styles.nextBtn, !canProceed() && styles.nextBtnDisabled]}
-            onPress={handleNext}
-            disabled={!canProceed()}
-            activeOpacity={0.85}
-          >
-            <LinearGradient
-              colors={canProceed() ? ['#A78BFA', '#7C3AED'] : [Colors.surfaceElevated, Colors.surfaceElevated]}
-              style={styles.nextGradient}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            >
-              <Text style={[styles.nextText, !canProceed() && { color: Colors.textMuted }]}>
-                {ctaLabel}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+          </View>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
 };
 
-// ── Step shared styles ────────────────────────────────
 const stepS = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', gap: Spacing.sm },
   stepNum: { fontSize: 72, fontWeight: '900', color: Colors.primary + '18', letterSpacing: -3, marginBottom: -Spacing.xl, lineHeight: 80 },
@@ -305,7 +364,6 @@ const stepS = StyleSheet.create({
   error: { fontSize: 13, color: Colors.danger, marginTop: -4 },
 });
 
-// ── Avatar styles ─────────────────────────────────────
 const avatarS = StyleSheet.create({
   previewArea: { alignItems: 'center', justifyContent: 'center', height: 120, marginVertical: Spacing.sm },
   glowRing: { position: 'absolute', width: 116, height: 116, borderRadius: 58, backgroundColor: Colors.primary },
@@ -318,7 +376,6 @@ const avatarS = StyleSheet.create({
   hint: { fontSize: 12, color: Colors.textMuted, textAlign: 'center', letterSpacing: 0.4 },
 });
 
-// ── Exam card styles ──────────────────────────────────
 const examS = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   card: {
@@ -340,7 +397,36 @@ const examS = StyleSheet.create({
   comboText: { fontSize: 13, color: Colors.primaryLight, lineHeight: 20 },
 });
 
-// ── Screen styles ─────────────────────────────────────
+const googleS = StyleSheet.create({
+  container: { alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
+  avatarWrap: { alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.sm },
+  avatarCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: Colors.surfaceElevated, borderWidth: 2, borderColor: Colors.primary + '66', alignItems: 'center', justifyContent: 'center' },
+  avatarEmoji: { fontSize: 56 },
+  nameText: { fontSize: 26, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.3 },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  badgeText: { fontSize: 13, fontWeight: '600' },
+  subtitle: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', marginTop: Spacing.sm, marginBottom: Spacing.md },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#ffffff',
+    borderRadius: BorderRadius.md,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  googleLogo: { fontSize: 20 },
+  googleText: { fontSize: 16, fontWeight: '700', color: '#1a1a2e', letterSpacing: 0.2 },
+});
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#040010' },
   bgOrb: { position: 'absolute', width: 350, height: 350, borderRadius: 175, top: -100, right: -100, backgroundColor: Colors.primary, opacity: 0.07 },
