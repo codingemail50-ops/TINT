@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "TINT",
+    "slug": "tint-app-team",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#080810"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.tintapp.tint"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#080810"
+      },
+      "package": "com.tintapp.tint",
+      "permissions": [
+        "PACKAGE_USAGE_STATS",
+        "SYSTEM_ALERT_WINDOW",
+        "RECEIVE_BOOT_COMPLETED"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "fc085763-cad8-4611-a0da-f864a9639bf0"
+      }
+    },
+    "owner": "tint-app-team",
+    "plugins": [
+      "expo-font",
+      "expo-notifications"
+    ]
+  }
+}
