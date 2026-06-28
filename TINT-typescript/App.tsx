@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { storage } from './src/utils/storage';
 import { UserProfile } from './src/types';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import HomeScreen from './src/screens/HomeScreen';
 
 type AppState = 'loading' | 'onboarding' | 'main';
 
@@ -44,22 +45,8 @@ export default function App() {
             }}
           />
         )}
-        {appState === 'main' && (
-          <View style={{ flex: 1, backgroundColor: '#080810', alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontSize: 64 }}>{profile?.avatar ?? '⭐'}</Text>
-            <Text style={{ color: '#fff', fontSize: 22, fontWeight: '700', marginTop: 16 }}>
-              Hey, {profile?.name ?? 'there'}!
-            </Text>
-            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, marginTop: 8 }}>
-              Home screen coming next
-            </Text>
-            <TouchableOpacity
-              onPress={async () => { await storage.clearAll(); setProfile(null); setAppState('onboarding'); }}
-              style={{ marginTop: 40, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
-            >
-              <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Reset onboarding (dev)</Text>
-            </TouchableOpacity>
-          </View>
+        {appState === 'main' && profile && (
+          <HomeScreen profile={profile} />
         )}
       </SafeAreaProvider>
     </GestureHandlerRootView>
