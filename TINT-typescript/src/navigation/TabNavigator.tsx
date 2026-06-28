@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { UserProfile } from '../types';
 import HomeScreen from '../screens/HomeScreen';
+import FocusScreen from '../screens/FocusScreen';
 import ProgressScreen from '../screens/ProgressScreen';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
 
@@ -16,6 +17,7 @@ interface Props {
 function icon(label: string, focused: boolean) {
   const icons: Record<string, [string, string]> = {
     Home:        ['🏠', '🏡'],
+    Focus:       ['⏱️', '🎯'],
     Progress:    ['📊', '📈'],
     Leaderboard: ['🏆', '🥇'],
   };
@@ -47,6 +49,12 @@ export default function TabNavigator({ profile }: Props) {
           options={{ tabBarIcon: ({ focused }) => icon('Home', focused) }}
         >
           {() => <HomeScreen profile={profile} />}
+        </Tab.Screen>
+        <Tab.Screen
+          name="Focus"
+          options={{ tabBarIcon: ({ focused }) => icon('Focus', focused) }}
+        >
+          {() => <FocusScreen profile={profile} />}
         </Tab.Screen>
         <Tab.Screen
           name="Progress"
