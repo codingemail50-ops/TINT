@@ -20,6 +20,7 @@ import {
   getStreakColor,
 } from '../utils/logic';
 import { EXAM_COUNTDOWNS } from '../data/examPresets';
+import UCEEDWall from '../components/UCEEDWall';
 
 const { width } = Dimensions.get('window');
 
@@ -170,6 +171,13 @@ export default function ProgressScreen({ profile }: Props) {
             </View>
           ))}
         </View>
+
+        {/* UCEED Wall */}
+        {profile.exams.includes('UCEED') && (
+          <View style={s.section}>
+            <UCEEDWall history={history} />
+          </View>
+        )}
 
         {/* Skipped tasks warning */}
         {skipped.length > 0 && (
