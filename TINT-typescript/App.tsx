@@ -1,37 +1,37 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { storage } from './src/utils/storage';
 import { UserProfile } from './src/types';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import TabNavigator from './src/navigation/TabNavigator';
+import AnimatedSplash from './src/components/AnimatedSplash';
+import { requestNotificationPermission, scheduleDailyReminder } from './src/utils/notifications';
 
-type AppState = 'loading' | 'onboarding' | 'main';
+type AppState = 'splash' | 'loading' | 'onboarding' | 'main';
 
 export default function App() {
-  const [appState, setAppState] = useState<AppState>('loading');
+  const [appState, setAppState] = useState<AppState>('splash');
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const onboarded = await storage.getOnboarded();
-      if (onboarded) {
-        const p = await storage.getProfile();
-        setProfile(p);
-        setAppState('main');
-      } else {
-        setAppState('onboarding');
-      }
-    })();
-  }, []);
+  async function init() {
+    const onboarded = await storage.getOnboarded();
+    if (onboarded) {
+      const p = await storage.getProfile();
+      setProfile(p);
+      setAppState('main');
+      // Set up notifications silently
+      requestNotificationPermission().then(granted => {
+        if (granted) scheduleDailyReminder();
+      });
+    } else {
+      setAppState('onboarding');
+    }
+  }
 
   if (appState === 'loading') {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#080810', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color="#6366F1" size="large" />
-      </View>
-    );
+    return <View style={{ flex: 1, backgroundColor: '#080810' }} />;
   }
 
   return (
@@ -42,11 +42,17 @@ export default function App() {
             onDone={(p) => {
               setProfile(p);
               setAppState('main');
+              requestNotificationPermission().then(granted => {
+                if (granted) scheduleDailyReminder();
+              });
             }}
           />
         )}
         {appState === 'main' && profile && (
-          <TabNavigator profile={profile} />
+          <TabNavigator profile={profile} onProfileReset={() => setAppState('onboarding')} />
+        )}
+        {appState === 'splash' && (
+          <AnimatedSplash onDone={init} />
         )}
       </SafeAreaProvider>
     </GestureHandlerRootView>

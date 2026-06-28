@@ -8,11 +8,13 @@ import HomeScreen from '../screens/HomeScreen';
 import FocusScreen from '../screens/FocusScreen';
 import ProgressScreen from '../screens/ProgressScreen';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
 interface Props {
   profile: UserProfile;
+  onProfileReset: () => void;
 }
 
 function icon(label: string, focused: boolean) {
@@ -21,12 +23,13 @@ function icon(label: string, focused: boolean) {
     Focus:       ['⏱️', '🎯'],
     Progress:    ['📊', '📈'],
     Leaderboard: ['🏆', '🥇'],
+    Profile:     ['👤', '😊'],
   };
   const [off, on] = icons[label] ?? ['●', '●'];
   return <Text style={{ fontSize: 18, opacity: focused ? 1 : 0.45 }}>{focused ? on : off}</Text>;
 }
 
-export default function TabNavigator({ profile }: Props) {
+export default function TabNavigator({ profile, onProfileReset }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -44,7 +47,7 @@ export default function TabNavigator({ profile }: Props) {
           },
           tabBarActiveTintColor: '#6366F1',
           tabBarInactiveTintColor: 'rgba(255,255,255,0.3)',
-          tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+          tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
         }}
       >
         <Tab.Screen
@@ -70,6 +73,12 @@ export default function TabNavigator({ profile }: Props) {
           options={{ tabBarIcon: ({ focused }) => icon('Leaderboard', focused) }}
         >
           {() => <LeaderboardScreen profile={profile} />}
+        </Tab.Screen>
+        <Tab.Screen
+          name="Profile"
+          options={{ tabBarIcon: ({ focused }) => icon('Profile', focused) }}
+        >
+          {() => <ProfileScreen profile={profile} onReset={onProfileReset} />}
         </Tab.Screen>
       </Tab.Navigator>
     </NavigationContainer>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ import {
   buildHistoryEntry,
 } from '../utils/logic';
 import { EXAM_COUNTDOWNS } from '../data/examPresets';
+import AllDoneCelebration from '../components/AllDoneCelebration';
 
 const { width } = Dimensions.get('window');
 
@@ -109,6 +110,8 @@ export default function HomeScreen({ profile }: Props) {
   const [streak, setStreak] = useState(0);
   const [streakColor, setStreakColor] = useState('#FBBF24');
   const [pct, setPct] = useState(0);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const celebrationShownRef = useRef(false);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
 
@@ -170,6 +173,12 @@ export default function HomeScreen({ profile }: Props) {
     }).start();
 
     syncToCloud(profile.email, profile, updated, history, focusLog).catch(() => {});
+
+    const { allDone } = calcProgress(updated);
+    if (allDone && !celebrationShownRef.current) {
+      celebrationShownRef.current = true;
+      setShowCelebration(true);
+    }
   }
 
   const { focusToday } = calcFocusMetrics(focusLog);
@@ -183,6 +192,9 @@ export default function HomeScreen({ profile }: Props) {
 
   return (
     <SafeAreaView style={s.safe}>
+      {showCelebration && (
+        <AllDoneCelebration onDismiss={() => setShowCelebration(false)} />
+      )}
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
 
         {/* Header */}
