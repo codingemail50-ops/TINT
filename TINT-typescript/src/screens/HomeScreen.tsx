@@ -37,6 +37,71 @@ interface Props {
   profile: UserProfile;
 }
 
+function FlameAnimation({ streak, color }: { streak: number; color: string }) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
+  const floatAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // Pulsing scale
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scaleAnim, { toValue: 1.15, duration: 600, useNativeDriver: true }),
+        Animated.timing(scaleAnim, { toValue: 0.95, duration: 600, useNativeDriver: true }),
+        Animated.timing(scaleAnim, { toValue: 1.1, duration: 400, useNativeDriver: true }),
+        Animated.timing(scaleAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+      ])
+    ).start();
+
+    // Glow opacity flicker
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0.4, duration: 300, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0.9, duration: 400, useNativeDriver: true }),
+        Animated.timing(glowAnim, { toValue: 0.5, duration: 500, useNativeDriver: true }),
+      ])
+    ).start();
+
+    // Floating up/down
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, { toValue: -4, duration: 800, useNativeDriver: true }),
+        Animated.timing(floatAnim, { toValue: 2, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [scaleAnim, glowAnim, floatAnim]);
+
+  return (
+    <View style={fl.wrap}>
+      {/* Glow behind flame */}
+      <Animated.View
+        style={[
+          fl.glow,
+          {
+            backgroundColor: color,
+            opacity: glowAnim,
+          },
+        ]}
+      />
+      {/* Flame emoji */}
+      <Animated.Text
+        style={[
+          fl.flame,
+          {
+            transform: [{ scale: scaleAnim }, { translateY: floatAnim }],
+          },
+        ]}
+      >
+        🔥
+      </Animated.Text>
+      {/* Streak number */}
+      <Text style={[fl.num, { color }]}>{streak}</Text>
+      <Text style={fl.label}>day streak</Text>
+    </View>
+  );
+}
+
 export default function HomeScreen({ profile }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -54,7 +119,6 @@ export default function HomeScreen({ profile }: Props) {
       storage.getFocusLog(),
     ]);
 
-    // Daily reset: if tasks are from a previous day, archive and reset
     const today = getAppDate();
     const lastReset = await storage.getLastReset();
     let currentTasks = t;
@@ -127,10 +191,7 @@ export default function HomeScreen({ profile }: Props) {
             <Text style={s.greeting}>Good day,</Text>
             <Text style={s.name}>{profile.avatar} {profile.name}</Text>
           </View>
-          <View style={s.streakBadge}>
-            <Text style={s.streakFlame}>🔥</Text>
-            <Text style={[s.streakNum, { color: streakColor }]}>{streak}</Text>
-          </View>
+          <FlameAnimation streak={streak} color={streakColor} />
         </View>
 
         {/* Progress card */}
@@ -215,19 +276,28 @@ function TaskRow({ task, onToggle }: { task: Task; onToggle: (id: string) => voi
   );
 }
 
+const fl = StyleSheet.create({
+  wrap: { alignItems: 'center', minWidth: 64 },
+  glow: {
+    position: 'absolute',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    top: 0,
+  },
+  flame: { fontSize: 36 },
+  num: { fontSize: 20, fontWeight: '800', marginTop: 2 },
+  label: { color: 'rgba(255,255,255,0.3)', fontSize: 10, marginTop: 1 },
+});
+
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#080810' },
   scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 },
 
-  // Header
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   greeting: { color: 'rgba(255,255,255,0.4)', fontSize: 13 },
   name: { color: '#fff', fontSize: 22, fontWeight: '700', marginTop: 2 },
-  streakBadge: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 8 },
-  streakFlame: { fontSize: 18 },
-  streakNum: { fontSize: 20, fontWeight: '800', marginTop: 2 },
 
-  // Progress card
   progressCard: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: 20, marginBottom: 16 },
   progressTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   progressLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 13 },
@@ -236,16 +306,13 @@ const s = StyleSheet.create({
   progressFill: { height: 6, borderRadius: 3 },
   progressSub: { color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 10 },
 
-  // Countdown chips
   countdownRow: { marginBottom: 24 },
   countdownChip: { backgroundColor: 'rgba(99,102,241,0.12)', borderRadius: 14, paddingHorizontal: 16, paddingVertical: 10, marginRight: 10, borderWidth: 1, borderColor: 'rgba(99,102,241,0.25)', alignItems: 'center' },
   countdownDays: { color: '#6366F1', fontSize: 22, fontWeight: '800' },
   countdownLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 },
 
-  // Section
   sectionTitle: { color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12 },
 
-  // Task rows
   taskRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 14, marginBottom: 8 },
   taskRowDone: { opacity: 0.55 },
   taskCheck: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },

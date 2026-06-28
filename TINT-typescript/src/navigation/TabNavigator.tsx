@@ -2,6 +2,7 @@ import React from 'react';
 import { Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { UserProfile } from '../types';
 import HomeScreen from '../screens/HomeScreen';
 import FocusScreen from '../screens/FocusScreen';
@@ -26,6 +27,8 @@ function icon(label: string, focused: boolean) {
 }
 
 export default function TabNavigator({ profile }: Props) {
+  const insets = useSafeAreaInsets();
+
   return (
     <NavigationContainer>
       <Tab.Navigator
@@ -35,8 +38,8 @@ export default function TabNavigator({ profile }: Props) {
             backgroundColor: '#0E0E1A',
             borderTopColor: 'rgba(255,255,255,0.06)',
             borderTopWidth: 1,
-            height: 64,
-            paddingBottom: 8,
+            height: 56 + insets.bottom,
+            paddingBottom: insets.bottom,
             paddingTop: 6,
           },
           tabBarActiveTintColor: '#6366F1',
