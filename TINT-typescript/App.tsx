@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { storage } from './src/utils/storage';
@@ -53,6 +53,12 @@ export default function App() {
             <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, marginTop: 8 }}>
               Home screen coming next
             </Text>
+            <TouchableOpacity
+              onPress={async () => { await storage.clearAll(); setProfile(null); setAppState('onboarding'); }}
+              style={{ marginTop: 40, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' }}
+            >
+              <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Reset onboarding (dev)</Text>
+            </TouchableOpacity>
           </View>
         )}
       </SafeAreaProvider>
