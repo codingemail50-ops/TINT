@@ -22,7 +22,7 @@ function icon(label: string, focused: boolean) {
     Leaderboard: ['🏆', '🥇'],
   };
   const [off, on] = icons[label] ?? ['●', '●'];
-  return <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.45 }}>{focused ? on : off}</Text>;
+  return <Text style={{ fontSize: 18, opacity: focused ? 1 : 0.45 }}>{focused ? on : off}</Text>;
 }
 
 export default function TabNavigator({ profile }: Props) {
@@ -35,9 +35,9 @@ export default function TabNavigator({ profile }: Props) {
             backgroundColor: '#0E0E1A',
             borderTopColor: 'rgba(255,255,255,0.06)',
             borderTopWidth: 1,
-            height: 72,
-            paddingBottom: 12,
-            paddingTop: 8,
+            height: 64,
+            paddingBottom: 8,
+            paddingTop: 6,
           },
           tabBarActiveTintColor: '#6366F1',
           tabBarInactiveTintColor: 'rgba(255,255,255,0.3)',
