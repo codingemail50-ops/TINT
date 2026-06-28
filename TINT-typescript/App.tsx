@@ -5,7 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { storage } from './src/utils/storage';
 import { UserProfile } from './src/types';
 import OnboardingScreen from './src/screens/OnboardingScreen';
-import HomeScreen from './src/screens/HomeScreen';
+import TabNavigator from './src/navigation/TabNavigator';
 
 type AppState = 'loading' | 'onboarding' | 'main';
 
@@ -46,7 +46,7 @@ export default function App() {
           />
         )}
         {appState === 'main' && profile && (
-          <HomeScreen profile={profile} />
+          <TabNavigator profile={profile} />
         )}
       </SafeAreaProvider>
     </GestureHandlerRootView>
