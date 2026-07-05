@@ -15,6 +15,26 @@ interface Props {
   onDone: () => void;
 }
 
+// ── Subtle grid ────────────────────────────────────────────
+const GRID_SIZE = 34;
+const H_LINES = Math.ceil(height / GRID_SIZE) + 1;
+const V_LINES = Math.ceil(width  / GRID_SIZE) + 1;
+
+function Grid() {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* Horizontal lines */}
+      {Array.from({ length: H_LINES }).map((_, i) => (
+        <View key={`h${i}`} style={[g.hLine, { top: i * GRID_SIZE }]} />
+      ))}
+      {/* Vertical lines */}
+      {Array.from({ length: V_LINES }).map((_, i) => (
+        <View key={`v${i}`} style={[g.vLine, { left: i * GRID_SIZE }]} />
+      ))}
+    </View>
+  );
+}
+
 // ── Shooting star ──────────────────────────────────────────
 const STAR_CONFIGS = [
   { startX: -30,  startY: 80,  angle: 22, length: 90,  delay: 200,  dur: 700 },
@@ -39,7 +59,7 @@ function ShootingStar({ startX, startY, angle, length, delay, dur }: typeof STAR
       Animated.delay(delay),
       Animated.parallel([
         Animated.sequence([
-          Animated.timing(opacity, { toValue: 0.75, duration: 180, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.8, duration: 180, useNativeDriver: true }),
           Animated.delay(dur - 400),
           Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: true }),
         ]),
@@ -58,11 +78,7 @@ function ShootingStar({ startX, startY, angle, length, delay, dur }: typeof STAR
           top:  startY,
           width: length,
           opacity,
-          transform: [
-            { translateX: tx },
-            { translateY: ty },
-            { rotate: `${angle}deg` },
-          ],
+          transform: [{ translateX: tx }, { translateY: ty }, { rotate: `${angle}deg` }],
         },
       ]}
     />
@@ -99,7 +115,6 @@ export default function AnimatedSplash({ onDone }: Props) {
       }),
     ]).start(() => onDone());
 
-    // Dot wave starts after flip + reveal (~2600 + 500ms)
     const t = setTimeout(() => {
       dotScale.forEach((anim, i) => {
         Animated.loop(
@@ -115,12 +130,10 @@ export default function AnimatedSplash({ onDone }: Props) {
     return () => clearTimeout(t);
   }, []);
 
-  // Front: 0deg → 90deg (first half of flip)
   const frontRotate = flipAnim.interpolate({
     inputRange:  [0, 0.5, 1],
     outputRange: ['0deg', '90deg', '90deg'],
   });
-  // Back: -90deg → 0deg (second half of flip)
   const backRotate = flipAnim.interpolate({
     inputRange:  [0, 0.5, 1],
     outputRange: ['-90deg', '-90deg', '0deg'],
@@ -129,43 +142,53 @@ export default function AnimatedSplash({ onDone }: Props) {
   return (
     <View style={s.root}>
 
-      {/* Background radial glow approximated with LinearGradient */}
+      {/* Subtle grid */}
+      <Grid />
+
+      {/* Deep gradient glow layers */}
       <LinearGradient
-        colors={['rgba(67,56,202,0.20)', '#06060F']}
-        style={s.glowLayer}
-        start={{ x: 0.5, y: 0.3 }}
+        colors={['transparent', 'rgba(55,48,163,0.30)', 'transparent']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={['transparent', 'rgba(79,70,229,0.22)', 'transparent']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        pointerEvents="none"
+      />
+      {/* Central bright spot */}
+      <LinearGradient
+        colors={['rgba(99,102,241,0.18)', 'transparent']}
+        style={[StyleSheet.absoluteFill, { borderRadius: width }]}
+        start={{ x: 0.5, y: 0.35 }}
+        end={{ x: 0.5, y: 0.75 }}
         pointerEvents="none"
       />
 
       {/* Shooting stars */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        {STAR_CONFIGS.map((cfg, i) => (
-          <ShootingStar key={i} {...cfg} />
-        ))}
+        {STAR_CONFIGS.map((cfg, i) => <ShootingStar key={i} {...cfg} />)}
       </View>
 
       {/* Centre content */}
       <View style={s.centre}>
 
-        {/* Flip faces — absolutely positioned on top of each other */}
+        {/* Flip faces */}
         <View style={s.faceContainer}>
           {/* TINT — front */}
           <Animated.View
-            style={[
-              s.face,
-              { transform: [{ perspective: 1200 }, { rotateY: frontRotate }] },
-            ]}
+            style={[s.face, { transform: [{ perspective: 1200 }, { rotateY: frontRotate }] }]}
           >
             <Text style={s.tintText}>TINT</Text>
           </Animated.View>
 
           {/* THERE IS NO TOMORROW — back */}
           <Animated.View
-            style={[
-              s.face,
-              { transform: [{ perspective: 1200 }, { rotateY: backRotate }] },
-            ]}
+            style={[s.face, { transform: [{ perspective: 1200 }, { rotateY: backRotate }] }]}
           >
             <Text style={s.mainText}>THERE IS NO TOMORROW</Text>
           </Animated.View>
@@ -188,36 +211,34 @@ export default function AnimatedSplash({ onDone }: Props) {
 
         {/* Dots */}
         <Animated.View style={[s.dotsRow, { opacity: revealAnim }]}>
-          {[
-            { color: '#818CF8' },
-            { color: '#6366F1' },
-            { color: '#4F46E5' },
-          ].map(({ color }, i) => (
+          {[{ color: '#818CF8' }, { color: '#6366F1' }, { color: '#4F46E5' }].map(({ color }, i) => (
             <Animated.View
               key={i}
-              style={[
-                s.dot,
-                { backgroundColor: color, transform: [{ scale: dotScale[i] }] },
-              ]}
+              style={[s.dot, { backgroundColor: color, transform: [{ scale: dotScale[i] }] }]}
             />
           ))}
         </Animated.View>
       </View>
 
-      {/* Fade to black */}
+      {/* Fade overlay */}
       <Animated.View
-        style={[StyleSheet.absoluteFill, s.fadeOverlay, { opacity: fadeAnim }]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: '#03030A', opacity: fadeAnim }]}
         pointerEvents="none"
       />
     </View>
   );
 }
 
+const g = StyleSheet.create({
+  hLine: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(99,102,241,0.07)' },
+  vLine: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(99,102,241,0.07)' },
+});
+
 const ss = StyleSheet.create({
   star: {
     position: 'absolute',
     height: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: 'rgba(255,255,255,0.88)',
     borderRadius: 1,
   },
 });
@@ -227,20 +248,17 @@ const s = StyleSheet.create({
     position: 'absolute',
     width,
     height,
-    backgroundColor: '#06060F',
+    backgroundColor: '#03030A',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 999,
-  },
-  glowLayer: {
-    ...StyleSheet.absoluteFillObject,
   },
   centre: {
     alignItems: 'center',
   },
   faceContainer: {
     width: width - 40,
-    height: 80,
+    height: 90,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -255,6 +273,7 @@ const s = StyleSheet.create({
     fontSize: 64,
     fontWeight: '900',
     letterSpacing: 10,
+    textAlign: 'center',
   },
   mainText: {
     color: '#FFFFFF',
@@ -262,9 +281,9 @@ const s = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 5,
     textAlign: 'center',
-    textShadowColor: 'rgba(255,255,255,0.28)',
+    textShadowColor: 'rgba(255,255,255,0.25)',
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 18,
+    textShadowRadius: 16,
   },
   accentWrap: {
     marginTop: 18,
@@ -297,8 +316,5 @@ const s = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-  },
-  fadeOverlay: {
-    backgroundColor: '#06060F',
   },
 });
