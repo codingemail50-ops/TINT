@@ -16,26 +16,23 @@ interface Props {
 }
 
 // ── Subtle grid ────────────────────────────────────────────
-const GRID_SIZE = 34;
-const H_LINES = Math.ceil(height / GRID_SIZE) + 1;
-const V_LINES = Math.ceil(width  / GRID_SIZE) + 1;
-
+const GRID = 34;
 function Grid() {
+  const hLines = Math.ceil(height / GRID) + 1;
+  const vLines = Math.ceil(width  / GRID) + 1;
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* Horizontal lines */}
-      {Array.from({ length: H_LINES }).map((_, i) => (
-        <View key={`h${i}`} style={[g.hLine, { top: i * GRID_SIZE }]} />
+      {Array.from({ length: hLines }).map((_, i) => (
+        <View key={`h${i}`} style={[g.hLine, { top: i * GRID }]} />
       ))}
-      {/* Vertical lines */}
-      {Array.from({ length: V_LINES }).map((_, i) => (
-        <View key={`v${i}`} style={[g.vLine, { left: i * GRID_SIZE }]} />
+      {Array.from({ length: vLines }).map((_, i) => (
+        <View key={`v${i}`} style={[g.vLine, { left: i * GRID }]} />
       ))}
     </View>
   );
 }
 
-// ── Shooting star ──────────────────────────────────────────
+// ── Shooting stars ─────────────────────────────────────────
 const STAR_CONFIGS = [
   { startX: -30,  startY: 80,  angle: 22, length: 90,  delay: 200,  dur: 700 },
   { startX: 80,   startY: -20, angle: 18, length: 70,  delay: 900,  dur: 650 },
@@ -49,7 +46,6 @@ function ShootingStar({ startX, startY, angle, length, delay, dur }: typeof STAR
   const tx      = useRef(new Animated.Value(0)).current;
   const ty      = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
-
   const rad = (angle * Math.PI) / 180;
   const dx  = Math.cos(rad) * length * 3;
   const dy  = Math.sin(rad) * length * 3;
@@ -59,7 +55,7 @@ function ShootingStar({ startX, startY, angle, length, delay, dur }: typeof STAR
       Animated.delay(delay),
       Animated.parallel([
         Animated.sequence([
-          Animated.timing(opacity, { toValue: 0.8, duration: 180, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.75, duration: 180, useNativeDriver: true }),
           Animated.delay(dur - 400),
           Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: true }),
         ]),
@@ -71,16 +67,8 @@ function ShootingStar({ startX, startY, angle, length, delay, dur }: typeof STAR
 
   return (
     <Animated.View
-      style={[
-        ss.star,
-        {
-          left: startX,
-          top:  startY,
-          width: length,
-          opacity,
-          transform: [{ translateX: tx }, { translateY: ty }, { rotate: `${angle}deg` }],
-        },
-      ]}
+      style={[ss.star, { left: startX, top: startY, width: length, opacity,
+        transform: [{ translateX: tx }, { translateY: ty }, { rotate: `${angle}deg` }] }]}
     />
   );
 }
@@ -95,24 +83,10 @@ export default function AnimatedSplash({ onDone }: Props) {
   useEffect(() => {
     Animated.sequence([
       Animated.delay(1500),
-      Animated.timing(flipAnim, {
-        toValue: 1,
-        duration: 1100,
-        easing: Easing.inOut(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(revealAnim, {
-        toValue: 1,
-        duration: 500,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
+      Animated.timing(flipAnim, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(revealAnim, { toValue: 1, duration: 500, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       Animated.delay(1900),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
     ]).start(() => onDone());
 
     const t = setTimeout(() => {
@@ -142,30 +116,23 @@ export default function AnimatedSplash({ onDone }: Props) {
   return (
     <View style={s.root}>
 
-      {/* Subtle grid */}
+      {/* Grid */}
       <Grid />
 
-      {/* Deep gradient glow layers */}
+      {/* Dark blue/indigo gradient — vertical sweep */}
       <LinearGradient
-        colors={['transparent', 'rgba(55,48,163,0.30)', 'transparent']}
+        colors={['#0A0A1E', '#0D0B2B', '#0A0A1E']}
         style={StyleSheet.absoluteFill}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
         pointerEvents="none"
       />
+      {/* Central indigo glow spot */}
       <LinearGradient
-        colors={['transparent', 'rgba(79,70,229,0.22)', 'transparent']}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        pointerEvents="none"
-      />
-      {/* Central bright spot */}
-      <LinearGradient
-        colors={['rgba(99,102,241,0.18)', 'transparent']}
-        style={[StyleSheet.absoluteFill, { borderRadius: width }]}
-        start={{ x: 0.5, y: 0.35 }}
-        end={{ x: 0.5, y: 0.75 }}
+        colors={['rgba(79,70,229,0.22)', 'transparent']}
+        style={[StyleSheet.absoluteFill]}
+        start={{ x: 0.5, y: 0.3 }}
+        end={{ x: 0.5, y: 0.8 }}
         pointerEvents="none"
       />
 
@@ -177,20 +144,17 @@ export default function AnimatedSplash({ onDone }: Props) {
       {/* Centre content */}
       <View style={s.centre}>
 
-        {/* Flip faces */}
         <View style={s.faceContainer}>
           {/* TINT — front */}
-          <Animated.View
-            style={[s.face, { transform: [{ perspective: 1200 }, { rotateY: frontRotate }] }]}
-          >
+          <Animated.View style={[s.face, { transform: [{ perspective: 1200 }, { rotateY: frontRotate }] }]}>
             <Text style={s.tintText}>TINT</Text>
           </Animated.View>
 
-          {/* THERE IS NO TOMORROW — back */}
-          <Animated.View
-            style={[s.face, { transform: [{ perspective: 1200 }, { rotateY: backRotate }] }]}
-          >
-            <Text style={s.mainText}>THERE IS NO TOMORROW</Text>
+          {/* THERE IS NO TOMORROW — back, single line */}
+          <Animated.View style={[s.face, { transform: [{ perspective: 1200 }, { rotateY: backRotate }] }]}>
+            <Text style={s.mainText} numberOfLines={1} adjustsFontSizeToFit>
+              THERE IS NO TOMORROW
+            </Text>
           </Animated.View>
         </View>
 
@@ -220,9 +184,9 @@ export default function AnimatedSplash({ onDone }: Props) {
         </Animated.View>
       </View>
 
-      {/* Fade overlay */}
+      {/* Fade to black */}
       <Animated.View
-        style={[StyleSheet.absoluteFill, { backgroundColor: '#03030A', opacity: fadeAnim }]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: '#080818', opacity: fadeAnim }]}
         pointerEvents="none"
       />
     </View>
@@ -230,17 +194,12 @@ export default function AnimatedSplash({ onDone }: Props) {
 }
 
 const g = StyleSheet.create({
-  hLine: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(99,102,241,0.07)' },
-  vLine: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(99,102,241,0.07)' },
+  hLine: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(99,102,241,0.08)' },
+  vLine: { position: 'absolute', top: 0, bottom: 0, width: StyleSheet.hairlineWidth,  backgroundColor: 'rgba(99,102,241,0.08)' },
 });
 
 const ss = StyleSheet.create({
-  star: {
-    position: 'absolute',
-    height: 1.5,
-    backgroundColor: 'rgba(255,255,255,0.88)',
-    borderRadius: 1,
-  },
+  star: { position: 'absolute', height: 1.5, backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 1 },
 });
 
 const s = StyleSheet.create({
@@ -248,17 +207,15 @@ const s = StyleSheet.create({
     position: 'absolute',
     width,
     height,
-    backgroundColor: '#03030A',
+    backgroundColor: '#080818',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 999,
   },
-  centre: {
-    alignItems: 'center',
-  },
+  centre: { alignItems: 'center' },
   faceContainer: {
     width: width - 40,
-    height: 90,
+    height: 80,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -277,23 +234,16 @@ const s = StyleSheet.create({
   },
   mainText: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
-    letterSpacing: 5,
+    letterSpacing: 4,
     textAlign: 'center',
     textShadowColor: 'rgba(255,255,255,0.25)',
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 16,
   },
-  accentWrap: {
-    marginTop: 18,
-    width: 220,
-    height: 2,
-  },
-  accentLine: {
-    flex: 1,
-    borderRadius: 1,
-  },
+  accentWrap: { marginTop: 18, width: 220, height: 2 },
+  accentLine:  { flex: 1, borderRadius: 1 },
   quote: {
     marginTop: 20,
     color: '#A5B4FC',
@@ -305,16 +255,6 @@ const s = StyleSheet.create({
     lineHeight: 20,
     paddingHorizontal: 50,
   },
-  dotsRow: {
-    flexDirection: 'row',
-    marginTop: 20,
-    gap: 14,
-    alignItems: 'center',
-    height: 14,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
+  dotsRow: { flexDirection: 'row', marginTop: 20, gap: 14, alignItems: 'center', height: 14 },
+  dot:     { width: 6, height: 6, borderRadius: 3 },
 });
