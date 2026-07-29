@@ -1,13 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Typography } from '../constants/theme';
 import { SplashScreen } from '../screens/SplashScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { TodoScreen } from '../screens/TodoScreen';
 import { ProductivityScreen } from '../screens/ProductivityScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
-import { StorageService, AppState, UserProfile } from '../utils/storage';
+import { StorageService, AppState } from '../utils/storage';
 import { supabase } from '../lib/supabase';
 import {
   loadUserFromSupabase,
@@ -15,6 +14,25 @@ import {
   saveNewUserToSupabase,
   checkUserExists,
 } from '../utils/supabaseStorage';
+
+// Every device gets an anonymous Supabase user behind the scenes — no login
+// screen needed. Onboarding (name + exam) is the only "sign in" a user sees.
+async function ensureSession(): Promise<string | null> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) return session.user.id;
+
+    const { data, error } = await supabase.auth.signInAnonymously();
+    if (error) {
+      console.error('[AppNavigator] Anonymous sign-in failed:', error.message);
+      return null;
+    }
+    return data.session?.user.id ?? null;
+  } catch (err) {
+    console.error('[AppNavigator] ensureSession exception:', err);
+    return null;
+  }
+}
 
 type Screen = 'splash' | 'onboarding' | 'todo' | 'productivity' | 'leaderboard';
 
@@ -40,24 +58,13 @@ export const AppNavigator: React.FC = () => {
 
   const handleSplashFinish = (_hasUser: boolean) => {
     void (async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
+      const userId = await ensureSession();
+      userIdRef.current = userId;
 
-        if (session) {
-          userIdRef.current = session.user.id;
-
-          // Check for pending profile from OAuth redirect (stored in AsyncStorage)
-          const pendingRaw = await AsyncStorage.getItem('tint_pending_profile');
-          if (pendingRaw) {
-            const profile = JSON.parse(pendingRaw) as UserProfile;
-            const exists = await checkUserExists(session.user.id);
-            if (!exists) {
-              await saveNewUserToSupabase(session.user.id, session.user.email ?? '', profile);
-            }
-            await AsyncStorage.removeItem('tint_pending_profile');
-          }
-
-          const loaded = await loadUserFromSupabase(session.user.id);
+      if (userId) {
+        const exists = await checkUserExists(userId);
+        if (exists) {
+          const loaded = await loadUserFromSupabase(userId);
           if (loaded) {
             setAppState(loaded);
             setShowTabs(true);
@@ -66,15 +73,15 @@ export const AppNavigator: React.FC = () => {
             return;
           }
         }
-      } catch (err) {
-        console.error('[AppNavigator] Supabase session check failed:', err);
       }
 
-      // No session or no user data — fall back to local storage
+      // No cloud profile yet (brand-new anonymous user, or offline) — fall back to local storage
       const state = await StorageService.getAppState();
       setAppState(state);
       const user = await StorageService.getUser();
       if (user) {
+        // Existing local user with no cloud row yet (e.g. was offline before) — push it up now
+        if (userId) void saveNewUserToSupabase(userId, '', user);
         setShowTabs(true);
         setScreen('todo');
         Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
@@ -85,11 +92,18 @@ export const AppNavigator: React.FC = () => {
   };
 
   const handleOnboardingComplete = () => {
-    StorageService.getAppState().then(state => {
+    StorageService.getAppState().then(async state => {
       setAppState(state);
       setShowTabs(true);
       setScreen('todo');
       Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+
+      if (!userIdRef.current) {
+        userIdRef.current = await ensureSession();
+      }
+      if (userIdRef.current && state.user) {
+        void saveNewUserToSupabase(userIdRef.current, '', state.user);
+      }
     });
   };
 
