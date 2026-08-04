@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { LeaderboardEntry } from '../data/leaderboard';
 import { LeaderboardCard } from '../components/LeaderboardCard';
@@ -11,11 +10,11 @@ import { loadLeaderboard, CloudLeaderboardRow } from '../utils/supabaseStorage';
 
 interface Props { appState: AppState; userId?: string }
 
-const EXAM_TABS: { id: ExamType; emoji: string; label: string; color: string }[] = [
-  { id: 'JEE',   emoji: '⚡', label: 'JEE',   color: '#3B82F6' },
-  { id: 'UCEED', emoji: '✏️', label: 'UCEED', color: '#8B5CF6' },
-  { id: 'NID',   emoji: '🎨', label: 'NID',   color: '#EC4899' },
-  { id: 'NIFT',  emoji: '👗', label: 'NIFT',  color: '#F59E0B' },
+const EXAM_TABS: { id: ExamType; emoji: string; label: string }[] = [
+  { id: 'JEE',   emoji: '⚡', label: 'JEE' },
+  { id: 'UCEED', emoji: '✏️', label: 'UCEED' },
+  { id: 'NID',   emoji: '🎨', label: 'NID' },
+  { id: 'NIFT',  emoji: '👗', label: 'NIFT' },
 ];
 
 export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
@@ -63,12 +62,9 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
     ]).start();
   }, []);
 
-  const activeColor = EXAM_TABS.find(t => t.id === activeExam)?.color ?? Colors.primary;
-
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <LinearGradient colors={['#0A0015', '#080810']} style={StyleSheet.absoluteFill} />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
@@ -86,15 +82,15 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
             return (
               <TouchableOpacity
                 key={tab.id}
-                style={[styles.examTab, isActive && { borderColor: tab.color, backgroundColor: tab.color + '22' }]}
+                style={[styles.examTab, isActive && styles.examTabActive]}
                 onPress={() => setActiveExam(tab.id)}
                 activeOpacity={0.7}
               >
                 <Text style={styles.examTabEmoji}>{tab.emoji}</Text>
-                <Text style={[styles.examTabLabel, isActive && { color: tab.color }]}>
+                <Text style={[styles.examTabLabel, isActive && styles.examTabLabelActive]}>
                   {tab.label}
                 </Text>
-                {isUserExam && <View style={[styles.examTabDot, { backgroundColor: tab.color }]} />}
+                {isUserExam && <View style={styles.examTabDot} />}
               </TouchableOpacity>
             );
           })}
@@ -105,13 +101,8 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
           <Animated.View style={[styles.userRankBanner, {
             opacity: headerAnim,
             transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
-            borderColor: activeColor + '44',
           }]}>
-            <LinearGradient
-              colors={[activeColor + '22', Colors.surface]}
-              style={styles.userRankGradient}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            >
+            <View style={styles.userRankGradient}>
               <View style={styles.userRankLeft}>
                 <Text style={styles.userRankEmoji}>{user?.avatar ?? '⭐'}</Text>
                 <View>
@@ -120,14 +111,14 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
                 </View>
               </View>
               <View style={styles.userRankRight}>
-                <Text style={[styles.userRankNumber, { color: activeColor }]}>
+                <Text style={styles.userRankNumber}>
                   {userRank > 0 ? `#${userRank}` : '--'}
                 </Text>
                 <Text style={styles.userRankLabel}>
                   {examTypes.includes(activeExam) ? 'your rank' : 'not your exam'}
                 </Text>
               </View>
-            </LinearGradient>
+            </View>
           </Animated.View>
         )}
 
@@ -186,18 +177,14 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
         </View>
 
         <View style={styles.motivationFooter}>
-          <LinearGradient
-            colors={[activeColor + '22', Colors.surface]}
-            style={styles.motivationGradient}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          >
+          <View style={styles.motivationGradient}>
             <Text style={styles.motivationText}>
               Rankings update as your consistency grows. Every task you complete today moves you up the board.
             </Text>
-            <Text style={[styles.motivationCta, { color: activeColor }]}>
+            <Text style={styles.motivationCta}>
               Keep your streak alive 🔥
             </Text>
-          </LinearGradient>
+          </View>
         </View>
 
         <View style={{ height: 100 }} />
@@ -266,11 +253,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceElevated,
     gap: 2,
   },
+  examTabActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryGlow },
   examTabEmoji: { fontSize: 18 },
   examTabLabel: { ...Typography.labelSmall, color: Colors.textSecondary, fontSize: 10 },
+  examTabLabelActive: { color: Colors.primary },
   examTabDot: {
     width: 5, height: 5, borderRadius: 3,
     position: 'absolute', top: 5, right: 8,
+    backgroundColor: Colors.primary,
   },
 
   // User rank banner
@@ -279,17 +269,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: Spacing.md,
     borderWidth: 1,
+    borderColor: Colors.border,
   },
   userRankGradient: {
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', padding: Spacing.md,
+    backgroundColor: Colors.surfaceElevated,
   },
   userRankLeft:  { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   userRankEmoji: { fontSize: 32 },
   userRankName:  { ...Typography.headlineSmall, color: Colors.textPrimary },
   userRankMeta:  { ...Typography.bodySmall, color: Colors.textSecondary },
   userRankRight: { alignItems: 'flex-end' },
-  userRankNumber: { fontSize: 32, fontWeight: '900', letterSpacing: -1 },
+  userRankNumber: { fontSize: 32, fontWeight: '900', letterSpacing: -1, color: Colors.primary },
   userRankLabel:  { ...Typography.labelSmall, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
 
   // Podium
@@ -322,12 +314,12 @@ const styles = StyleSheet.create({
 
   motivationFooter: {
     borderRadius: BorderRadius.lg, overflow: 'hidden',
-    marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.primary + '33',
+    marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.border,
   },
-  motivationGradient: { padding: Spacing.md, gap: Spacing.xs },
+  motivationGradient: { padding: Spacing.md, gap: Spacing.xs, backgroundColor: Colors.surfaceElevated },
   motivationText: {
     ...Typography.bodyMedium, color: Colors.textSecondary,
     lineHeight: 22, textAlign: 'center',
   },
-  motivationCta: { ...Typography.labelLarge, textAlign: 'center' },
+  motivationCta: { ...Typography.labelLarge, textAlign: 'center', color: Colors.primary },
 });

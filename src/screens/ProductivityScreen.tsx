@@ -3,7 +3,6 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { AppState, getConsistencyData, getHeatmapData } from '../utils/storage';
 import { ConsistencyGraph } from '../components/ConsistencyGraph';
@@ -14,12 +13,12 @@ interface Props { appState: AppState }
 
 // ── Heatmap ───────────────────────────────────────────────────────────────────
 function heatColor(value: number): string {
-  if (value < 0)  return '#13132A'; // no data
-  if (value === 0) return '#1E1E35';
+  if (value < 0)  return Colors.surface; // no data
+  if (value === 0) return Colors.border;
   if (value < 40)  return '#14532D';
   if (value < 70)  return '#166534';
   if (value < 90)  return '#15803D';
-  return '#22C55E';
+  return Colors.success;
 }
 
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -142,7 +141,6 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <LinearGradient colors={['#0A0015', '#080810']} style={StyleSheet.absoluteFill} />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
@@ -180,16 +178,13 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
         {/* Reality check */}
         {avg < 95 && (
           <View style={styles.realityCard}>
-            <LinearGradient
-              colors={avg >= 70 ? [Colors.primaryGlow, Colors.surface] : [Colors.dangerGlow, Colors.surface]}
-              style={styles.realityGradient}
-            >
+            <View style={[styles.realityGradient, { backgroundColor: avg >= 70 ? Colors.surfaceElevated : Colors.dangerGlow }]}>
               <Text style={styles.realityIcon}>{avg >= 70 ? '⚡' : avg >= 50 ? '⚠️' : '🚨'}</Text>
               <Text style={[styles.realityTitle, { color: avg >= 70 ? Colors.primaryLight : Colors.danger }]}>
                 Reality Check
               </Text>
               <Text style={styles.realityMessage}>{realityCheck.message}</Text>
-            </LinearGradient>
+            </View>
           </View>
         )}
 

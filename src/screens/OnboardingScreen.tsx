@@ -196,14 +196,14 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
           return (
             <TouchableOpacity
               key={exam.id}
-              style={[examS.card, checked && { borderColor: exam.color, backgroundColor: exam.color + '14' }]}
+              style={[examS.card, checked && examS.cardActive]}
               onPress={() => toggleExam(exam.id)}
               activeOpacity={0.75}
             >
               <Text style={examS.emoji}>{exam.emoji}</Text>
-              <Text style={[examS.label, checked && { color: exam.color }]}>{exam.label}</Text>
+              <Text style={[examS.label, checked && examS.labelActive]}>{exam.label}</Text>
               <Text style={examS.desc}>{exam.description}</Text>
-              <View style={[examS.checkbox, checked && { backgroundColor: exam.color, borderColor: exam.color }]}>
+              <View style={[examS.checkbox, checked && examS.checkboxActive]}>
                 {checked && <Text style={examS.checkmark}>✓</Text>}
               </View>
             </TouchableOpacity>
@@ -228,7 +228,6 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.container}>
         <StatusBar style="light" />
-        <LinearGradient colors={['#040010', '#09001A', '#07070E']} style={StyleSheet.absoluteFill} />
         <View style={styles.bgOrb} />
         <View style={styles.header}>
           <View style={styles.progressTrack}>
@@ -263,15 +262,11 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
             disabled={!canProceed()}
             activeOpacity={0.85}
           >
-            <LinearGradient
-              colors={canProceed() ? ['#A78BFA', '#7C3AED'] : [Colors.surfaceElevated, Colors.surfaceElevated]}
-              style={styles.nextGradient}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            >
+            <View style={[styles.nextGradient, { backgroundColor: canProceed() ? Colors.primary : Colors.surfaceElevated }]}>
               <Text style={[styles.nextText, !canProceed() && { color: Colors.textMuted }]}>
                 {ctaLabel}
               </Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -314,17 +309,20 @@ const examS = StyleSheet.create({
     gap: 4,
     position: 'relative',
   },
+  cardActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryGlow },
   emoji: { fontSize: 28 },
   label: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
+  labelActive: { color: Colors.primary },
   desc: { fontSize: 11, color: Colors.textSecondary, lineHeight: 16 },
   checkbox: { position: 'absolute', top: 10, right: 10, width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
-  checkmark: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  checkboxActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  checkmark: { color: '#000', fontSize: 13, fontWeight: '800' },
   comboNote: { backgroundColor: Colors.primary + '18', borderRadius: BorderRadius.md, padding: Spacing.sm, borderWidth: 1, borderColor: Colors.primary + '33' },
   comboText: { fontSize: 13, color: Colors.primaryLight, lineHeight: 20 },
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#040010' },
+  container: { flex: 1, backgroundColor: Colors.background },
   bgOrb: { position: 'absolute', width: 350, height: 350, borderRadius: 175, top: -100, right: -100, backgroundColor: Colors.primary, opacity: 0.07 },
   header: { paddingTop: 58, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.md, gap: Spacing.sm },
   progressTrack: { height: 3, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden' },
@@ -342,5 +340,5 @@ const styles = StyleSheet.create({
   nextBtn: { flex: 1, borderRadius: BorderRadius.md, overflow: 'hidden' },
   nextBtnDisabled: { opacity: 0.45 },
   nextGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
-  nextText: { fontSize: 17, fontWeight: '700', color: '#fff', letterSpacing: 0.2 },
+  nextText: { fontSize: 17, fontWeight: '700', color: '#000', letterSpacing: 0.2 },
 });

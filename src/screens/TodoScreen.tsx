@@ -6,7 +6,6 @@ import {
   AppState as RNAppState, AppStateStatus,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { Task, getCombinedPreset, ExamType } from '../data/examPresets';
@@ -530,7 +529,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <LinearGradient colors={['#0A0015', '#080810']} style={StyleSheet.absoluteFill} />
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <Animated.View style={[styles.header, {
@@ -638,9 +636,9 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
               onPress={() => { setShowAddModal(true); buttonPress(); }}
               activeOpacity={0.7}
             >
-              <LinearGradient colors={['#9B5CF6', '#7C3AED']} style={styles.addBtnGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+              <View style={styles.addBtnGradient}>
                 <Text style={styles.addBtnText}>+ Add Task</Text>
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
           )}
         </View>
@@ -731,19 +729,14 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
           }]}
           pointerEvents="none"
         >
-          <LinearGradient
-            colors={['#7C3AED44', '#10B98133']}
-            style={styles.trophyGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
+          <View style={styles.trophyGradient}>
             <Text style={styles.trophyEmoji}>🏆</Text>
             <Text style={styles.trophyTitle}>Day Complete!</Text>
             <Text style={styles.trophySub}>
               All {totalCount} tasks done. Day {appState.streak + 1} locked in.
             </Text>
             <Text style={styles.trophyMotivation}>There is no tomorrow — you owned today.</Text>
-          </LinearGradient>
+          </View>
         </Animated.View>
       )}
 
@@ -764,7 +757,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
           pointerEvents="box-none"
         >
           <View style={styles.modalSheet}>
-            <LinearGradient colors={[Colors.surfaceElevated, Colors.surface]} style={StyleSheet.absoluteFill} />
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>New Task</Text>
 
@@ -822,9 +814,9 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
                 onPress={handleAddTask}
                 disabled={!newTaskTitle.trim()}
               >
-                <LinearGradient colors={['#9B5CF6', '#7C3AED']} style={styles.createBtnGradient}>
+                <View style={styles.createBtnGradient}>
                   <Text style={styles.createText}>Add Task</Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -844,7 +836,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
         </TouchableWithoutFeedback>
         <View style={styles.modalKAV} pointerEvents="box-none">
           <View style={styles.modalSheetSmall}>
-            <LinearGradient colors={[Colors.surfaceElevated, Colors.surface]} style={StyleSheet.absoluteFill} />
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Edit Duration</Text>
             {editingTask && (
@@ -856,9 +847,9 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.createBtn} onPress={handleSaveDuration}>
-                <LinearGradient colors={['#9B5CF6', '#7C3AED']} style={styles.createBtnGradient}>
+                <View style={styles.createBtnGradient}>
                   <Text style={styles.createText}>Save</Text>
-                </LinearGradient>
+                </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -949,8 +940,8 @@ const styles = StyleSheet.create({
   filterChipText: { ...Typography.labelSmall, color: Colors.textSecondary },
   filterChipTextActive: { color: Colors.primaryLight },
   addBtn: { borderRadius: BorderRadius.sm, overflow: 'hidden' },
-  addBtnGradient: { paddingHorizontal: Spacing.md, paddingVertical: 8 },
-  addBtnText: { ...Typography.labelLarge, color: '#fff', fontSize: 13 },
+  addBtnGradient: { paddingHorizontal: Spacing.md, paddingVertical: 8, backgroundColor: Colors.primary },
+  addBtnText: { ...Typography.labelLarge, color: '#000', fontSize: 13 },
   backTodayBtn: {
     paddingHorizontal: Spacing.md,
     paddingVertical: 8,
@@ -989,8 +980,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
     borderWidth: 1,
-    borderColor: Colors.primary + '66',
+    borderColor: Colors.border,
     borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.surfaceElevated,
   },
   trophyEmoji:      { fontSize: 52 },
   trophyTitle:      { fontSize: 26, fontWeight: '900', color: Colors.textPrimary, letterSpacing: -0.5 },
@@ -1014,6 +1006,7 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
     paddingBottom: 44,
     overflow: 'hidden',
+    backgroundColor: Colors.surfaceElevated,
   },
   modalSheetSmall: {
     borderTopLeftRadius: BorderRadius.xl,
@@ -1021,6 +1014,7 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
     paddingBottom: 44,
     overflow: 'hidden',
+    backgroundColor: Colors.surfaceElevated,
   },
   modalHandle: {
     width: 36, height: 4,
@@ -1094,6 +1088,6 @@ const styles = StyleSheet.create({
   cancelText:   { ...Typography.headlineSmall, color: Colors.textSecondary, fontSize: 15 },
   createBtn:    { flex: 1, borderRadius: BorderRadius.md, overflow: 'hidden' },
   createBtnDisabled: { opacity: 0.4 },
-  createBtnGradient: { paddingVertical: Spacing.md, alignItems: 'center' },
-  createText:   { ...Typography.headlineSmall, color: '#fff', fontSize: 15 },
+  createBtnGradient: { paddingVertical: Spacing.md, alignItems: 'center', backgroundColor: Colors.primary },
+  createText:   { ...Typography.headlineSmall, color: '#000', fontSize: 15 },
 });

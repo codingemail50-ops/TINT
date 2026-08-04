@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing } from '../constants/theme';
 import { StorageService } from '../utils/storage';
 import { MOTIVATIONAL_QUOTES } from '../data/examPresets';
@@ -60,7 +59,7 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
       y:   new Animated.Value(H + 20),
       op:  new Animated.Value(0),
       sz:  2 + (i % 4),
-      col: i % 3 === 0 ? Colors.primary : i % 3 === 1 ? Colors.accent : '#A78BFA',
+      col: Colors.textSecondary,
     }))
   ).current;
 
@@ -164,11 +163,10 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <LinearGradient colors={['#040010', '#09001A', '#07070E']} locations={[0, 0.55, 1]} style={StyleSheet.absoluteFill} />
 
       {/* Orbs */}
-      <Animated.View style={[styles.orb, { top: -120, left: -100, backgroundColor: '#6D28D9', opacity: orbOp, transform: [{ scale: orb1Sc }] }]} />
-      <Animated.View style={[styles.orb, { bottom: -90, right: -90, backgroundColor: '#B45309', opacity: orbOp, transform: [{ scale: orb2Sc }] }]} />
+      <Animated.View style={[styles.orb, { top: -120, left: -100, backgroundColor: Colors.surfaceElevated, opacity: orbOp, transform: [{ scale: orb1Sc }] }]} />
+      <Animated.View style={[styles.orb, { bottom: -90, right: -90, backgroundColor: Colors.surfaceElevated, opacity: orbOp, transform: [{ scale: orb2Sc }] }]} />
 
       {/* Particles */}
       {particles.map((p, i) => (
@@ -249,7 +247,7 @@ export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#040010' },
+  container: { flex: 1, backgroundColor: Colors.background },
 
   orb: {
     position: 'absolute',
@@ -277,11 +275,8 @@ const styles = StyleSheet.create({
     fontSize: 88,
     fontWeight: '900',
     fontFamily: DISPLAY_FONT,
-    color: '#F5C518',
+    color: Colors.textPrimary,
     letterSpacing: -2,
-    textShadowColor: '#F5C51888',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 28,
   },
 
   // Rays
@@ -295,7 +290,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     height: 2,
     left: 0, top: 0,
-    backgroundColor: '#F5C518',
+    backgroundColor: Colors.textSecondary,
     borderRadius: 2,
     transformOrigin: '0% 50%',
   },
@@ -314,14 +309,11 @@ const styles = StyleSheet.create({
     fontSize: 74,
     fontWeight: '900',
     fontFamily: DISPLAY_FONT,
-    color: '#F5C518',
+    color: Colors.textPrimary,
     letterSpacing: -1,
     lineHeight: 82,
     width: 52,
     textAlign: 'center',
-    textShadowColor: '#F5C51866',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 14,
   },
   expandedWordCol: {
     paddingBottom: 8,
@@ -331,13 +323,13 @@ const styles = StyleSheet.create({
     fontSize: 42,
     fontWeight: '900',
     fontFamily: DISPLAY_FONT,
-    color: '#F0F0FF',
+    color: Colors.textPrimary,
     letterSpacing: 1,
     lineHeight: 48,
   },
   underline: {
     height: 3,
-    backgroundColor: '#F0F0FF',
+    backgroundColor: Colors.textPrimary,
     borderRadius: 2,
     marginTop: 1,
   },
@@ -363,7 +355,5 @@ const styles = StyleSheet.create({
   },
   loadFill: {
     height: '100%', backgroundColor: Colors.primary, borderRadius: 2,
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9, shadowRadius: 6,
   },
 });

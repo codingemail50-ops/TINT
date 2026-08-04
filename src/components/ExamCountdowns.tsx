@@ -34,11 +34,10 @@ function formatDateStamp(d: Date): string {
 interface CountdownCardProps {
   examName: string;
   emoji: string;
-  accentColor: string;
   target: Date;
 }
 
-const CountdownCard: React.FC<CountdownCardProps> = ({ examName, emoji, accentColor, target }) => {
+const CountdownCard: React.FC<CountdownCardProps> = ({ examName, emoji, target }) => {
   const [remaining, setRemaining] = useState<RemainingTime>(() => getRemaining(target));
 
   useEffect(() => {
@@ -50,16 +49,16 @@ const CountdownCard: React.FC<CountdownCardProps> = ({ examName, emoji, accentCo
     return (
       <View style={[styles.card, { borderColor: Colors.success }]}>
         <Text style={styles.passedText}>🎉 Exam day is here!</Text>
-        <Text style={[styles.examLabel, { color: accentColor }]}>{examName}</Text>
+        <Text style={styles.examLabel}>{examName}</Text>
       </View>
     );
   }
 
   return (
-    <View style={[styles.card, { borderColor: accentColor + '55' }]}>
+    <View style={styles.card}>
       <View style={styles.headerRow}>
         <Text style={styles.emoji}>{emoji}</Text>
-        <Text style={[styles.examLabel, { color: accentColor }]}>{examName} Countdown</Text>
+        <Text style={styles.examLabel}>{examName} Countdown</Text>
       </View>
       <View style={styles.bottomRow}>
         <Text style={styles.countdownText}>
@@ -76,12 +75,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceElevated,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
+    borderColor: Colors.border,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: 6 },
   emoji: { fontSize: 16 },
-  examLabel: { ...Typography.labelSmall, fontWeight: '700' },
+  examLabel: { ...Typography.labelSmall, fontWeight: '700', color: Colors.textSecondary },
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   countdownText: { ...Typography.headlineMedium, color: Colors.textPrimary, fontVariant: ['tabular-nums'] },
   dateStamp: { ...Typography.bodySmall, color: Colors.textMuted },
@@ -98,7 +98,6 @@ export const UCEEDCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
     <CountdownCard
       examName="UCEED"
       emoji="⏳"
-      accentColor="#FB923C"
       target={new Date('2027-01-17T09:00:00+05:30')}
     />
   );
@@ -110,7 +109,6 @@ export const NIDCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
     <CountdownCard
       examName="NID"
       emoji="🎨"
-      accentColor="#EC4899"
       target={new Date('2026-12-21T09:00:00+05:30')}
     />
   );
@@ -122,7 +120,6 @@ export const NIFTCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
     <CountdownCard
       examName="NIFT"
       emoji="👗"
-      accentColor="#F59E0B"
       target={new Date('2027-02-08T09:00:00+05:30')}
     />
   );

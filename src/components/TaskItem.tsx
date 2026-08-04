@@ -30,16 +30,7 @@ export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPres
     Animated.spring(checkAnim, { toValue: task.completed ? 1 : 0, useNativeDriver: true }).start();
   }, [task.completed]);
 
-  const CATEGORY_COLORS: Record<string, string> = {
-    Physics: '#3B82F6', Chemistry: '#10B981', Mathematics: '#7C3AED',
-    Biology: '#F59E0B', Revision: '#8B5CF6', Practice: '#EF4444',
-    Reading: '#06B6D4', Writing: '#F472B6', Study: '#8B5CF6',
-    Drawing: '#EC4899', Design: '#A78BFA', Portfolio: '#F59E0B',
-    Theory: '#6366F1', Aptitude: '#14B8A6', General: '#FB923C',
-    Other: '#6B7280',
-  };
-
-  const catColor = CATEGORY_COLORS[task.category] ?? Colors.primary;
+  const catColor = Colors.textSecondary;
   const hours = Math.floor(task.duration / 60);
   const mins  = task.duration % 60;
   const durationLabel = hours > 0 ? `${hours}h${mins > 0 ? ` ${mins}m` : ''}` : `${mins}m`;
@@ -66,8 +57,8 @@ export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPres
         <Animated.View style={[
           styles.checkbox,
           {
-            borderColor:     task.completed ? catColor : Colors.border,
-            backgroundColor: task.completed ? catColor : 'transparent',
+            borderColor:     task.completed ? Colors.success : Colors.border,
+            backgroundColor: task.completed ? Colors.success : 'transparent',
             transform: [{ scale: checkAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.2, 1] }) }],
           },
         ]}>
@@ -80,8 +71,8 @@ export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPres
             {task.repeat && !readOnly && <Text style={styles.repeatBadge}> ↺</Text>}
           </Text>
           <View style={styles.meta}>
-            <View style={[styles.categoryBadge, { backgroundColor: catColor + '22', borderColor: catColor + '44' }]}>
-              <Text style={[styles.categoryText, { color: catColor }]}>{task.category}</Text>
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryText}>{task.category}</Text>
             </View>
             <Text style={styles.duration}>⏱ {durationLabel}</Text>
           </View>
@@ -134,8 +125,9 @@ const styles = StyleSheet.create({
   categoryBadge: {
     paddingHorizontal: 8, paddingVertical: 3,
     borderRadius: BorderRadius.sm, borderWidth: 1,
+    borderColor: Colors.border, backgroundColor: Colors.surface,
   },
-  categoryText: { ...Typography.labelSmall, fontSize: 10 },
+  categoryText: { ...Typography.labelSmall, fontSize: 10, color: Colors.textSecondary },
   duration: { ...Typography.bodySmall, color: Colors.textSecondary },
   deleteBtn: {
     width: 28, height: 28,
