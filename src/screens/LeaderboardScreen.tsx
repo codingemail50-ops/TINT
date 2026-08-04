@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     marginHorizontal: -Spacing.xl, paddingHorizontal: Spacing.xl,
   },
-  screenTitle: { fontSize: 28, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
+  screenTitle: { fontSize: 32, fontWeight: '800', color: Colors.primary, letterSpacing: -0.8 },
   screenSub:   { ...Typography.bodyMedium, color: Colors.textSecondary, marginTop: 4 },
 
   // Exam tabs

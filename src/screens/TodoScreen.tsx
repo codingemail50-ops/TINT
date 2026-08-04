@@ -877,7 +877,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   greeting: { ...Typography.bodyMedium, color: Colors.textSecondary },
-  userName:  { fontSize: 24, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
+  userName:  { fontSize: 32, fontWeight: '800', color: Colors.primary, letterSpacing: -0.8, marginTop: 2 },
   progressSection: { gap: 6 },
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   progressLabel: { ...Typography.labelSmall, color: Colors.textSecondary },
