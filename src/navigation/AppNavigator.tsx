@@ -4,6 +4,7 @@ import { Colors, Typography } from '../constants/theme';
 import { SplashScreen } from '../screens/SplashScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { TodoScreen } from '../screens/TodoScreen';
+import { FocusScreen } from '../screens/FocusScreen';
 import { ProductivityScreen } from '../screens/ProductivityScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
 import { StorageService, AppState } from '../utils/storage';
@@ -34,10 +35,11 @@ async function ensureSession(): Promise<string | null> {
   }
 }
 
-type Screen = 'splash' | 'onboarding' | 'todo' | 'productivity' | 'leaderboard';
+type Screen = 'splash' | 'onboarding' | 'todo' | 'focus' | 'productivity' | 'leaderboard';
 
 const TAB_CONFIG = [
   { id: 'todo' as Screen, label: 'Today', icon: '📋' },
+  { id: 'focus' as Screen, label: 'Focus', icon: '⚡' },
   { id: 'productivity' as Screen, label: 'Progress', icon: '📊' },
   { id: 'leaderboard' as Screen, label: 'Rank', icon: '🏆' },
 ];
@@ -123,9 +125,10 @@ export const AppNavigator: React.FC = () => {
     <View style={styles.root}>
       {screen === 'splash' && <SplashScreen onFinish={handleSplashFinish} />}
       {screen === 'onboarding' && <OnboardingScreen onComplete={handleOnboardingComplete} />}
-      {screen === 'todo' && <TodoScreen appState={appState} onStateChange={handleStateChange} />}
+      {screen === 'todo' && <TodoScreen appState={appState} onStateChange={handleStateChange} userId={userIdRef.current ?? undefined} />}
+      {screen === 'focus' && <FocusScreen userId={userIdRef.current ?? undefined} />}
       {screen === 'productivity' && <ProductivityScreen appState={appState} />}
-      {screen === 'leaderboard' && <LeaderboardScreen appState={appState} />}
+      {screen === 'leaderboard' && <LeaderboardScreen appState={appState} userId={userIdRef.current ?? undefined} />}
 
       {showTabs && (
         <Animated.View style={[styles.tabBar, { opacity: tabFadeAnim }]}>

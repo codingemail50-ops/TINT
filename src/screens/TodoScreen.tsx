@@ -3,16 +3,20 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Animated, Modal, KeyboardAvoidingView,
   Platform, TouchableWithoutFeedback, Keyboard,
+  AppState as RNAppState, AppStateStatus,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { Task, getCombinedPreset, ExamType } from '../data/examPresets';
 import { StorageService, AppState } from '../utils/storage';
 import { TaskItem } from '../components/TaskItem';
 import { FlameIcon } from '../components/FlameIcon';
 import { Confetti } from '../components/Confetti';
+import { UCEEDCountdown, NIDCountdown, NIFTCountdown } from '../components/ExamCountdowns';
 import { useHaptics } from '../hooks/useHaptics';
+import { syncFocusLog } from '../utils/supabaseStorage';
 
 const CATEGORIES = [
   'Study', 'Practice', 'Revision', 'Reading', 'Writing',
@@ -159,10 +163,68 @@ const sliderSt = StyleSheet.create({
   presetTextActive: { color: Colors.primary },
 });
 
+// ── Active per-task timer row ────────────────────────────────────────────────
+const ActiveTimerRow: React.FC<{
+  task: Task;
+  remaining: number;
+  total: number;
+  running: boolean;
+  onTogglePause: () => void;
+  onCancel: () => void;
+}> = ({ task, remaining, total, running, onTogglePause, onCancel }) => {
+  const pct = total > 0 ? (total - remaining) / total : 0;
+  const mins = Math.floor(remaining / 60).toString().padStart(2, '0');
+  const secs = (remaining % 60).toString().padStart(2, '0');
+
+  return (
+    <View style={timerRowSt.container}>
+      <TouchableOpacity style={timerRowSt.main} onPress={onTogglePause} activeOpacity={0.8}>
+        <View style={timerRowSt.headerRow}>
+          <Text style={timerRowSt.title} numberOfLines={1}>{task.title}</Text>
+          <Text style={timerRowSt.time}>{mins}:{secs}</Text>
+        </View>
+        <View style={timerRowSt.track}>
+          <View style={[timerRowSt.fill, { width: `${pct * 100}%` as any }, !running && timerRowSt.fillPaused]} />
+        </View>
+        <Text style={timerRowSt.hint}>{running ? 'Tap to pause' : 'Paused — tap to resume'}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={timerRowSt.cancelBtn}
+        onPress={onCancel}
+        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+      >
+        <Text style={timerRowSt.cancelText}>Stop</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
+const timerRowSt = StyleSheet.create({
+  container: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md,
+    borderWidth: 1, borderColor: Colors.primary, padding: Spacing.md, marginBottom: Spacing.sm,
+  },
+  main: { flex: 1, gap: 6 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.sm },
+  title: { ...Typography.bodyLarge, color: Colors.textPrimary, fontWeight: '600', flex: 1 },
+  time: { fontSize: 18, fontWeight: '800', color: Colors.primary, fontVariant: ['tabular-nums'] },
+  track: { height: 5, backgroundColor: Colors.border, borderRadius: 3, overflow: 'hidden' },
+  fill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 3 },
+  fillPaused: { backgroundColor: Colors.accent },
+  hint: { ...Typography.labelSmall, color: Colors.textMuted, fontSize: 10 },
+  cancelBtn: {
+    paddingHorizontal: Spacing.sm, paddingVertical: 6,
+    borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: Colors.danger + '55',
+  },
+  cancelText: { ...Typography.labelSmall, color: Colors.danger },
+});
+
 // ── Main Screen ───────────────────────────────────────────────────────────────
 interface Props {
   appState: AppState;
   onStateChange: (s: AppState) => void;
+  userId?: string;
 }
 
 const todayStr = new Date().toDateString();
@@ -186,9 +248,20 @@ function buildDateStrip(history: AppState['history']) {
   return items;
 }
 
-export const TodoScreen: React.FC<Props> = ({ appState, onStateChange }) => {
+export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId }) => {
   const [tasks, setTasks]           = useState<Task[]>([]);
   const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [filter, setFilter] = useState<'all' | 'todo' | 'done'>('all');
+
+  // Per-task countdown timer — only one active at a time
+  const [timerTaskId, setTimerTaskId]   = useState<string | null>(null);
+  const [timerRemaining, setTimerRemaining] = useState(0);
+  const [timerTotal, setTimerTotal]     = useState(0);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const timerEndRef      = useRef(0);
+  const timerTaskIdRef   = useRef<string | null>(null);
+  const timerTotalRef    = useRef(0);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Add task modal
   const [showAddModal, setShowAddModal]     = useState(false);
@@ -240,6 +313,9 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange }) => {
     ? appState.history.find(h => h.date === selectedDate)
     : null;
   const displayTasks = viewingPast ? (pastRecord?.tasks ?? []) : tasks;
+  const filteredTasks = filter === 'todo' ? displayTasks.filter(t => !t.completed)
+    : filter === 'done' ? displayTasks.filter(t => t.completed)
+    : displayTasks;
 
   const completedCount = displayTasks.filter(t => t.completed).length;
   const totalCount     = displayTasks.length;
@@ -264,19 +340,15 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange }) => {
     setTimeout(() => dateScrollRef.current?.scrollToEnd({ animated: false }), 100);
   }, []);
 
-  // ── Task toggle ──────────────────────────────────────────────────────────────
-  const handleToggle = useCallback(async (id: string) => {
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-
-    const wasCompleted = task.completed;
+  // ── Task completion (shared by instant un-toggle and timer completion) ───────
+  const applyCompletion = useCallback(async (id: string, completed: boolean) => {
     const updated = tasks.map(t =>
-      t.id === id ? { ...t, completed: !t.completed, completedAt: !t.completed ? new Date().toISOString() : undefined } : t
+      t.id === id ? { ...t, completed, completedAt: completed ? new Date().toISOString() : undefined } : t
     );
     setTasks(updated);
     await StorageService.saveTodayTasks(updated);
 
-    if (!wasCompleted) {
+    if (completed) {
       await taskComplete();
       setConfettiVisible(true);
 
@@ -289,6 +361,107 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange }) => {
     const newState = await StorageService.recordDayCompletion(updated);
     onStateChange(newState);
   }, [tasks]);
+
+  // ── Per-task countdown timer ──────────────────────────────────────────────────
+  const logFocusMinutes = async (mins: number) => {
+    if (mins < 1) return;
+    try {
+      const raw = await AsyncStorage.getItem('tint_focus_log');
+      const log = raw ? JSON.parse(raw) : [];
+      const updatedLog = [...log, { date: new Date().toDateString(), mins }];
+      await AsyncStorage.setItem('tint_focus_log', JSON.stringify(updatedLog));
+      if (userId) void syncFocusLog(userId, updatedLog);
+    } catch {}
+  };
+
+  const stopTimerInterval = () => {
+    if (timerIntervalRef.current) { clearInterval(timerIntervalRef.current); timerIntervalRef.current = null; }
+  };
+
+  const finishTimer = useCallback(() => {
+    stopTimerInterval();
+    const id = timerTaskIdRef.current;
+    const mins = Math.round(timerTotalRef.current / 60);
+    timerEndRef.current = 0;
+    timerTaskIdRef.current = null;
+    setTimerTaskId(null);
+    setTimerRunning(false);
+    setTimerRemaining(0);
+    setTimerTotal(0);
+    if (id) {
+      void applyCompletion(id, true);
+      void logFocusMinutes(mins);
+    }
+  }, [applyCompletion]);
+
+  const tickTimer = useCallback(() => {
+    if (timerEndRef.current <= 0) return;
+    const remaining = Math.max(0, Math.round((timerEndRef.current - Date.now()) / 1000));
+    setTimerRemaining(remaining);
+    if (remaining <= 0) finishTimer();
+  }, [finishTimer]);
+
+  useEffect(() => {
+    if (timerRunning) {
+      timerIntervalRef.current = setInterval(tickTimer, 1000);
+      return () => stopTimerInterval();
+    }
+  }, [timerRunning, tickTimer]);
+
+  useEffect(() => {
+    const onChange = (state: AppStateStatus) => {
+      if (state === 'active' && timerEndRef.current > 0) tickTimer();
+    };
+    const sub = RNAppState.addEventListener('change', onChange);
+    return () => sub.remove();
+  }, [tickTimer]);
+
+  const startTaskTimer = (task: Task) => {
+    buttonPress();
+    const totalSeconds = task.duration * 60;
+    timerTaskIdRef.current = task.id;
+    timerTotalRef.current = totalSeconds;
+    timerEndRef.current = Date.now() + totalSeconds * 1000;
+    setTimerTaskId(task.id);
+    setTimerTotal(totalSeconds);
+    setTimerRemaining(totalSeconds);
+    setTimerRunning(true);
+  };
+
+  const toggleTimerPause = () => {
+    buttonPress();
+    if (timerRunning) {
+      stopTimerInterval();
+      setTimerRunning(false);
+    } else {
+      timerEndRef.current = Date.now() + timerRemaining * 1000;
+      setTimerRunning(true);
+    }
+  };
+
+  const cancelTimer = () => {
+    buttonPress();
+    stopTimerInterval();
+    timerEndRef.current = 0;
+    timerTaskIdRef.current = null;
+    setTimerTaskId(null);
+    setTimerRunning(false);
+    setTimerRemaining(0);
+    setTimerTotal(0);
+  };
+
+  const handleTaskPress = useCallback((id: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+
+    if (task.completed) {
+      void applyCompletion(id, false);
+      return;
+    }
+    if (timerTaskId && timerTaskId !== id) return; // one timer at a time
+    if (timerTaskId === id) { toggleTimerPause(); return; }
+    startTaskTimer(task);
+  }, [tasks, timerTaskId, timerRunning, timerRemaining, applyCompletion]);
 
   const triggerTrophy = async () => {
     await allComplete();
@@ -333,6 +506,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange }) => {
 
   // ── Edit duration (long press) ───────────────────────────────────────────────
   const handleLongPress = (id: string) => {
+    if (id === timerTaskId) return; // duration is locked in once a timer is running
     const task = tasks.find(t => t.id === id);
     if (!task) return;
     setEditingTask(task);
@@ -392,6 +566,15 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange }) => {
           </View>
         </View>
       </Animated.View>
+
+      {/* ── Exam countdowns ────────────────────────────────────────────────── */}
+      {!viewingPast && (examTypes.length > 0) && (
+        <View style={styles.countdownStack}>
+          <UCEEDCountdown examTypes={examTypes} />
+          <NIDCountdown examTypes={examTypes} />
+          <NIFTCountdown examTypes={examTypes} />
+        </View>
+      )}
 
       {/* ── Date Strip ─────────────────────────────────────────────────────── */}
       <View style={styles.dateStripWrapper}>
@@ -463,32 +646,64 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange }) => {
         </View>
 
         {!viewingPast && (
-          <Text style={styles.longPressHint}>Long-press any task to edit its duration</Text>
+          <>
+            <Text style={styles.longPressHint}>Long-press any task to edit its duration</Text>
+            <View style={styles.filterRow}>
+              {(['all', 'todo', 'done'] as const).map(f => (
+                <TouchableOpacity
+                  key={f}
+                  style={[styles.filterChip, filter === f && styles.filterChipActive]}
+                  onPress={() => { setFilter(f); buttonPress(); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.filterChipText, filter === f && styles.filterChipTextActive]}>
+                    {f === 'all' ? 'All' : f === 'todo' ? 'To do' : 'Done'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
         )}
 
-        {displayTasks.length === 0 ? (
+        {filteredTasks.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>{viewingPast ? '📅' : '📋'}</Text>
+            <Text style={styles.emptyEmoji}>{viewingPast ? '📅' : filter === 'done' ? '✅' : '📋'}</Text>
             <Text style={styles.emptyTitle}>
-              {viewingPast ? 'No tasks recorded' : 'No tasks yet'}
+              {viewingPast ? 'No tasks recorded'
+                : filter === 'done' ? 'Nothing done yet'
+                : filter === 'todo' ? 'All caught up'
+                : 'No tasks yet'}
             </Text>
             <Text style={styles.emptyDesc}>
-              {viewingPast
-                ? 'No study session was recorded for this day.'
+              {viewingPast ? 'No study session was recorded for this day.'
+                : filter === 'done' ? 'Complete a task and it will show up here.'
+                : filter === 'todo' ? 'Every task is done — nice.'
                 : 'Tap "+ Add Task" to build your study plan.'}
             </Text>
           </View>
         ) : (
-          displayTasks.map((task, index) => (
-            <TaskItem
-              key={task.id}
-              task={task}
-              onToggle={viewingPast ? undefined : handleToggle}
-              onDelete={(!viewingPast && task.isCustom) ? handleDelete : undefined}
-              onLongPress={viewingPast ? undefined : handleLongPress}
-              readOnly={viewingPast}
-              index={index}
-            />
+          filteredTasks.map((task, index) => (
+            task.id === timerTaskId ? (
+              <ActiveTimerRow
+                key={task.id}
+                task={task}
+                remaining={timerRemaining}
+                total={timerTotal}
+                running={timerRunning}
+                onTogglePause={toggleTimerPause}
+                onCancel={cancelTimer}
+              />
+            ) : (
+              <TaskItem
+                key={task.id}
+                task={task}
+                onToggle={viewingPast ? undefined : handleTaskPress}
+                onDelete={(!viewingPast && task.isCustom) ? handleDelete : undefined}
+                onLongPress={viewingPast ? undefined : handleLongPress}
+                readOnly={viewingPast}
+                index={index}
+              />
+            )
           ))
         )}
 
@@ -722,7 +937,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   listTitle: { ...Typography.headlineSmall, color: Colors.textPrimary, flex: 1, marginRight: Spacing.sm },
-  longPressHint: { ...Typography.bodySmall, color: Colors.textMuted, marginBottom: Spacing.md },
+  longPressHint: { ...Typography.bodySmall, color: Colors.textMuted, marginBottom: Spacing.sm },
+  countdownStack: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm, gap: Spacing.sm },
+  filterRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
+  filterChip: {
+    paddingHorizontal: Spacing.md, paddingVertical: 6,
+    borderRadius: BorderRadius.full, backgroundColor: Colors.surface,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  filterChipActive: { backgroundColor: Colors.primaryGlow, borderColor: Colors.primary },
+  filterChipText: { ...Typography.labelSmall, color: Colors.textSecondary },
+  filterChipTextActive: { color: Colors.primaryLight },
   addBtn: { borderRadius: BorderRadius.sm, overflow: 'hidden' },
   addBtnGradient: { paddingHorizontal: Spacing.md, paddingVertical: 8 },
   addBtnText: { ...Typography.labelLarge, color: '#fff', fontSize: 13 },

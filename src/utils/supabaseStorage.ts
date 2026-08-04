@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
-import { AppState, UserProfile } from './storage';
+import { AppState, UserProfile, computeLifetimeConsistency } from './storage';
 
 // ── Types for the user_data row ──────────────────────────────────────────────
 interface UserDataRow {
@@ -175,5 +175,44 @@ export async function checkUserExists(userId: string): Promise<boolean> {
   } catch (err) {
     console.error('[supabaseStorage] checkUserExists exception:', err);
     return false;
+  }
+}
+
+// ── Leaderboard: every user's public-facing row ──────────────────────────────
+export interface CloudLeaderboardRow {
+  id: string;
+  name: string;
+  avatar: string;
+  exams: string[];
+  streak: number;
+  consistency: number;
+  tasksCompleted: number;
+}
+
+export async function loadLeaderboard(): Promise<CloudLeaderboardRow[]> {
+  try {
+    const { data, error } = await supabase
+      .from('user_data')
+      .select('id, name, avatar, exams, streak, history, total_tasks_completed')
+      .order('streak', { ascending: false })
+      .limit(100);
+
+    if (error || !data) {
+      if (error) console.error('[supabaseStorage] loadLeaderboard error:', error.message);
+      return [];
+    }
+
+    return (data as UserDataRow[]).map(row => ({
+      id: row.id,
+      name: row.name || 'Anonymous',
+      avatar: row.avatar || '⭐',
+      exams: Array.isArray(row.exams) ? row.exams : [],
+      streak: row.streak ?? 0,
+      consistency: computeLifetimeConsistency(Array.isArray(row.history) ? row.history : []),
+      tasksCompleted: row.total_tasks_completed ?? 0,
+    }));
+  } catch (err) {
+    console.error('[supabaseStorage] loadLeaderboard exception:', err);
+    return [];
   }
 }

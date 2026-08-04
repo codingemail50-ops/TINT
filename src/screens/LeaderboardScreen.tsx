@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity } from '
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
-import { MOCK_LEADERBOARD, LeaderboardEntry } from '../data/leaderboard';
+import { LeaderboardEntry } from '../data/leaderboard';
 import { LeaderboardCard } from '../components/LeaderboardCard';
 import { AppState } from '../utils/storage';
 import { ExamType } from '../data/examPresets';
+import { loadLeaderboard, CloudLeaderboardRow } from '../utils/supabaseStorage';
 
-interface Props { appState: AppState }
+interface Props { appState: AppState; userId?: string }
 
 const EXAM_TABS: { id: ExamType; emoji: string; label: string; color: string }[] = [
   { id: 'JEE',   emoji: '⚡', label: 'JEE',   color: '#3B82F6' },
@@ -17,7 +18,7 @@ const EXAM_TABS: { id: ExamType; emoji: string; label: string; color: string }[]
   { id: 'NIFT',  emoji: '👗', label: 'NIFT',  color: '#F59E0B' },
 ];
 
-export const LeaderboardScreen: React.FC<Props> = ({ appState }) => {
+export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
   const headerAnim = useRef(new Animated.Value(0)).current;
   const podiumAnim = useRef(new Animated.Value(0)).current;
 
@@ -29,12 +30,17 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState }) => {
     examTypes.length > 0 ? examTypes[0] : 'JEE'
   );
 
+  const [cloudRows, setCloudRows] = useState<CloudLeaderboardRow[]>([]);
+  useEffect(() => {
+    loadLeaderboard().then(setCloudRows);
+  }, []);
+
   const userConsistency = appState.history.length > 0
     ? Math.round(appState.history.reduce((s, h) => s + h.consistency, 0) / appState.history.length)
     : 0;
 
   const userEntry: LeaderboardEntry = {
-    id: 'me',
+    id: userId ?? 'me',
     name: user?.name ?? 'You',
     streak: appState.streak,
     consistency: userConsistency,
@@ -45,7 +51,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState }) => {
   };
 
   // Build tab-filtered leaderboard
-  const tabList = buildTabLeaderboard(activeExam, userEntry, examTypes);
+  const tabList = buildTabLeaderboard(activeExam, cloudRows, userId, userEntry, examTypes);
 
   const top3     = tabList.slice(0, 3);
   const userRank = tabList.findIndex(e => e.isCurrentUser) + 1;
@@ -202,13 +208,29 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState }) => {
 
 function buildTabLeaderboard(
   activeExam: ExamType,
+  cloudRows: CloudLeaderboardRow[],
+  userId: string | undefined,
   userEntry: LeaderboardEntry,
   userExamTypes: ExamType[],
 ): (LeaderboardEntry & { _rank: number })[] {
-  const filtered = MOCK_LEADERBOARD.filter(e => e.examType === activeExam);
-  const withUser = userExamTypes.includes(activeExam)
+  const filtered: LeaderboardEntry[] = cloudRows
+    .filter(r => (r.exams as ExamType[]).includes(activeExam))
+    .map(r => ({
+      id: r.id,
+      name: r.name,
+      streak: r.streak,
+      consistency: r.consistency,
+      tasksCompleted: r.tasksCompleted,
+      avatar: r.avatar,
+      examType: activeExam,
+      isCurrentUser: !!userId && r.id === userId,
+    }));
+
+  const hasUser = filtered.some(e => e.isCurrentUser);
+  const withUser = (!hasUser && userExamTypes.includes(activeExam))
     ? [...filtered, userEntry]
     : filtered;
+
   return withUser
     .sort((a, b) => b.consistency - a.consistency || b.streak - a.streak)
     .map((e, i) => ({ ...e, _rank: i + 1 }));
