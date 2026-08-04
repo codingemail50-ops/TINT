@@ -136,6 +136,25 @@ export async function syncAppStateToSupabase(
   }
 }
 
+// ── Sync the focus log to Supabase (update existing row's focus_log jsonb) ──
+export async function syncFocusLog(
+  userId: string,
+  focusLog: { date: string; mins: number }[]
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('user_data')
+      .update({ focus_log: focusLog })
+      .eq('id', userId);
+
+    if (error) {
+      console.error('[supabaseStorage] syncFocusLog error:', error.message);
+    }
+  } catch (err) {
+    console.error('[supabaseStorage] syncFocusLog exception:', err);
+  }
+}
+
 // ── Check whether a user row already exists in Supabase ─────────────────────
 export async function checkUserExists(userId: string): Promise<boolean> {
   try {
