@@ -81,22 +81,62 @@ export const StorageService = {
     else state.history.push(dayRecord);
     state.history = state.history.slice(-60);
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toDateString();
-
-    if (consistency >= 50) {
-      if (state.lastActiveDate === yesterdayStr) state.streak += 1;
-      else if (state.lastActiveDate !== today) state.streak = 1;
-      state.lastActiveDate = today;
-    }
-
+    state.streak = computeStreak(state.history);
+    state.lastActiveDate = today;
     state.longestStreak = Math.max(state.longestStreak, state.streak);
     state.totalTasksCompleted += completed;
     await this.saveAppState(state);
     return state;
   },
 };
+
+// Streak = consecutive all-tasks-done days counting back from today, walking
+// through a 2-day grace window (missing 1-2 days in a row doesn't break it —
+// only a 3rd consecutive missed day resets the streak to 0). Today itself is
+// skipped while still in progress so an unfinished "today" never breaks
+// yesterday's streak.
+export function computeStreak(history: DayRecord[]): number {
+  if (history.length === 0) return 0;
+
+  const byDate = new Map(history.map(h => [h.date, h]));
+  const today = new Date().toDateString();
+  const cursor = new Date();
+
+  let streak = 0;
+  let consecutiveMissed = 0;
+
+  for (let i = 0; i < 400; i++) {
+    const dateStr = cursor.toDateString();
+    const entry = byDate.get(dateStr);
+    const allDone = !!entry && entry.totalCount > 0 && entry.completedCount === entry.totalCount;
+
+    if (dateStr === today && !allDone) {
+      cursor.setDate(cursor.getDate() - 1);
+      continue;
+    }
+
+    if (allDone) {
+      streak++;
+      consecutiveMissed = 0;
+    } else {
+      consecutiveMissed++;
+      if (consecutiveMissed >= 3) break;
+    }
+
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return streak;
+}
+
+// Lifetime % of logged days that were fully completed — used for the
+// leaderboard's consistency score (distinct from a single day's % or the
+// 7-day rolling average shown on the Progress screen).
+export function computeLifetimeConsistency(history: DayRecord[]): number {
+  if (history.length === 0) return 0;
+  const allDoneCount = history.filter(h => h.totalCount > 0 && h.completedCount === h.totalCount).length;
+  return Math.round((allDoneCount / history.length) * 100);
+}
 
 export function getConsistencyData(history: DayRecord[]): { day: string; value: number; date: string }[] {
   const last7: { day: string; value: number; date: string }[] = [];
