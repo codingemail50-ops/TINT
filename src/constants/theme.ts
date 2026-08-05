@@ -1,23 +1,23 @@
-// Dark ground with a soft lavender accent and muted pastel category tags —
-// bold condensed headlines for hero moments, rounded flat cards everywhere else.
+// Flat black-and-white palette — one warm accent reserved for the flame/streak,
+// everything else is white/grey/black. No gradients, no glow.
 export const Colors = {
   background: '#0A0A0A',
-  surface: '#151515',
-  surfaceElevated: '#1A1A1A',
-  border: '#262626',
+  surface: '#141414',
+  surfaceElevated: '#1C1C1C',
+  border: '#2A2A2A',
 
-  primary: '#C4A7E8',
-  primaryLight: '#D8C4F0',
-  primaryGlow: 'rgba(196, 167, 232, 0.16)',
+  primary: '#FFFFFF',
+  primaryLight: '#E8E8E8',
+  primaryGlow: 'rgba(255, 255, 255, 0.08)',
 
-  accent: '#C4A7E8',
-  accentLight: '#D8C4F0',
-  accentGlow: 'rgba(196, 167, 232, 0.16)',
+  accent: '#FFFFFF',
+  accentLight: '#E8E8E8',
+  accentGlow: 'rgba(255, 255, 255, 0.08)',
 
   success: '#4ADE80',
-  successGlow: 'rgba(74, 222, 128, 0.14)',
+  successGlow: 'rgba(74, 222, 128, 0.12)',
   danger: '#F87171',
-  dangerGlow: 'rgba(248, 113, 113, 0.14)',
+  dangerGlow: 'rgba(248, 113, 113, 0.12)',
 
   textPrimary: '#FFFFFF',
   textSecondary: '#9B9B9B',
@@ -25,7 +25,7 @@ export const Colors = {
 
   gradientPurple: ['#1C1C1C', '#0A0A0A'] as string[],
   gradientFire: ['#F97316', '#EF4444'] as string[],
-  gradientDark: ['#151515', '#0A0A0A'] as string[],
+  gradientDark: ['#141414', '#0A0A0A'] as string[],
   gradientSuccess: ['#4ADE80', '#22C55E'] as string[],
 
   streakColors: {
@@ -35,25 +35,6 @@ export const Colors = {
     blazing: '#EF4444',
   },
 };
-
-// Muted pastel tags for task/goal categories — cycled deterministically per
-// category name so the same category always lands on the same color.
-export const CategoryPalette = [
-  '#D9C2EC', // lavender
-  '#B8C4EA', // periwinkle
-  '#B8DCEA', // sky
-  '#B8E8D0', // mint
-  '#F0CFC0', // peach
-  '#F0E0B8', // sand
-];
-
-export function getCategoryColor(category: string): string {
-  let hash = 0;
-  for (let i = 0; i < category.length; i++) {
-    hash = (hash * 31 + category.charCodeAt(i)) >>> 0;
-  }
-  return CategoryPalette[hash % CategoryPalette.length];
-}
 
 export const Spacing = {
   xs: 4,
@@ -67,15 +48,15 @@ export const Spacing = {
 
 export const BorderRadius = {
   sm: 8,
-  md: 14,
-  lg: 20,
-  xl: 28,
+  md: 12,
+  lg: 16,
+  xl: 24,
   full: 9999,
 };
 
 export const Typography = {
-  displayLarge: { fontSize: 40, fontWeight: '800' as const, letterSpacing: -1 },
-  displayMedium: { fontSize: 30, fontWeight: '800' as const, letterSpacing: -0.5 },
+  displayLarge: { fontSize: 36, fontWeight: '800' as const, letterSpacing: -1 },
+  displayMedium: { fontSize: 28, fontWeight: '800' as const, letterSpacing: -0.5 },
   headlineLarge: { fontSize: 24, fontWeight: '700' as const, letterSpacing: -0.3 },
   headlineMedium: { fontSize: 20, fontWeight: '700' as const },
   headlineSmall: { fontSize: 18, fontWeight: '600' as const },

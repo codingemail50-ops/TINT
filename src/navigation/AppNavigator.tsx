@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/theme';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { Colors, Typography } from '../constants/theme';
+import { SplashScreen } from '../screens/SplashScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { TodoScreen } from '../screens/TodoScreen';
 import { FocusScreen } from '../screens/FocusScreen';
@@ -35,17 +35,17 @@ async function ensureSession(): Promise<string | null> {
   }
 }
 
-type Screen = 'boot' | 'onboarding' | 'todo' | 'focus' | 'productivity' | 'leaderboard';
+type Screen = 'splash' | 'onboarding' | 'todo' | 'focus' | 'productivity' | 'leaderboard';
 
 const TAB_CONFIG = [
-  { id: 'todo' as Screen, icon: 'home' as const },
-  { id: 'focus' as Screen, icon: 'flash' as const },
-  { id: 'productivity' as Screen, icon: 'stats-chart' as const },
-  { id: 'leaderboard' as Screen, icon: 'trophy' as const },
+  { id: 'todo' as Screen, label: 'Today', icon: '📋' },
+  { id: 'focus' as Screen, label: 'Focus', icon: '⚡' },
+  { id: 'productivity' as Screen, label: 'Progress', icon: '📊' },
+  { id: 'leaderboard' as Screen, label: 'Rank', icon: '🏆' },
 ];
 
 export const AppNavigator: React.FC = () => {
-  const [screen, setScreen] = useState<Screen>('boot');
+  const [screen, setScreen] = useState<Screen>('splash');
   const [appState, setAppState] = useState<AppState>({
     user: null,
     streak: 0,
@@ -58,8 +58,7 @@ export const AppNavigator: React.FC = () => {
   const tabFadeAnim = useRef(new Animated.Value(0)).current;
   const userIdRef = useRef<string | null>(null);
 
-  // No splash animation — resolve session/local state directly on mount.
-  useEffect(() => {
+  const handleSplashFinish = (_hasUser: boolean) => {
     void (async () => {
       const userId = await ensureSession();
       userIdRef.current = userId;
@@ -72,7 +71,7 @@ export const AppNavigator: React.FC = () => {
             setAppState(loaded);
             setShowTabs(true);
             setScreen('todo');
-            Animated.timing(tabFadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+            Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
             return;
           }
         }
@@ -87,12 +86,12 @@ export const AppNavigator: React.FC = () => {
         if (userId) void saveNewUserToSupabase(userId, '', user);
         setShowTabs(true);
         setScreen('todo');
-        Animated.timing(tabFadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+        Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
       } else {
         setScreen('onboarding');
       }
     })();
-  }, []);
+  };
 
   const handleOnboardingComplete = () => {
     StorageService.getAppState().then(async state => {
@@ -124,6 +123,7 @@ export const AppNavigator: React.FC = () => {
 
   return (
     <View style={styles.root}>
+      {screen === 'splash' && <SplashScreen onFinish={handleSplashFinish} />}
       {screen === 'onboarding' && <OnboardingScreen onComplete={handleOnboardingComplete} />}
       {screen === 'todo' && <TodoScreen appState={appState} onStateChange={handleStateChange} userId={userIdRef.current ?? undefined} />}
       {screen === 'focus' && <FocusScreen userId={userIdRef.current ?? undefined} />}
@@ -137,16 +137,17 @@ export const AppNavigator: React.FC = () => {
             return (
               <TouchableOpacity
                 key={tab.id}
-                testID={`tab-${tab.id}`}
                 style={styles.tabItem}
                 onPress={() => navigateTo(tab.id)}
                 activeOpacity={0.7}
               >
-                <Ionicons
-                  name={isActive ? tab.icon : (`${tab.icon}-outline` as any)}
-                  size={24}
-                  color={isActive ? Colors.primary : Colors.textMuted}
-                />
+                <View style={[styles.tabIconContainer, isActive && styles.tabIconActive]}>
+                  <Text style={styles.tabIcon}>{tab.icon}</Text>
+                </View>
+                <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+                  {tab.label}
+                </Text>
+                {isActive && <View style={styles.tabDot} />}
               </TouchableOpacity>
             );
           })}
@@ -171,11 +172,40 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     paddingBottom: 28,
-    paddingTop: 16,
+    paddingTop: 12,
     paddingHorizontal: 16,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
+    gap: 3,
+  },
+  tabIconContainer: {
+    width: 40,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+  },
+  tabIconActive: {
+    backgroundColor: Colors.primaryGlow,
+  },
+  tabIcon: {
+    fontSize: 20,
+  },
+  tabLabel: {
+    ...Typography.labelSmall,
+    color: Colors.textMuted,
+    fontSize: 10,
+    letterSpacing: 0.5,
+  },
+  tabLabelActive: {
+    color: Colors.primaryLight,
+  },
+  tabDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.primary,
   },
 });

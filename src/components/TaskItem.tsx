@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { Colors, Spacing, BorderRadius, Typography, getCategoryColor } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { Task } from '../data/examPresets';
 
 interface Props {
@@ -30,7 +30,7 @@ export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPres
     Animated.spring(checkAnim, { toValue: task.completed ? 1 : 0, useNativeDriver: true }).start();
   }, [task.completed]);
 
-  const catColor = getCategoryColor(task.category);
+  const catColor = Colors.textSecondary;
   const hours = Math.floor(task.duration / 60);
   const mins  = task.duration % 60;
   const durationLabel = hours > 0 ? `${hours}h${mins > 0 ? ` ${mins}m` : ''}` : `${mins}m`;
@@ -71,7 +71,7 @@ export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPres
             {task.repeat && !readOnly && <Text style={styles.repeatBadge}> ↺</Text>}
           </Text>
           <View style={styles.meta}>
-            <View style={[styles.categoryBadge, { backgroundColor: catColor }]}>
+            <View style={styles.categoryBadge}>
               <Text style={styles.categoryText}>{task.category}</Text>
             </View>
             <Text style={styles.duration}>⏱ {durationLabel}</Text>
@@ -123,10 +123,11 @@ const styles = StyleSheet.create({
   repeatBadge: { color: Colors.accent, fontSize: 13 },
   meta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   categoryBadge: {
-    paddingHorizontal: 9, paddingVertical: 3,
-    borderRadius: BorderRadius.full,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: BorderRadius.sm, borderWidth: 1,
+    borderColor: Colors.border, backgroundColor: Colors.surface,
   },
-  categoryText: { ...Typography.labelSmall, fontSize: 10, color: '#1A1A1A', fontWeight: '700' },
+  categoryText: { ...Typography.labelSmall, fontSize: 10, color: Colors.textSecondary },
   duration: { ...Typography.bodySmall, color: Colors.textSecondary },
   deleteBtn: {
     width: 28, height: 28,

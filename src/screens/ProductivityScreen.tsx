@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     marginHorizontal: -Spacing.xl, paddingHorizontal: Spacing.xl,
   },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  screenTitle: { fontSize: 32, fontWeight: '800', color: Colors.primary, letterSpacing: -0.8 },
+  screenTitle: { fontSize: 28, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
   screenSub:   { ...Typography.bodyMedium, color: Colors.textSecondary, marginTop: 4 },
 
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.md },

@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 56, paddingBottom: Spacing.xxxl },
 
-  title: { ...Typography.displayMedium, color: Colors.primary },
+  title: { ...Typography.displayMedium, color: Colors.textPrimary },
   subtitle: { ...Typography.bodyMedium, color: Colors.textSecondary, marginTop: 4, marginBottom: Spacing.xl },
 
   section: { marginBottom: Spacing.lg },
