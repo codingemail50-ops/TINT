@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Animated, Modal, KeyboardAvoidingView,
+  TextInput, Animated, Easing, Modal, KeyboardAvoidingView,
   Platform, TouchableWithoutFeedback, Keyboard,
   AppState as RNAppState, AppStateStatus,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Typography, getCategoryColor } from '../constants/theme';
 import { Task, getCombinedPreset, ExamType } from '../data/examPresets';
 import { StorageService, AppState } from '../utils/storage';
 import { TaskItem } from '../components/TaskItem';
@@ -162,7 +162,7 @@ const sliderSt = StyleSheet.create({
   presetTextActive: { color: Colors.primary },
 });
 
-// ── Active per-task timer row ────────────────────────────────────────────────
+// ── Active per-task timer row — water drains out as time runs down ──────────
 const ActiveTimerRow: React.FC<{
   task: Task;
   remaining: number;
@@ -171,19 +171,50 @@ const ActiveTimerRow: React.FC<{
   onTogglePause: () => void;
   onCancel: () => void;
 }> = ({ task, remaining, total, running, onTogglePause, onCancel }) => {
-  const pct = total > 0 ? (total - remaining) / total : 0;
+  const fillPct = total > 0 ? remaining / total : 0; // starts full (1), drains to empty (0)
   const mins = Math.floor(remaining / 60).toString().padStart(2, '0');
   const secs = (remaining % 60).toString().padStart(2, '0');
 
+  const waterAnim = useRef(new Animated.Value(fillPct)).current;
+  const rippleAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(waterAnim, {
+      toValue: fillPct,
+      duration: 950,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
+  }, [fillPct]);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(rippleAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(rippleAnim, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
   return (
     <View style={timerRowSt.container}>
-      <TouchableOpacity style={timerRowSt.main} onPress={onTogglePause} activeOpacity={0.8}>
+      <TouchableOpacity style={timerRowSt.main} onPress={onTogglePause} activeOpacity={0.85}>
+        <View style={timerRowSt.waterTrack} pointerEvents="none">
+          <Animated.View style={[timerRowSt.waterFill, {
+            height: waterAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+            opacity: running ? 1 : 0.55,
+          }]}>
+            <Animated.View style={[timerRowSt.waterSurface, {
+              transform: [{ translateX: rippleAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 8] }) }],
+            }]} />
+          </Animated.View>
+        </View>
+
         <View style={timerRowSt.headerRow}>
           <Text style={timerRowSt.title} numberOfLines={1}>{task.title}</Text>
           <Text style={timerRowSt.time}>{mins}:{secs}</Text>
-        </View>
-        <View style={timerRowSt.track}>
-          <View style={[timerRowSt.fill, { width: `${pct * 100}%` as any }, !running && timerRowSt.fillPaused]} />
         </View>
         <Text style={timerRowSt.hint}>{running ? 'Tap to pause' : 'Paused — tap to resume'}</Text>
       </TouchableOpacity>
@@ -202,15 +233,16 @@ const timerRowSt = StyleSheet.create({
   container: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
     backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md,
-    borderWidth: 1, borderColor: Colors.primary, padding: Spacing.md, marginBottom: Spacing.sm,
+    borderWidth: 1, borderColor: Colors.primary, marginBottom: Spacing.sm,
+    overflow: 'hidden', padding: Spacing.xs,
   },
-  main: { flex: 1, gap: 6 },
+  main: { flex: 1, gap: 6, padding: Spacing.sm, position: 'relative', overflow: 'hidden', borderRadius: BorderRadius.sm },
+  waterTrack: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' },
+  waterFill: { width: '100%', backgroundColor: Colors.water + '4D' },
+  waterSurface: { height: 2, width: '112%', marginLeft: '-6%', backgroundColor: Colors.waterSurface },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.sm },
   title: { ...Typography.bodyLarge, color: Colors.textPrimary, fontWeight: '600', flex: 1 },
   time: { fontSize: 18, fontWeight: '800', color: Colors.primary, fontVariant: ['tabular-nums'] },
-  track: { height: 5, backgroundColor: Colors.border, borderRadius: 3, overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 3 },
-  fillPaused: { backgroundColor: Colors.accent },
   hint: { ...Typography.labelSmall, color: Colors.textMuted, fontSize: 10 },
   cancelBtn: {
     paddingHorizontal: Spacing.sm, paddingVertical: 6,
@@ -227,6 +259,16 @@ interface Props {
 }
 
 const todayStr = new Date().toDateString();
+
+function groupByCategory(list: Task[]): { category: string; tasks: Task[] }[] {
+  const order: string[] = [];
+  const map = new Map<string, Task[]>();
+  for (const t of list) {
+    if (!map.has(t.category)) { map.set(t.category, []); order.push(t.category); }
+    map.get(t.category)!.push(t);
+  }
+  return order.map(category => ({ category, tasks: map.get(category)! }));
+}
 
 function buildDateStrip(history: AppState['history']) {
   const items: { dateStr: string; dayLetter: string; dayNum: number; isToday: boolean; consistency: number }[] = [];
@@ -679,29 +721,47 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
                 : 'Tap "+ Add Task" to build your study plan.'}
             </Text>
           </View>
-        ) : (
+        ) : viewingPast ? (
           filteredTasks.map((task, index) => (
-            task.id === timerTaskId ? (
-              <ActiveTimerRow
-                key={task.id}
-                task={task}
-                remaining={timerRemaining}
-                total={timerTotal}
-                running={timerRunning}
-                onTogglePause={toggleTimerPause}
-                onCancel={cancelTimer}
-              />
-            ) : (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onToggle={viewingPast ? undefined : handleTaskPress}
-                onDelete={(!viewingPast && task.isCustom) ? handleDelete : undefined}
-                onLongPress={viewingPast ? undefined : handleLongPress}
-                readOnly={viewingPast}
-                index={index}
-              />
-            )
+            <TaskItem
+              key={task.id}
+              task={task}
+              readOnly
+              index={index}
+            />
+          ))
+        ) : (
+          groupByCategory(filteredTasks).map(group => (
+            <View key={group.category} style={styles.categoryGroup}>
+              <View style={[styles.categoryHeader, { backgroundColor: getCategoryColor(group.category) }]}>
+                <Text style={styles.categoryHeaderText}>{group.category}</Text>
+                <Text style={styles.categoryHeaderCount}>{group.tasks.filter(t => t.completed).length}/{group.tasks.length}</Text>
+              </View>
+              <View style={styles.categoryBody}>
+                {group.tasks.map((task, index) => (
+                  task.id === timerTaskId ? (
+                    <ActiveTimerRow
+                      key={task.id}
+                      task={task}
+                      remaining={timerRemaining}
+                      total={timerTotal}
+                      running={timerRunning}
+                      onTogglePause={toggleTimerPause}
+                      onCancel={cancelTimer}
+                    />
+                  ) : (
+                    <TaskItem
+                      key={task.id}
+                      task={task}
+                      onToggle={handleTaskPress}
+                      onDelete={task.isCustom ? handleDelete : undefined}
+                      onLongPress={handleLongPress}
+                      index={index}
+                    />
+                  )
+                ))}
+              </View>
+            </View>
           ))
         )}
 
@@ -939,6 +999,21 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: Colors.primaryGlow, borderColor: Colors.primary },
   filterChipText: { ...Typography.labelSmall, color: Colors.textSecondary },
   filterChipTextActive: { color: Colors.primaryLight },
+
+  categoryGroup: {
+    borderRadius: BorderRadius.lg, overflow: 'hidden',
+    marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.border,
+  },
+  categoryHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: Spacing.md, paddingVertical: 10,
+  },
+  categoryHeaderText: {
+    fontSize: 13, fontWeight: '800', color: '#1A1A1A',
+    letterSpacing: 0.4, textTransform: 'uppercase',
+  },
+  categoryHeaderCount: { fontSize: 12, fontWeight: '700', color: '#1A1A1A99' },
+  categoryBody: { backgroundColor: Colors.surface, padding: Spacing.sm, gap: Spacing.xs },
   addBtn: { borderRadius: BorderRadius.sm, overflow: 'hidden' },
   addBtnGradient: { paddingHorizontal: Spacing.md, paddingVertical: 8, backgroundColor: Colors.primary },
   addBtnText: { ...Typography.labelLarge, color: '#000', fontSize: 13 },

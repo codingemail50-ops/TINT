@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Colors, Typography } from '../constants/theme';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
+import { HomeScreen } from '../screens/HomeScreen';
 import { TodoScreen } from '../screens/TodoScreen';
 import { FocusScreen } from '../screens/FocusScreen';
 import { ProductivityScreen } from '../screens/ProductivityScreen';
@@ -34,9 +35,10 @@ async function ensureSession(): Promise<string | null> {
   }
 }
 
-type Screen = 'boot' | 'onboarding' | 'todo' | 'focus' | 'productivity' | 'leaderboard';
+type Screen = 'boot' | 'onboarding' | 'home' | 'todo' | 'focus' | 'productivity' | 'leaderboard';
 
 const TAB_CONFIG = [
+  { id: 'home' as Screen, label: 'Home', icon: '🏠' },
   { id: 'todo' as Screen, label: 'Today', icon: '📋' },
   { id: 'focus' as Screen, label: 'Focus', icon: '⚡' },
   { id: 'productivity' as Screen, label: 'Progress', icon: '📊' },
@@ -70,7 +72,7 @@ export const AppNavigator: React.FC = () => {
           if (loaded) {
             setAppState(loaded);
             setShowTabs(true);
-            setScreen('todo');
+            setScreen('home');
             Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
             return;
           }
@@ -85,7 +87,7 @@ export const AppNavigator: React.FC = () => {
         // Existing local user with no cloud row yet (e.g. was offline before) — push it up now
         if (userId) void saveNewUserToSupabase(userId, '', user);
         setShowTabs(true);
-        setScreen('todo');
+        setScreen('home');
         Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
       } else {
         setScreen('onboarding');
@@ -97,7 +99,7 @@ export const AppNavigator: React.FC = () => {
     StorageService.getAppState().then(async state => {
       setAppState(state);
       setShowTabs(true);
-      setScreen('todo');
+      setScreen('home');
       Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
 
       if (!userIdRef.current) {
@@ -124,6 +126,7 @@ export const AppNavigator: React.FC = () => {
   return (
     <View style={styles.root}>
       {screen === 'onboarding' && <OnboardingScreen onComplete={handleOnboardingComplete} />}
+      {screen === 'home' && <HomeScreen appState={appState} />}
       {screen === 'todo' && <TodoScreen appState={appState} onStateChange={handleStateChange} userId={userIdRef.current ?? undefined} />}
       {screen === 'focus' && <FocusScreen userId={userIdRef.current ?? undefined} />}
       {screen === 'productivity' && <ProductivityScreen appState={appState} />}
