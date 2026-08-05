@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { Colors, Typography } from '../constants/theme';
-import { SplashScreen } from '../screens/SplashScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { TodoScreen } from '../screens/TodoScreen';
 import { FocusScreen } from '../screens/FocusScreen';
@@ -35,7 +34,7 @@ async function ensureSession(): Promise<string | null> {
   }
 }
 
-type Screen = 'splash' | 'onboarding' | 'todo' | 'focus' | 'productivity' | 'leaderboard';
+type Screen = 'boot' | 'onboarding' | 'todo' | 'focus' | 'productivity' | 'leaderboard';
 
 const TAB_CONFIG = [
   { id: 'todo' as Screen, label: 'Today', icon: '📋' },
@@ -45,7 +44,7 @@ const TAB_CONFIG = [
 ];
 
 export const AppNavigator: React.FC = () => {
-  const [screen, setScreen] = useState<Screen>('splash');
+  const [screen, setScreen] = useState<Screen>('boot');
   const [appState, setAppState] = useState<AppState>({
     user: null,
     streak: 0,
@@ -58,7 +57,8 @@ export const AppNavigator: React.FC = () => {
   const tabFadeAnim = useRef(new Animated.Value(0)).current;
   const userIdRef = useRef<string | null>(null);
 
-  const handleSplashFinish = (_hasUser: boolean) => {
+  // No splash animation — resolve session/local state directly on mount.
+  useEffect(() => {
     void (async () => {
       const userId = await ensureSession();
       userIdRef.current = userId;
@@ -91,7 +91,7 @@ export const AppNavigator: React.FC = () => {
         setScreen('onboarding');
       }
     })();
-  };
+  }, []);
 
   const handleOnboardingComplete = () => {
     StorageService.getAppState().then(async state => {
@@ -123,7 +123,6 @@ export const AppNavigator: React.FC = () => {
 
   return (
     <View style={styles.root}>
-      {screen === 'splash' && <SplashScreen onFinish={handleSplashFinish} />}
       {screen === 'onboarding' && <OnboardingScreen onComplete={handleOnboardingComplete} />}
       {screen === 'todo' && <TodoScreen appState={appState} onStateChange={handleStateChange} userId={userIdRef.current ?? undefined} />}
       {screen === 'focus' && <FocusScreen userId={userIdRef.current ?? undefined} />}
