@@ -11,11 +11,11 @@ export interface Task {
   repeat?: boolean;
 }
 
-export const EXAM_TYPES: { id: ExamType; label: string; emoji: string; description: string; color: string }[] = [
-  { id: 'JEE',   label: 'JEE',   emoji: '⚡', description: 'Joint Entrance Exam — Mains & Advanced', color: '#3B82F6' },
-  { id: 'UCEED', label: 'UCEED', emoji: '✏️', description: 'Undergraduate Common Entrance Exam for Design', color: '#8B5CF6' },
-  { id: 'NID',   label: 'NID',   emoji: '🎨', description: 'National Institute of Design Entrance', color: '#EC4899' },
-  { id: 'NIFT',  label: 'NIFT',  emoji: '👗', description: 'National Institute of Fashion Technology', color: '#F59E0B' },
+export const EXAM_TYPES: { id: ExamType; label: string; icon: string; description: string; color: string }[] = [
+  { id: 'JEE',   label: 'JEE',   icon: 'flash',          description: 'Joint Entrance Exam — Mains & Advanced', color: '#3B82F6' },
+  { id: 'UCEED', label: 'UCEED', icon: 'pencil',         description: 'Undergraduate Common Entrance Exam for Design', color: '#8B5CF6' },
+  { id: 'NID',   label: 'NID',   icon: 'color-palette',  description: 'National Institute of Design Entrance', color: '#EC4899' },
+  { id: 'NIFT',  label: 'NIFT',  icon: 'shirt',          description: 'National Institute of Fashion Technology', color: '#F59E0B' },
 ];
 
 const BASE_TASKS: Record<ExamType, Task[]> = {
@@ -119,7 +119,10 @@ export const REALITY_CHECK_MESSAGES = [
   { threshold: 95, message: "95% consistency. You're already winning. Stay the course." },
 ];
 
+// Icon names (Ionicons) used as user avatars — not emoji.
 export const AVATARS = [
-  '🎯','🔥','⚡','🧠','🏆','🚀','💎','🦁','⚔️','🐉',
-  '🌟','💫','🦋','🌙','☄️','💡','🔬','⚗️','🎮','🦊',
+  'rocket', 'flash', 'trophy', 'flame', 'star',
+  'planet', 'telescope', 'compass', 'shield', 'ribbon',
+  'medal', 'football', 'basketball', 'game-controller', 'musical-notes',
+  'color-palette', 'brush', 'book', 'bulb', 'paw',
 ];

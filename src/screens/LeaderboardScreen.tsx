@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { LeaderboardEntry } from '../data/leaderboard';
 import { LeaderboardCard } from '../components/LeaderboardCard';
@@ -10,11 +11,11 @@ import { loadLeaderboard, CloudLeaderboardRow } from '../utils/supabaseStorage';
 
 interface Props { appState: AppState; userId?: string }
 
-const EXAM_TABS: { id: ExamType; emoji: string; label: string }[] = [
-  { id: 'JEE',   emoji: '⚡', label: 'JEE' },
-  { id: 'UCEED', emoji: '✏️', label: 'UCEED' },
-  { id: 'NID',   emoji: '🎨', label: 'NID' },
-  { id: 'NIFT',  emoji: '👗', label: 'NIFT' },
+const EXAM_TABS: { id: ExamType; icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
+  { id: 'JEE',   icon: 'flash',         label: 'JEE' },
+  { id: 'UCEED', icon: 'pencil',        label: 'UCEED' },
+  { id: 'NID',   icon: 'color-palette', label: 'NID' },
+  { id: 'NIFT',  icon: 'shirt',         label: 'NIFT' },
 ];
 
 export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
@@ -44,7 +45,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
     streak: appState.streak,
     consistency: userConsistency,
     tasksCompleted: appState.totalTasksCompleted,
-    avatar: user?.avatar ?? '⭐',
+    avatar: user?.avatar ?? 'star',
     examType: activeExam,
     isCurrentUser: true,
   };
@@ -86,7 +87,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
                 onPress={() => setActiveExam(tab.id)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.examTabEmoji}>{tab.emoji}</Text>
+                <Ionicons name={tab.icon} size={18} color={isActive ? Colors.primary : Colors.textSecondary} />
                 <Text style={[styles.examTabLabel, isActive && styles.examTabLabelActive]}>
                   {tab.label}
                 </Text>
@@ -104,10 +105,12 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
           }]}>
             <View style={styles.userRankGradient}>
               <View style={styles.userRankLeft}>
-                <Text style={styles.userRankEmoji}>{user?.avatar ?? '⭐'}</Text>
+                <View style={styles.userRankAvatar}>
+                  <Ionicons name={(user?.avatar ?? 'star') as any} size={22} color={Colors.textPrimary} />
+                </View>
                 <View>
                   <Text style={styles.userRankName}>{user?.name ?? 'You'}</Text>
-                  <Text style={styles.userRankMeta}>{userConsistency}% consistent · 🔥{appState.streak}d</Text>
+                  <Text style={styles.userRankMeta}>{userConsistency}% consistent · {appState.streak}d streak</Text>
                 </View>
               </View>
               <View style={styles.userRankRight}>
@@ -127,35 +130,35 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
           opacity:   podiumAnim,
           transform: [{ scale: podiumAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }],
         }]}>
-          <Text style={styles.sectionTitle}>Top 3 🏆</Text>
+          <Text style={styles.sectionTitle}>Top 3</Text>
           <View style={styles.podium}>
             {top3[1] && (
               <View style={[styles.podiumBlock, styles.podiumSecond]}>
-                <Text style={styles.podiumAvatar}>{top3[1].avatar}</Text>
+                <Ionicons name={(top3[1].avatar || 'star') as any} size={26} color={Colors.textPrimary} />
                 <Text style={styles.podiumName} numberOfLines={1}>{top3[1].name}</Text>
                 <View style={[styles.podiumPedestal, { height: 64, backgroundColor: '#9CA3AF33' }]}>
-                  <Text style={styles.podiumMedal}>🥈</Text>
+                  <Ionicons name="medal" size={20} color="#9CA3AF" />
                   <Text style={styles.podiumConsistency}>{top3[1].consistency}%</Text>
                 </View>
               </View>
             )}
             {top3[0] && (
               <View style={[styles.podiumBlock, styles.podiumFirst]}>
-                <Text style={styles.podiumCrown}>👑</Text>
-                <Text style={styles.podiumAvatar}>{top3[0].avatar}</Text>
+                <Ionicons name="ribbon" size={20} color="#F59E0B" style={styles.podiumCrown} />
+                <Ionicons name={(top3[0].avatar || 'star') as any} size={26} color={Colors.textPrimary} />
                 <Text style={styles.podiumName} numberOfLines={1}>{top3[0].name}</Text>
                 <View style={[styles.podiumPedestal, { height: 90, backgroundColor: '#F59E0B33' }]}>
-                  <Text style={styles.podiumMedal}>🥇</Text>
+                  <Ionicons name="medal" size={20} color="#F59E0B" />
                   <Text style={styles.podiumConsistency}>{top3[0].consistency}%</Text>
                 </View>
               </View>
             )}
             {top3[2] && (
               <View style={[styles.podiumBlock, styles.podiumThird]}>
-                <Text style={styles.podiumAvatar}>{top3[2].avatar}</Text>
+                <Ionicons name={(top3[2].avatar || 'star') as any} size={26} color={Colors.textPrimary} />
                 <Text style={styles.podiumName} numberOfLines={1}>{top3[2].name}</Text>
                 <View style={[styles.podiumPedestal, { height: 48, backgroundColor: '#CD7C3233' }]}>
-                  <Text style={styles.podiumMedal}>🥉</Text>
+                  <Ionicons name="medal" size={20} color="#CD7C32" />
                   <Text style={styles.podiumConsistency}>{top3[2].consistency}%</Text>
                 </View>
               </View>
@@ -182,7 +185,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
               Rankings update as your consistency grows. Every task you complete today moves you up the board.
             </Text>
             <Text style={styles.motivationCta}>
-              Keep your streak alive 🔥
+              Keep your streak alive
             </Text>
           </View>
         </View>
@@ -254,7 +257,6 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   examTabActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryGlow },
-  examTabEmoji: { fontSize: 18 },
   examTabLabel: { ...Typography.labelSmall, color: Colors.textSecondary, fontSize: 10 },
   examTabLabelActive: { color: Colors.primary },
   examTabDot: {
@@ -277,7 +279,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceElevated,
   },
   userRankLeft:  { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  userRankEmoji: { fontSize: 32 },
+  userRankAvatar: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.border,
+  },
   userRankName:  { ...Typography.headlineSmall, color: Colors.textPrimary },
   userRankMeta:  { ...Typography.bodySmall, color: Colors.textSecondary },
   userRankRight: { alignItems: 'flex-end' },
@@ -295,8 +301,7 @@ const styles = StyleSheet.create({
   podiumFirst:  {},
   podiumSecond: {},
   podiumThird:  {},
-  podiumCrown:  { fontSize: 20 },
-  podiumAvatar: { fontSize: 28 },
+  podiumCrown:  { marginBottom: 2 },
   podiumName: {
     ...Typography.bodySmall, color: Colors.textPrimary,
     fontWeight: '600', textAlign: 'center', fontSize: 11,
@@ -307,7 +312,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     gap: 4, paddingTop: 8,
   },
-  podiumMedal:       { fontSize: 20 },
   podiumConsistency: { ...Typography.labelSmall, color: Colors.textSecondary, fontSize: 11 },
 
   listSection: { marginBottom: Spacing.md },

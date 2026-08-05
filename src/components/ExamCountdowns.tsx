@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 
 interface RemainingTime {
@@ -33,11 +34,11 @@ function formatDateStamp(d: Date): string {
 
 interface CountdownCardProps {
   examName: string;
-  emoji: string;
+  icon: keyof typeof Ionicons.glyphMap;
   target: Date;
 }
 
-const CountdownCard: React.FC<CountdownCardProps> = ({ examName, emoji, target }) => {
+const CountdownCard: React.FC<CountdownCardProps> = ({ examName, icon, target }) => {
   const [remaining, setRemaining] = useState<RemainingTime>(() => getRemaining(target));
 
   useEffect(() => {
@@ -48,7 +49,7 @@ const CountdownCard: React.FC<CountdownCardProps> = ({ examName, emoji, target }
   if (remaining.passed) {
     return (
       <View style={[styles.card, { borderColor: Colors.success }]}>
-        <Text style={styles.passedText}>🎉 Exam day is here!</Text>
+        <Text style={styles.passedText}>Exam day is here!</Text>
         <Text style={styles.examLabel}>{examName}</Text>
       </View>
     );
@@ -57,7 +58,7 @@ const CountdownCard: React.FC<CountdownCardProps> = ({ examName, emoji, target }
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
-        <Text style={styles.emoji}>{emoji}</Text>
+        <Ionicons name={icon} size={16} color={Colors.textSecondary} />
         <Text style={styles.examLabel}>{examName} Countdown</Text>
       </View>
       <View style={styles.bottomRow}>
@@ -80,7 +81,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: 6 },
-  emoji: { fontSize: 16 },
   examLabel: { ...Typography.labelSmall, fontWeight: '700', color: Colors.textSecondary },
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   countdownText: { ...Typography.headlineMedium, color: Colors.textPrimary, fontVariant: ['tabular-nums'] },
@@ -97,7 +97,7 @@ export const UCEEDCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
   return (
     <CountdownCard
       examName="UCEED"
-      emoji="⏳"
+      icon="pencil"
       target={new Date('2027-01-17T09:00:00+05:30')}
     />
   );
@@ -108,7 +108,7 @@ export const NIDCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
   return (
     <CountdownCard
       examName="NID"
-      emoji="🎨"
+      icon="color-palette"
       target={new Date('2026-12-21T09:00:00+05:30')}
     />
   );
@@ -119,7 +119,7 @@ export const NIFTCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
   return (
     <CountdownCard
       examName="NIFT"
-      emoji="👗"
+      icon="shirt"
       target={new Date('2027-02-08T09:00:00+05:30')}
     />
   );

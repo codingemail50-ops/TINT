@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../constants/theme';
 import { EXAM_TYPES, ExamType, AVATARS } from '../data/examPresets';
 import { StorageService } from '../utils/storage';
@@ -128,7 +129,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
         <Animated.View style={[avatarS.previewCircle, {
           transform: [{ scale: Animated.multiply(avatarBounce, avatarPulse) }],
         }]}>
-          <Text style={avatarS.previewEmoji}>{avatar}</Text>
+          <Ionicons name={avatar as any} size={44} color={Colors.textPrimary} />
         </Animated.View>
       </View>
       <FlatList
@@ -151,7 +152,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
                   style={[StyleSheet.absoluteFill, { borderRadius: BorderRadius.md }]}
                 />
               )}
-              <Text style={avatarS.cellEmoji}>{item}</Text>
+              <Ionicons name={item as any} size={26} color={Colors.textPrimary} />
             </TouchableOpacity>
           );
         }}
@@ -164,7 +165,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
     <View style={stepS.container}>
       <Text style={stepS.stepNum}>02</Text>
       <View style={stepS.avatarChip}>
-        <Text style={{ fontSize: 32 }}>{avatar}</Text>
+        <Ionicons name={avatar as any} size={28} color={Colors.textPrimary} />
       </View>
       <Text style={stepS.title}>What's your name?</Text>
       <Text style={stepS.sub}>We'll keep it personal from here on.</Text>
@@ -200,7 +201,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
               onPress={() => toggleExam(exam.id)}
               activeOpacity={0.75}
             >
-              <Text style={examS.emoji}>{exam.emoji}</Text>
+              <Ionicons name={exam.icon as any} size={26} color={checked ? Colors.primary : Colors.textSecondary} />
               <Text style={[examS.label, checked && examS.labelActive]}>{exam.label}</Text>
               <Text style={examS.desc}>{exam.description}</Text>
               <View style={[examS.checkbox, checked && examS.checkboxActive]}>
@@ -213,7 +214,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
       {selectedExams.size > 1 && (
         <View style={examS.comboNote}>
           <Text style={examS.comboText}>
-            🧩 Combined plan: {selectedExams.size} exams detected — we'll merge tasks intelligently.
+            Combined plan: {selectedExams.size} exams detected — we'll merge tasks intelligently.
           </Text>
         </View>
       )}
@@ -222,7 +223,7 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
 
   const CONTENT = [renderAvatarStep, renderNameStep, renderExamsStep];
 
-  const ctaLabel = step === 0 ? `Lock in as ${avatar}  →` : step === 2 ? "Let's go →" : 'Continue →';
+  const ctaLabel = step === 0 ? 'Lock in this look →' : step === 2 ? "Let's go →" : 'Continue →';
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -289,11 +290,9 @@ const avatarS = StyleSheet.create({
   previewArea: { alignItems: 'center', justifyContent: 'center', height: 120, marginVertical: Spacing.sm },
   glowRing: { position: 'absolute', width: 116, height: 116, borderRadius: 58, backgroundColor: Colors.primary },
   previewCircle: { width: 92, height: 92, borderRadius: 46, backgroundColor: Colors.surfaceElevated, borderWidth: 2, borderColor: Colors.primary + '66', alignItems: 'center', justifyContent: 'center' },
-  previewEmoji: { fontSize: 52 },
   carousel: { paddingHorizontal: Spacing.xl, gap: 10, paddingVertical: 4 },
   cell: { width: AVATAR_CELL, height: AVATAR_CELL, borderRadius: BorderRadius.md, backgroundColor: Colors.surfaceElevated, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   cellActive: { borderColor: Colors.primary },
-  cellEmoji: { fontSize: 30 },
   hint: { fontSize: 12, color: Colors.textMuted, textAlign: 'center', letterSpacing: 0.4 },
 });
 
@@ -310,7 +309,6 @@ const examS = StyleSheet.create({
     position: 'relative',
   },
   cardActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryGlow },
-  emoji: { fontSize: 28 },
   label: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
   labelActive: { color: Colors.primary },
   desc: { fontSize: 11, color: Colors.textSecondary, lineHeight: 16 },

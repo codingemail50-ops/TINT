@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { LeaderboardEntry } from '../data/leaderboard';
 
@@ -9,10 +10,10 @@ interface Props {
   index: number;
 }
 
-const RANK_STYLES: Record<number, { bg: string; border: string; text: string; label: string }> = {
-  1: { bg: '#F59E0B22', border: '#F59E0B55', text: '#F59E0B', label: '🥇' },
-  2: { bg: '#9CA3AF22', border: '#9CA3AF55', text: '#9CA3AF', label: '🥈' },
-  3: { bg: '#CD7C3222', border: '#CD7C3255', text: '#CD7C32', label: '🥉' },
+const RANK_STYLES: Record<number, { bg: string; border: string; text: string }> = {
+  1: { bg: '#F59E0B22', border: '#F59E0B55', text: '#F59E0B' },
+  2: { bg: '#9CA3AF22', border: '#9CA3AF55', text: '#9CA3AF' },
+  3: { bg: '#CD7C3222', border: '#CD7C3255', text: '#CD7C32' },
 };
 
 export const LeaderboardCard: React.FC<Props> = ({ entry, rank, index }) => {
@@ -43,14 +44,14 @@ export const LeaderboardCard: React.FC<Props> = ({ entry, rank, index }) => {
     >
       <View style={styles.rankContainer}>
         {rankStyle ? (
-          <Text style={styles.rankEmoji}>{rankStyle.label}</Text>
+          <Ionicons name="medal" size={20} color={rankStyle.text} />
         ) : (
           <Text style={[styles.rankNumber, isCurrentUser && { color: Colors.primary }]}>#{rank}</Text>
         )}
       </View>
 
       <View style={[styles.avatar, rankStyle && { borderColor: rankStyle.border }]}>
-        <Text style={styles.avatarEmoji}>{entry.avatar}</Text>
+        <Ionicons name={(entry.avatar || 'star') as any} size={20} color={Colors.textPrimary} />
       </View>
 
       <View style={styles.info}>
@@ -64,11 +65,13 @@ export const LeaderboardCard: React.FC<Props> = ({ entry, rank, index }) => {
           </View>
         </View>
         <View style={styles.stats}>
-          <Text style={styles.statItem}>🔥 {entry.streak}d</Text>
+          <Ionicons name="flame" size={12} color={Colors.textSecondary} />
+          <Text style={styles.statItem}>{entry.streak}d</Text>
           <Text style={styles.statDot}>·</Text>
           <Text style={styles.statItem}>{entry.consistency}% consistent</Text>
           <Text style={styles.statDot}>·</Text>
-          <Text style={styles.statItem}>✓ {entry.tasksCompleted}</Text>
+          <Ionicons name="checkmark" size={12} color={Colors.textSecondary} />
+          <Text style={styles.statItem}>{entry.tasksCompleted}</Text>
         </View>
       </View>
 
@@ -99,9 +102,6 @@ const styles = StyleSheet.create({
     width: 32,
     alignItems: 'center',
   },
-  rankEmoji: {
-    fontSize: 20,
-  },
   rankNumber: {
     ...Typography.labelLarge,
     color: Colors.textSecondary,
@@ -115,9 +115,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: Colors.border,
-  },
-  avatarEmoji: {
-    fontSize: 22,
   },
   info: {
     flex: 1,

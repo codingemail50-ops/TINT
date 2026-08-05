@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { AppState, getConsistencyData, getHeatmapData } from '../utils/storage';
 import { ConsistencyGraph } from '../components/ConsistencyGraph';
@@ -128,12 +129,12 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
     )).start();
   }, []);
 
-  const statCards = [
-    { label: 'Current Streak', value: appState.streak,              unit: 'days',  icon: '🔥', color: Colors.accent },
-    { label: 'Best Streak',    value: appState.longestStreak,        unit: 'days',  icon: '🏅', color: Colors.primary },
-    { label: 'Tasks Done',     value: appState.totalTasksCompleted,  unit: 'total', icon: '✅', color: Colors.success },
+  const statCards: { label: string; value: number; unit: string; icon: keyof typeof Ionicons.glyphMap; color: string }[] = [
+    { label: 'Current Streak', value: appState.streak,              unit: 'days',  icon: 'flame',       color: Colors.accent },
+    { label: 'Best Streak',    value: appState.longestStreak,        unit: 'days',  icon: 'medal',       color: Colors.primary },
+    { label: 'Tasks Done',     value: appState.totalTasksCompleted,  unit: 'total', icon: 'checkmark-circle', color: Colors.success },
     {
-      label: '7-Day Avg',      value: avg,                           unit: '%',     icon: '📊',
+      label: '7-Day Avg',      value: avg,                           unit: '%',     icon: 'stats-chart',
       color: avg >= 70 ? Colors.success : avg >= 40 ? Colors.accent : Colors.danger,
     },
   ];
@@ -165,7 +166,7 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
                 transform: [{ scale: cardAnims[i].interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }],
               },
             ]}>
-              <Text style={styles.statIcon}>{card.icon}</Text>
+              <Ionicons name={card.icon} size={22} color={card.color} style={styles.statIcon} />
               <Text style={[styles.statValue, { color: card.color }]}>
                 {card.value}<Text style={styles.statUnit}> {card.unit}</Text>
               </Text>
@@ -179,7 +180,12 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
         {avg < 95 && (
           <View style={styles.realityCard}>
             <View style={[styles.realityGradient, { backgroundColor: avg >= 70 ? Colors.surfaceElevated : Colors.dangerGlow }]}>
-              <Text style={styles.realityIcon}>{avg >= 70 ? '⚡' : avg >= 50 ? '⚠️' : '🚨'}</Text>
+              <Ionicons
+                name={avg >= 70 ? 'flash' : avg >= 50 ? 'warning' : 'alert-circle'}
+                size={22}
+                color={avg >= 70 ? Colors.primaryLight : Colors.danger}
+                style={styles.realityIcon}
+              />
               <Text style={[styles.realityTitle, { color: avg >= 70 ? Colors.primaryLight : Colors.danger }]}>
                 Reality Check
               </Text>
@@ -243,19 +249,19 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
           <View style={styles.insightsSection}>
             <Text style={styles.insightsTitle}>Insights</Text>
             {avg >= 80 && (
-              <InsightRow icon="🔥" text={`Top consistency bracket — ${appState.streak} days straight. Don't stop.`} positive />
+              <InsightRow icon="flame" text={`Top consistency bracket — ${appState.streak} days straight. Don't stop.`} positive />
             )}
             {avg >= 50 && avg < 80 && (
-              <InsightRow icon="📈" text="Building momentum. Push past 80% to lock in the habit." />
+              <InsightRow icon="trending-up" text="Building momentum. Push past 80% to lock in the habit." />
             )}
             {avg < 50 && avg > 0 && (
-              <InsightRow icon="⏰" text="Under 50% consistency. Every missed day compounds. Start with just 1 task today." negative />
+              <InsightRow icon="time" text="Under 50% consistency. Every missed day compounds. Start with just 1 task today." negative />
             )}
             {appState.streak >= 7 && (
-              <InsightRow icon="🏆" text={`${appState.streak}-day streak. That's discipline.`} positive />
+              <InsightRow icon="trophy" text={`${appState.streak}-day streak. That's discipline.`} positive />
             )}
             {appState.totalTasksCompleted > 0 && (
-              <InsightRow icon="✅" text={`${appState.totalTasksCompleted} tasks completed. Keep stacking.`} positive />
+              <InsightRow icon="checkmark-circle" text={`${appState.totalTasksCompleted} tasks completed. Keep stacking.`} positive />
             )}
           </View>
         )}
@@ -266,13 +272,13 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
   );
 };
 
-const InsightRow: React.FC<{ icon: string; text: string; positive?: boolean; negative?: boolean }> = ({ icon, text, positive, negative }) => (
+const InsightRow: React.FC<{ icon: keyof typeof Ionicons.glyphMap; text: string; positive?: boolean; negative?: boolean }> = ({ icon, text, positive, negative }) => (
   <View style={[
     insightSt.row,
     positive  && { borderColor: Colors.success + '44', backgroundColor: Colors.successGlow },
     negative  && { borderColor: Colors.danger + '44',  backgroundColor: Colors.dangerGlow },
   ]}>
-    <Text style={{ fontSize: 18 }}>{icon}</Text>
+    <Ionicons name={icon} size={18} color={positive ? Colors.success : negative ? Colors.danger : Colors.textSecondary} />
     <Text style={insightSt.text}>{text}</Text>
   </View>
 );
@@ -315,7 +321,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border,
     gap: 4, overflow: 'hidden',
   },
-  statIcon:  { fontSize: 22, marginBottom: 2 },
+  statIcon:  { marginBottom: 2 },
   statValue: { fontSize: 28, fontWeight: '800', letterSpacing: -1 },
   statUnit:  { fontSize: 14, fontWeight: '500', color: Colors.textSecondary },
   statLabel: { ...Typography.bodySmall, color: Colors.textSecondary },
@@ -329,7 +335,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.danger + '33',
   },
   realityGradient: { padding: Spacing.md, gap: Spacing.xs },
-  realityIcon:    { fontSize: 22 },
+  realityIcon: { marginBottom: 2 },
   realityTitle:   { ...Typography.labelLarge, letterSpacing: 1, textTransform: 'uppercase' },
   realityMessage: { ...Typography.bodyMedium, color: Colors.textSecondary, lineHeight: 22 },
 
@@ -367,7 +373,7 @@ const styles = StyleSheet.create({
   tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: BorderRadius.sm - 2 },
   tabActive: { backgroundColor: Colors.primary },
   tabText:   { ...Typography.labelSmall, color: Colors.textSecondary },
-  tabTextActive: { color: '#fff' },
+  tabTextActive: { color: '#000' },
 
   insightsSection: { marginBottom: Spacing.md },
   insightsTitle:   { ...Typography.headlineSmall, color: Colors.textPrimary, marginBottom: Spacing.sm },

@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Circle } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { useHaptics } from '../hooks/useHaptics';
@@ -14,13 +15,13 @@ import { syncFocusLog } from '../utils/supabaseStorage';
 const DURATIONS = [15, 25, 45, 60, 90];
 const DEFAULT_DURATION = 25;
 
-const FOCUS_APPS: { id: string; label: string; emoji: string }[] = [
-  { id: 'instagram', label: 'Instagram', emoji: '📷' },
-  { id: 'youtube', label: 'YouTube', emoji: '▶️' },
-  { id: 'tiktok', label: 'TikTok', emoji: '🎵' },
-  { id: 'twitter', label: 'Twitter / X', emoji: '𝕏' },
-  { id: 'reddit', label: 'Reddit', emoji: '👽' },
-  { id: 'snapchat', label: 'Snapchat', emoji: '👻' },
+const FOCUS_APPS: { id: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: 'instagram', label: 'Instagram', icon: 'logo-instagram' },
+  { id: 'youtube', label: 'YouTube', icon: 'logo-youtube' },
+  { id: 'tiktok', label: 'TikTok', icon: 'logo-tiktok' },
+  { id: 'twitter', label: 'Twitter / X', icon: 'logo-twitter' },
+  { id: 'reddit', label: 'Reddit', icon: 'logo-reddit' },
+  { id: 'snapchat', label: 'Snapchat', icon: 'logo-snapchat' },
 ];
 const DEFAULT_BLOCKED_APPS = ['instagram', 'youtube', 'tiktok'];
 
@@ -233,8 +234,9 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
               onPress={() => { setShowBlockModal(true); buttonPress(); }}
               activeOpacity={0.7}
             >
+              <Ionicons name="ban" size={20} color={Colors.textPrimary} style={styles.blockRowIcon} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.blockRowTitle}>🚫 Distraction Block</Text>
+                <Text style={styles.blockRowTitle}>Distraction Block</Text>
                 <Text style={styles.blockRowSub}>
                   {blockedApps.length > 0
                     ? `${blockedApps.length} app${blockedApps.length === 1 ? '' : 's'} on your reminder list`
@@ -245,7 +247,7 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.startBtn} onPress={handleStart} activeOpacity={0.8}>
-              <Text style={styles.startBtnText}>Start Focus Session ⚡</Text>
+              <Text style={styles.startBtnText}>Start Focus Session</Text>
             </TouchableOpacity>
 
             {/* Stats */}
@@ -307,7 +309,7 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
 
         {phase === 'done' && (
           <View style={styles.doneWrapper}>
-            <Text style={styles.doneEmoji}>🔥</Text>
+            <Ionicons name="flame" size={56} color={Colors.primary} style={styles.doneIcon} />
             <Text style={styles.doneTitle}>Session Complete!</Text>
             <Text style={styles.doneSub}>{duration} minutes of pure focus.</Text>
             <TouchableOpacity style={styles.startBtn} onPress={handleStartAnother} activeOpacity={0.8}>
@@ -346,7 +348,7 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
                 onPress={() => toggleBlockedApp(app.id)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.appEmoji}>{app.emoji}</Text>
+                <Ionicons name={app.icon} size={20} color={Colors.textPrimary} style={styles.appIcon} />
                 <Text style={styles.appLabel}>{app.label}</Text>
                 <View style={[styles.toggle, active && styles.toggleOn]}>
                   <View style={[styles.toggleThumb, active && styles.toggleThumbOn]} />
@@ -399,7 +401,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     padding: Spacing.md,
     marginBottom: Spacing.lg,
+    gap: Spacing.sm,
   },
+  blockRowIcon: {},
   blockRowTitle: { ...Typography.headlineSmall, color: Colors.textPrimary, fontSize: 15 },
   blockRowSub: { ...Typography.bodySmall, color: Colors.textMuted, marginTop: 2 },
   blockRowChevron: { fontSize: 24, color: Colors.textMuted },
@@ -411,7 +415,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.xl,
   },
-  startBtnText: { ...Typography.headlineSmall, color: '#fff', fontSize: 16 },
+  startBtnText: { ...Typography.headlineSmall, color: '#000', fontSize: 16 },
 
   statsRow: { flexDirection: 'row', gap: Spacing.sm },
   statCard: {
@@ -448,7 +452,7 @@ const styles = StyleSheet.create({
 
   // Done phase
   doneWrapper: { alignItems: 'center', paddingVertical: Spacing.xxl, gap: Spacing.sm },
-  doneEmoji: { fontSize: 56, marginBottom: Spacing.sm },
+  doneIcon: { marginBottom: Spacing.sm },
   doneTitle: { ...Typography.headlineLarge, color: Colors.textPrimary },
   doneSub: { ...Typography.bodyMedium, color: Colors.textSecondary, marginBottom: Spacing.lg },
 
@@ -478,7 +482,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     gap: Spacing.sm,
   },
-  appEmoji: { fontSize: 20, width: 28 },
+  appIcon: { width: 28 },
   appLabel: { ...Typography.bodyLarge, color: Colors.textPrimary, flex: 1 },
   toggle: {
     width: 44, height: 26,
@@ -501,5 +505,5 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     alignItems: 'center',
   },
-  doneBtnModalText: { ...Typography.headlineSmall, color: '#fff', fontSize: 15 },
+  doneBtnModalText: { ...Typography.headlineSmall, color: '#000', fontSize: 15 },
 });

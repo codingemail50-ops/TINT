@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography } from '../constants/theme';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
-import { HomeScreen } from '../screens/HomeScreen';
 import { TodoScreen } from '../screens/TodoScreen';
 import { FocusScreen } from '../screens/FocusScreen';
 import { ProductivityScreen } from '../screens/ProductivityScreen';
@@ -35,14 +35,13 @@ async function ensureSession(): Promise<string | null> {
   }
 }
 
-type Screen = 'boot' | 'onboarding' | 'home' | 'todo' | 'focus' | 'productivity' | 'leaderboard';
+type Screen = 'boot' | 'onboarding' | 'todo' | 'focus' | 'productivity' | 'leaderboard';
 
 const TAB_CONFIG = [
-  { id: 'home' as Screen, label: 'Home', icon: '🏠' },
-  { id: 'todo' as Screen, label: 'Today', icon: '📋' },
-  { id: 'focus' as Screen, label: 'Focus', icon: '⚡' },
-  { id: 'productivity' as Screen, label: 'Progress', icon: '📊' },
-  { id: 'leaderboard' as Screen, label: 'Rank', icon: '🏆' },
+  { id: 'todo' as Screen, label: 'Today', icon: 'checkbox' as const },
+  { id: 'focus' as Screen, label: 'Focus', icon: 'flash' as const },
+  { id: 'productivity' as Screen, label: 'Progress', icon: 'stats-chart' as const },
+  { id: 'leaderboard' as Screen, label: 'Rank', icon: 'trophy' as const },
 ];
 
 export const AppNavigator: React.FC = () => {
@@ -72,7 +71,7 @@ export const AppNavigator: React.FC = () => {
           if (loaded) {
             setAppState(loaded);
             setShowTabs(true);
-            setScreen('home');
+            setScreen('todo');
             Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
             return;
           }
@@ -87,7 +86,7 @@ export const AppNavigator: React.FC = () => {
         // Existing local user with no cloud row yet (e.g. was offline before) — push it up now
         if (userId) void saveNewUserToSupabase(userId, '', user);
         setShowTabs(true);
-        setScreen('home');
+        setScreen('todo');
         Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
       } else {
         setScreen('onboarding');
@@ -99,7 +98,7 @@ export const AppNavigator: React.FC = () => {
     StorageService.getAppState().then(async state => {
       setAppState(state);
       setShowTabs(true);
-      setScreen('home');
+      setScreen('todo');
       Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
 
       if (!userIdRef.current) {
@@ -126,7 +125,6 @@ export const AppNavigator: React.FC = () => {
   return (
     <View style={styles.root}>
       {screen === 'onboarding' && <OnboardingScreen onComplete={handleOnboardingComplete} />}
-      {screen === 'home' && <HomeScreen appState={appState} />}
       {screen === 'todo' && <TodoScreen appState={appState} onStateChange={handleStateChange} userId={userIdRef.current ?? undefined} />}
       {screen === 'focus' && <FocusScreen userId={userIdRef.current ?? undefined} />}
       {screen === 'productivity' && <ProductivityScreen appState={appState} />}
@@ -144,7 +142,11 @@ export const AppNavigator: React.FC = () => {
                 activeOpacity={0.7}
               >
                 <View style={[styles.tabIconContainer, isActive && styles.tabIconActive]}>
-                  <Text style={styles.tabIcon}>{tab.icon}</Text>
+                  <Ionicons
+                    name={isActive ? tab.icon : (`${tab.icon}-outline` as any)}
+                    size={20}
+                    color={isActive ? Colors.primary : Colors.textMuted}
+                  />
                 </View>
                 <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
                   {tab.label}
@@ -191,9 +193,6 @@ const styles = StyleSheet.create({
   },
   tabIconActive: {
     backgroundColor: Colors.primaryGlow,
-  },
-  tabIcon: {
-    fontSize: 20,
   },
   tabLabel: {
     ...Typography.labelSmall,

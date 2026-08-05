@@ -75,7 +75,7 @@ export async function loadUserFromSupabase(userId: string): Promise<AppState | n
       name: row.name ?? '',
       email: row.email ?? '',
       examTypes: Array.isArray(row.exams) ? row.exams : [],
-      avatar: row.avatar ?? '🎯',
+      avatar: row.avatar ?? 'star',
       createdAt: new Date().toISOString(),
     };
 
@@ -205,7 +205,7 @@ export async function loadLeaderboard(): Promise<CloudLeaderboardRow[]> {
     return (data as UserDataRow[]).map(row => ({
       id: row.id,
       name: row.name || 'Anonymous',
-      avatar: row.avatar || '⭐',
+      avatar: row.avatar || 'star',
       exams: Array.isArray(row.exams) ? row.exams : [],
       streak: row.streak ?? 0,
       consistency: computeLifetimeConsistency(Array.isArray(row.history) ? row.history : []),

@@ -1,62 +1,43 @@
-// Dark ground with a soft lavender accent and muted pastel category tags —
-// bold condensed headlines for hero moments, rounded flat cards everywhere else.
+// Black ground, pink primary accent, green for success — the exact swatch
+// provided (#060606 / #f3a4a8 / #0f9b36 / #ffffff), used throughout.
 export const Colors = {
-  background: '#0A0A0A',
-  surface: '#151515',
+  background: '#060606',
+  surface: '#121212',
   surfaceElevated: '#1A1A1A',
   border: '#262626',
 
-  primary: '#C4A7E8',
-  primaryLight: '#D8C4F0',
-  primaryGlow: 'rgba(196, 167, 232, 0.16)',
+  primary: '#F3A4A8',
+  primaryLight: '#F7C1C4',
+  primaryGlow: 'rgba(243, 164, 168, 0.16)',
 
-  accent: '#C4A7E8',
-  accentLight: '#D8C4F0',
-  accentGlow: 'rgba(196, 167, 232, 0.16)',
+  accent: '#F3A4A8',
+  accentLight: '#F7C1C4',
+  accentGlow: 'rgba(243, 164, 168, 0.16)',
 
-  success: '#4ADE80',
-  successGlow: 'rgba(74, 222, 128, 0.14)',
-  danger: '#F87171',
-  dangerGlow: 'rgba(248, 113, 113, 0.14)',
+  success: '#0F9B36',
+  successGlow: 'rgba(15, 155, 54, 0.16)',
+  danger: '#F3A4A8',
+  dangerGlow: 'rgba(243, 164, 168, 0.16)',
 
   textPrimary: '#FFFFFF',
   textSecondary: '#9B9B9B',
   textMuted: '#5C5C5C',
 
-  water: '#6FB8E0',
+  water: '#F3A4A8',
   waterSurface: 'rgba(255, 255, 255, 0.55)',
 
-  gradientPurple: ['#1C1C1C', '#0A0A0A'] as string[],
-  gradientFire: ['#F97316', '#EF4444'] as string[],
-  gradientDark: ['#151515', '#0A0A0A'] as string[],
-  gradientSuccess: ['#4ADE80', '#22C55E'] as string[],
+  gradientPurple: ['#1A1A1A', '#060606'] as string[],
+  gradientFire: ['#F3A4A8', '#F7C1C4'] as string[],
+  gradientDark: ['#121212', '#060606'] as string[],
+  gradientSuccess: ['#0F9B36', '#0C7D2C'] as string[],
 
   streakColors: {
     cold: '#5C5C5C',
-    warm: '#F97316',
-    hot: '#FB923C',
-    blazing: '#EF4444',
+    warm: '#F3A4A8',
+    hot: '#F7C1C4',
+    blazing: '#0F9B36',
   },
 };
-
-// Muted pastel tags for task/goal categories — cycled deterministically per
-// category name so the same category always lands on the same color.
-export const CategoryPalette = [
-  '#D9C2EC', // lavender
-  '#B8C4EA', // periwinkle
-  '#B8DCEA', // sky
-  '#B8E8D0', // mint
-  '#F0CFC0', // peach
-  '#F0E0B8', // sand
-];
-
-export function getCategoryColor(category: string): string {
-  let hash = 0;
-  for (let i = 0; i < category.length; i++) {
-    hash = (hash * 31 + category.charCodeAt(i)) >>> 0;
-  }
-  return CategoryPalette[hash % CategoryPalette.length];
-}
 
 export const Spacing = {
   xs: 4,

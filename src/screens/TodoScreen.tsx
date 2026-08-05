@@ -6,8 +6,9 @@ import {
   AppState as RNAppState, AppStateStatus,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Spacing, BorderRadius, Typography, getCategoryColor } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { Task, getCombinedPreset, ExamType } from '../data/examPresets';
 import { StorageService, AppState } from '../utils/storage';
 import { TaskItem } from '../components/TaskItem';
@@ -259,16 +260,6 @@ interface Props {
 }
 
 const todayStr = new Date().toDateString();
-
-function groupByCategory(list: Task[]): { category: string; tasks: Task[] }[] {
-  const order: string[] = [];
-  const map = new Map<string, Task[]>();
-  for (const t of list) {
-    if (!map.has(t.category)) { map.set(t.category, []); order.push(t.category); }
-    map.get(t.category)!.push(t);
-  }
-  return order.map(category => ({ category, tasks: map.get(category)! }));
-}
 
 function buildDateStrip(history: AppState['history']) {
   const items: { dateStr: string; dayLetter: string; dayNum: number; isToday: boolean; consistency: number }[] = [];
@@ -582,7 +573,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
         <View style={styles.headerTop}>
           <View style={{ flex: 1 }}>
             <Text style={styles.greeting}>{getGreeting()},</Text>
-            <Text style={styles.userName}>{user?.name ?? 'Champion'} 👊</Text>
+            <Text style={styles.userName}>{user?.name ?? 'Champion'}</Text>
           </View>
           <FlameIcon streak={appState.streak} consistency={todayConsistency} size={52} />
         </View>
@@ -707,7 +698,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
 
         {filteredTasks.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>{viewingPast ? '📅' : filter === 'done' ? '✅' : '📋'}</Text>
             <Text style={styles.emptyTitle}>
               {viewingPast ? 'No tasks recorded'
                 : filter === 'done' ? 'Nothing done yet'
@@ -721,47 +711,29 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
                 : 'Tap "+ Add Task" to build your study plan.'}
             </Text>
           </View>
-        ) : viewingPast ? (
-          filteredTasks.map((task, index) => (
-            <TaskItem
-              key={task.id}
-              task={task}
-              readOnly
-              index={index}
-            />
-          ))
         ) : (
-          groupByCategory(filteredTasks).map(group => (
-            <View key={group.category} style={styles.categoryGroup}>
-              <View style={[styles.categoryHeader, { backgroundColor: getCategoryColor(group.category) }]}>
-                <Text style={styles.categoryHeaderText}>{group.category}</Text>
-                <Text style={styles.categoryHeaderCount}>{group.tasks.filter(t => t.completed).length}/{group.tasks.length}</Text>
-              </View>
-              <View style={styles.categoryBody}>
-                {group.tasks.map((task, index) => (
-                  task.id === timerTaskId ? (
-                    <ActiveTimerRow
-                      key={task.id}
-                      task={task}
-                      remaining={timerRemaining}
-                      total={timerTotal}
-                      running={timerRunning}
-                      onTogglePause={toggleTimerPause}
-                      onCancel={cancelTimer}
-                    />
-                  ) : (
-                    <TaskItem
-                      key={task.id}
-                      task={task}
-                      onToggle={handleTaskPress}
-                      onDelete={task.isCustom ? handleDelete : undefined}
-                      onLongPress={handleLongPress}
-                      index={index}
-                    />
-                  )
-                ))}
-              </View>
-            </View>
+          filteredTasks.map((task, index) => (
+            task.id === timerTaskId ? (
+              <ActiveTimerRow
+                key={task.id}
+                task={task}
+                remaining={timerRemaining}
+                total={timerTotal}
+                running={timerRunning}
+                onTogglePause={toggleTimerPause}
+                onCancel={cancelTimer}
+              />
+            ) : (
+              <TaskItem
+                key={task.id}
+                task={task}
+                onToggle={viewingPast ? undefined : handleTaskPress}
+                onDelete={(!viewingPast && task.isCustom) ? handleDelete : undefined}
+                onLongPress={viewingPast ? undefined : handleLongPress}
+                readOnly={viewingPast}
+                index={index}
+              />
+            )
           ))
         )}
 
@@ -790,7 +762,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
           pointerEvents="none"
         >
           <View style={styles.trophyGradient}>
-            <Text style={styles.trophyEmoji}>🏆</Text>
+            <Ionicons name="trophy" size={52} color={Colors.primary} style={styles.trophyIcon} />
             <Text style={styles.trophyTitle}>Day Complete!</Text>
             <Text style={styles.trophySub}>
               All {totalCount} tasks done. Day {appState.streak + 1} locked in.
@@ -1000,20 +972,6 @@ const styles = StyleSheet.create({
   filterChipText: { ...Typography.labelSmall, color: Colors.textSecondary },
   filterChipTextActive: { color: Colors.primaryLight },
 
-  categoryGroup: {
-    borderRadius: BorderRadius.lg, overflow: 'hidden',
-    marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.border,
-  },
-  categoryHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: Spacing.md, paddingVertical: 10,
-  },
-  categoryHeaderText: {
-    fontSize: 13, fontWeight: '800', color: '#1A1A1A',
-    letterSpacing: 0.4, textTransform: 'uppercase',
-  },
-  categoryHeaderCount: { fontSize: 12, fontWeight: '700', color: '#1A1A1A99' },
-  categoryBody: { backgroundColor: Colors.surface, padding: Spacing.sm, gap: Spacing.xs },
   addBtn: { borderRadius: BorderRadius.sm, overflow: 'hidden' },
   addBtnGradient: { paddingHorizontal: Spacing.md, paddingVertical: 8, backgroundColor: Colors.primary },
   addBtnText: { ...Typography.labelLarge, color: '#000', fontSize: 13 },
@@ -1028,7 +986,6 @@ const styles = StyleSheet.create({
   backTodayText: { ...Typography.labelSmall, color: Colors.textSecondary },
 
   emptyState: { alignItems: 'center', paddingVertical: Spacing.xxxl, gap: Spacing.sm },
-  emptyEmoji: { fontSize: 48 },
   emptyTitle: { ...Typography.headlineMedium, color: Colors.textPrimary },
   emptyDesc:  { ...Typography.bodyMedium, color: Colors.textSecondary, textAlign: 'center' },
 
@@ -1059,7 +1016,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xl,
     backgroundColor: Colors.surfaceElevated,
   },
-  trophyEmoji:      { fontSize: 52 },
+  trophyIcon:       { marginBottom: 4 },
   trophyTitle:      { fontSize: 26, fontWeight: '900', color: Colors.textPrimary, letterSpacing: -0.5 },
   trophySub:        { ...Typography.bodyMedium, color: Colors.textSecondary, textAlign: 'center' },
   trophyMotivation: { ...Typography.labelSmall, color: Colors.accent, textAlign: 'center', marginTop: 4, letterSpacing: 0.5 },
