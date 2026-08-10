@@ -112,11 +112,11 @@ export const MOTIVATIONAL_QUOTES = [
 ];
 
 export const REALITY_CHECK_MESSAGES = [
-  { threshold: 30, message: "You're at 30% — that's a starting point, not a verdict. Pick one task today and build from there." },
-  { threshold: 50, message: "50% consistency. You're showing up sometimes — let's make it more often. Small, steady days beat rare big ones." },
-  { threshold: 70, message: "70% consistency — that's a solid rhythm. A few more days like this and it stops feeling like effort." },
-  { threshold: 85, message: "85% — you're doing the work, consistently. Keep the streak going, one day at a time." },
-  { threshold: 95, message: "95%+ consistency. This is what discipline looks like from the outside. Proud-of-yourself territory." },
+  { threshold: 30, message: "Only 30% consistency. At this rate you'll walk into the exam underprepared. That feeling? Avoidable." },
+  { threshold: 50, message: "50% isn't enough. Your competition is at their desks right now. Every skipped day widens the gap." },
+  { threshold: 70, message: "70% — so close. Top rankers are at 90%+. A couple more hours a day separates you from them." },
+  { threshold: 85, message: "85% — you're in striking distance. Don't let up. The final stretch is where legends are made." },
+  { threshold: 95, message: "95% consistency. You're already winning. Stay the course." },
 ];
 
 // Icon names (Ionicons) used as user avatars — not emoji.

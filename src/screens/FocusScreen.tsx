@@ -10,7 +10,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog } from '../utils/supabaseStorage';
-import { FOCUS_LOG_KEY, FocusLogEntry, loadFocusLog, computeFocusStats } from '../utils/focusLog';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const DURATIONS = [15, 25, 45, 60, 90];
@@ -28,10 +27,16 @@ const DEFAULT_BLOCKED_APPS = ['instagram', 'youtube', 'tiktok'];
 
 const KEYS = {
   BLOCKED_APPS: 'tint_blocked_apps',
+  FOCUS_LOG: 'tint_focus_log',
 };
 
-const RADIUS = 108;
-const STROKE_WIDTH = 12;
+interface FocusLogEntry {
+  date: string;
+  mins: number;
+}
+
+const RADIUS = 75;
+const STROKE_WIDTH = 10;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 const SVG_SIZE = (RADIUS + STROKE_WIDTH) * 2;
 
@@ -39,6 +44,35 @@ function formatMMSS(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
   const s = totalSeconds % 60;
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+async function loadFocusLog(): Promise<FocusLogEntry[]> {
+  try {
+    const raw = await AsyncStorage.getItem(KEYS.FOCUS_LOG);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function startOfWeek(d: Date): Date {
+  const day = d.getDay(); // 0 = Sunday
+  const result = new Date(d);
+  result.setDate(d.getDate() - day);
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+function computeStats(log: FocusLogEntry[]): { today: number; week: number; allTime: number } {
+  const todayStr = new Date().toDateString();
+  const weekStart = startOfWeek(new Date());
+
+  let today = 0, week = 0, allTime = 0;
+  for (const entry of log) {
+    allTime += entry.mins;
+    if (entry.date === todayStr) today += entry.mins;
+    const entryDate = new Date(entry.date);
+    if (!isNaN(entryDate.getTime()) && entryDate >= weekStart) week += entry.mins;
+  }
+  return { today, week, allTime };
 }
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
@@ -87,7 +121,7 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
 
     const entry: FocusLogEntry = { date: new Date().toDateString(), mins: duration };
     const updatedLog = [...(await loadFocusLog()), entry];
-    try { await AsyncStorage.setItem(FOCUS_LOG_KEY, JSON.stringify(updatedLog)); } catch {}
+    try { await AsyncStorage.setItem(KEYS.FOCUS_LOG, JSON.stringify(updatedLog)); } catch {}
     setFocusLog(updatedLog);
 
     await taskComplete();
@@ -156,7 +190,7 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
     try { await AsyncStorage.setItem(KEYS.BLOCKED_APPS, JSON.stringify(updated)); } catch {}
   };
 
-  const stats = computeFocusStats(focusLog);
+  const stats = computeStats(focusLog);
 
   const totalSeconds = duration * 60;
   const pct = totalSeconds > 0 ? (totalSeconds - timeLeft) / totalSeconds : 0;
@@ -405,7 +439,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  timeText: { fontSize: 54, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -1 },
+  timeText: { fontSize: 40, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -1 },
   timeSub: { ...Typography.labelSmall, color: Colors.textSecondary, marginTop: 4 },
   endBtn: {
     borderWidth: 1,

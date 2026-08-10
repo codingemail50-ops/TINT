@@ -14,10 +14,9 @@ import { StorageService, AppState } from '../utils/storage';
 import { TaskItem } from '../components/TaskItem';
 import { FlameIcon } from '../components/FlameIcon';
 import { Confetti } from '../components/Confetti';
-import { ExamCountdownStrip } from '../components/ExamCountdowns';
+import { UCEEDCountdown, NIDCountdown, NIFTCountdown } from '../components/ExamCountdowns';
 import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog } from '../utils/supabaseStorage';
-import { FOCUS_LOG_KEY } from '../utils/focusLog';
 
 const CATEGORIES = [
   'Study', 'Practice', 'Revision', 'Reading', 'Writing',
@@ -399,10 +398,10 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
   const logFocusMinutes = async (mins: number) => {
     if (mins < 1) return;
     try {
-      const raw = await AsyncStorage.getItem(FOCUS_LOG_KEY);
+      const raw = await AsyncStorage.getItem('tint_focus_log');
       const log = raw ? JSON.parse(raw) : [];
       const updatedLog = [...log, { date: new Date().toDateString(), mins }];
-      await AsyncStorage.setItem(FOCUS_LOG_KEY, JSON.stringify(updatedLog));
+      await AsyncStorage.setItem('tint_focus_log', JSON.stringify(updatedLog));
       if (userId) void syncFocusLog(userId, updatedLog);
     } catch {}
   };
@@ -572,11 +571,11 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
         }),
       }]}>
         <View style={styles.headerTop}>
-          <Text style={styles.greetingLine} numberOfLines={1}>
-            <Text style={styles.greeting}>{getGreeting()}, </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.greeting}>{getGreeting()},</Text>
             <Text style={styles.userName}>{user?.name ?? 'Champion'}</Text>
-          </Text>
-          <FlameIcon streak={appState.streak} consistency={todayConsistency} size={40} />
+          </View>
+          <FlameIcon streak={appState.streak} consistency={todayConsistency} size={52} />
         </View>
 
         {/* Progress */}
@@ -602,7 +601,9 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
       {/* ── Exam countdowns ────────────────────────────────────────────────── */}
       {!viewingPast && (examTypes.length > 0) && (
         <View style={styles.countdownStack}>
-          <ExamCountdownStrip examTypes={examTypes} />
+          <UCEEDCountdown examTypes={examTypes} />
+          <NIDCountdown examTypes={examTypes} />
+          <NIFTCountdown examTypes={examTypes} />
         </View>
       )}
 
@@ -677,6 +678,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
 
         {!viewingPast && (
           <>
+            <Text style={styles.longPressHint}>Long-press any task to edit its duration</Text>
             <View style={styles.filterRow}>
               {(['all', 'todo', 'done'] as const).map(f => (
                 <TouchableOpacity
@@ -894,7 +896,7 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    paddingTop: 48,
+    paddingTop: 56,
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.sm,
     borderBottomWidth: 1,
@@ -904,11 +906,10 @@ const styles = StyleSheet.create({
   headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
-  greetingLine: { flex: 1, marginRight: Spacing.sm },
   greeting: { ...Typography.bodyMedium, color: Colors.textSecondary },
-  userName:  { fontSize: 20, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
+  userName:  { fontSize: 24, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
   progressSection: { gap: 6 },
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   progressLabel: { ...Typography.labelSmall, color: Colors.textSecondary },
@@ -959,6 +960,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   listTitle: { ...Typography.headlineSmall, color: Colors.textPrimary, flex: 1, marginRight: Spacing.sm },
+  longPressHint: { ...Typography.bodySmall, color: Colors.textMuted, marginBottom: Spacing.sm },
   countdownStack: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm, gap: Spacing.sm },
   filterRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
   filterChip: {

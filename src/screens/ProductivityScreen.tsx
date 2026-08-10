@@ -5,11 +5,10 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
-import { AppState, getConsistencyData, getHeatmapData, getCategoryTime } from '../utils/storage';
+import { AppState, getConsistencyData, getHeatmapData } from '../utils/storage';
 import { ConsistencyGraph } from '../components/ConsistencyGraph';
 import { FlameIcon } from '../components/FlameIcon';
 import { REALITY_CHECK_MESSAGES, EXAM_TYPES } from '../data/examPresets';
-import { loadFocusLog, computeFocusStats, formatDuration } from '../utils/focusLog';
 
 interface Props { appState: AppState }
 
@@ -112,7 +111,6 @@ const legendSt = StyleSheet.create({
 // ── Main screen ───────────────────────────────────────────────────────────────
 export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
   const [graphTab, setGraphTab] = useState<'week' | 'vsself'>('week');
-  const [focusStats, setFocusStats] = useState({ today: 0, week: 0, allTime: 0 });
   const headerAnim = useRef(new Animated.Value(0)).current;
   const cardAnims  = useRef([...Array(4)].map(() => new Animated.Value(0))).current;
 
@@ -124,15 +122,11 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
   const realityCheck = REALITY_CHECK_MESSAGES.find(r => avg <= r.threshold)
     ?? REALITY_CHECK_MESSAGES[REALITY_CHECK_MESSAGES.length - 1];
 
-  const categoryTime = useMemo(() => getCategoryTime(appState.history), [appState.history]);
-  const categoryTimeMax = categoryTime.length > 0 ? categoryTime[0].mins : 0;
-
   useEffect(() => {
     Animated.timing(headerAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
     Animated.stagger(80, cardAnims.map(a =>
       Animated.spring(a, { toValue: 1, useNativeDriver: true })
     )).start();
-    loadFocusLog().then(log => setFocusStats(computeFocusStats(log)));
   }, []);
 
   const statCards: { label: string; value: number; unit: string; icon: keyof typeof Ionicons.glyphMap; color: string }[] = [
@@ -187,58 +181,15 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
           <View style={styles.realityCard}>
             <View style={[styles.realityGradient, { backgroundColor: avg >= 70 ? Colors.surfaceElevated : Colors.dangerGlow }]}>
               <Ionicons
-                name={avg >= 70 ? 'flash' : avg >= 50 ? 'partly-sunny' : 'sunny'}
+                name={avg >= 70 ? 'flash' : avg >= 50 ? 'warning' : 'alert-circle'}
                 size={22}
                 color={avg >= 70 ? Colors.primaryLight : Colors.danger}
                 style={styles.realityIcon}
               />
               <Text style={[styles.realityTitle, { color: avg >= 70 ? Colors.primaryLight : Colors.danger }]}>
-                Check-in
+                Reality Check
               </Text>
               <Text style={styles.realityMessage}>{realityCheck.message}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Time invested */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Time Invested</Text>
-          <View style={styles.timeRow}>
-            <View style={styles.timeBlock}>
-              <Text style={styles.timeValue}>{formatDuration(focusStats.allTime)}</Text>
-              <Text style={styles.timeLabel}>All-Time</Text>
-            </View>
-            <View style={styles.timeDivider} />
-            <View style={styles.timeBlock}>
-              <Text style={styles.timeValue}>{formatDuration(focusStats.week)}</Text>
-              <Text style={styles.timeLabel}>This Week</Text>
-            </View>
-            <View style={styles.timeDivider} />
-            <View style={styles.timeBlock}>
-              <Text style={styles.timeValue}>{formatDuration(focusStats.today)}</Text>
-              <Text style={styles.timeLabel}>Today</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Time by category */}
-        {categoryTime.length > 0 && (
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Time by Category</Text>
-            <View style={{ gap: Spacing.sm, marginTop: Spacing.sm }}>
-              {categoryTime.map(item => (
-                <View key={item.category} style={styles.categoryRow}>
-                  <View style={styles.categoryRowHeader}>
-                    <Text style={styles.categoryName}>{item.category}</Text>
-                    <Text style={styles.categoryMins}>{formatDuration(item.mins)}</Text>
-                  </View>
-                  <View style={styles.categoryTrack}>
-                    <View style={[styles.categoryFill, {
-                      width: `${categoryTimeMax > 0 ? (item.mins / categoryTimeMax) * 100 : 0}%` as any,
-                    }]} />
-                  </View>
-                </View>
-              ))}
             </View>
           </View>
         )}
@@ -298,19 +249,19 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
           <View style={styles.insightsSection}>
             <Text style={styles.insightsTitle}>Insights</Text>
             {avg >= 80 && (
-              <InsightRow icon="flame" text={`Top consistency bracket — ${appState.streak} days straight. This is what a habit looks like.`} positive />
+              <InsightRow icon="flame" text={`Top consistency bracket — ${appState.streak} days straight. Don't stop.`} positive />
             )}
             {avg >= 50 && avg < 80 && (
-              <InsightRow icon="trending-up" text="Good momentum building. A few more consistent days and it'll feel automatic." />
+              <InsightRow icon="trending-up" text="Building momentum. Push past 80% to lock in the habit." />
             )}
             {avg < 50 && avg > 0 && (
-              <InsightRow icon="sunny" text="A quieter stretch lately — totally normal. One task today is enough to turn it around." />
+              <InsightRow icon="time" text="Under 50% consistency. Every missed day compounds. Start with just 1 task today." negative />
             )}
             {appState.streak >= 7 && (
-              <InsightRow icon="trophy" text={`${appState.streak}-day streak. You're showing up for yourself.`} positive />
+              <InsightRow icon="trophy" text={`${appState.streak}-day streak. That's discipline.`} positive />
             )}
             {appState.totalTasksCompleted > 0 && (
-              <InsightRow icon="checkmark-circle" text={`${appState.totalTasksCompleted} tasks completed. That all adds up.`} positive />
+              <InsightRow icon="checkmark-circle" text={`${appState.totalTasksCompleted} tasks completed. Keep stacking.`} positive />
             )}
           </View>
         )}
@@ -409,21 +360,6 @@ const styles = StyleSheet.create({
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   legendDot: { width: 10, height: 10, borderRadius: 2 },
   legendText: { ...Typography.bodySmall, color: Colors.textMuted, fontSize: 11 },
-
-  // Time invested
-  timeRow: { flexDirection: 'row', alignItems: 'center' },
-  timeBlock: { flex: 1, alignItems: 'center', gap: 2 },
-  timeValue: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
-  timeLabel: { ...Typography.labelSmall, color: Colors.textSecondary },
-  timeDivider: { width: 1, height: 28, backgroundColor: Colors.border },
-
-  // Time by category
-  categoryRow: { gap: 6 },
-  categoryRowHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-  categoryName: { ...Typography.bodyMedium, color: Colors.textPrimary, fontWeight: '600' },
-  categoryMins: { ...Typography.bodySmall, color: Colors.textSecondary },
-  categoryTrack: { height: 6, backgroundColor: Colors.surface, borderRadius: 3, overflow: 'hidden' },
-  categoryFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 3 },
 
   // Graph tab
   tabRow: {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 
@@ -23,22 +23,22 @@ function getRemaining(target: Date): RemainingTime {
   return { days, hours, mins, secs, passed: false };
 }
 
-interface ExamDef {
-  id: string;
+function pad(n: number): string {
+  return n.toString().padStart(2, '0');
+}
+
+function formatDateStamp(d: Date): string {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[d.getMonth()]} ${d.getDate()} / ${d.getFullYear()}`;
+}
+
+interface CountdownCardProps {
   examName: string;
   icon: keyof typeof Ionicons.glyphMap;
   target: Date;
 }
 
-const EXAM_DEFS: ExamDef[] = [
-  { id: 'UCEED', examName: 'UCEED', icon: 'pencil',        target: new Date('2027-01-17T09:00:00+05:30') },
-  { id: 'NID',   examName: 'NID',   icon: 'color-palette', target: new Date('2026-12-21T09:00:00+05:30') },
-  { id: 'NIFT',  examName: 'NIFT',  icon: 'shirt',         target: new Date('2027-02-08T09:00:00+05:30') },
-];
-
-// Compact single-line countdown chip — used in a horizontal strip so multiple
-// exams don't eat a full screen's worth of vertical space.
-const CountdownChip: React.FC<ExamDef> = ({ examName, icon, target }) => {
+const CountdownCard: React.FC<CountdownCardProps> = ({ examName, icon, target }) => {
   const [remaining, setRemaining] = useState<RemainingTime>(() => getRemaining(target));
 
   useEffect(() => {
@@ -48,60 +48,79 @@ const CountdownChip: React.FC<ExamDef> = ({ examName, icon, target }) => {
 
   if (remaining.passed) {
     return (
-      <View style={[styles.chip, { borderColor: Colors.success }]}>
-        <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
-        <Text style={styles.passedText}>{examName} day is here!</Text>
+      <View style={[styles.card, { borderColor: Colors.success }]}>
+        <Text style={styles.passedText}>Exam day is here!</Text>
+        <Text style={styles.examLabel}>{examName}</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.chip}>
-      <Ionicons name={icon} size={13} color={Colors.textSecondary} />
-      <Text style={styles.examLabel}>{examName}</Text>
-      <Text style={styles.countdownText}>{remaining.days}d {remaining.hours}h</Text>
+    <View style={styles.card}>
+      <View style={styles.headerRow}>
+        <Ionicons name={icon} size={16} color={Colors.textSecondary} />
+        <Text style={styles.examLabel}>{examName} Countdown</Text>
+      </View>
+      <View style={styles.bottomRow}>
+        <Text style={styles.countdownText}>
+          {remaining.days}d  {pad(remaining.hours)}:{pad(remaining.mins)}:{pad(remaining.secs)}
+        </Text>
+        <Text style={styles.dateStamp}>{formatDateStamp(target)}</Text>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  card: {
     backgroundColor: Colors.surfaceElevated,
-    borderRadius: BorderRadius.full,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 8,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
   },
-  examLabel: { ...Typography.labelSmall, fontWeight: '700', color: Colors.textSecondary, fontSize: 11 },
-  countdownText: { ...Typography.labelSmall, color: Colors.textPrimary, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  passedText: { ...Typography.labelSmall, color: Colors.success, fontWeight: '700' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: 6 },
+  examLabel: { ...Typography.labelSmall, fontWeight: '700', color: Colors.textSecondary },
+  bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  countdownText: { ...Typography.headlineMedium, color: Colors.textPrimary, fontVariant: ['tabular-nums'] },
+  dateStamp: { ...Typography.bodySmall, color: Colors.textMuted },
+  passedText: { ...Typography.headlineSmall, color: Colors.success },
 });
 
-interface StripProps {
+interface CountdownProps {
   examTypes: string[];
 }
 
-// Renders one compact chip per exam the user is preparing for, in a single
-// horizontally-scrollable row.
-export const ExamCountdownStrip: React.FC<StripProps> = ({ examTypes }) => {
-  const active = EXAM_DEFS.filter(e => examTypes.includes(e.id));
-  if (active.length === 0) return null;
-
+export const UCEEDCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
+  if (!examTypes.includes('UCEED')) return null;
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={stripSt.row}
-    >
-      {active.map(def => <CountdownChip key={def.id} {...def} />)}
-    </ScrollView>
+    <CountdownCard
+      examName="UCEED"
+      icon="pencil"
+      target={new Date('2027-01-17T09:00:00+05:30')}
+    />
   );
 };
 
-const stripSt = StyleSheet.create({
-  row: { flexDirection: 'row', gap: Spacing.sm },
-});
+export const NIDCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
+  if (!examTypes.includes('NID')) return null;
+  return (
+    <CountdownCard
+      examName="NID"
+      icon="color-palette"
+      target={new Date('2026-12-21T09:00:00+05:30')}
+    />
+  );
+};
+
+export const NIFTCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
+  if (!examTypes.includes('NIFT')) return null;
+  return (
+    <CountdownCard
+      examName="NIFT"
+      icon="shirt"
+      target={new Date('2027-02-08T09:00:00+05:30')}
+    />
+  );
+};
