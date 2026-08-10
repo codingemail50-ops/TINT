@@ -1,41 +1,41 @@
-// Black ground, pink primary accent, green for success — the exact swatch
-// provided (#060606 / #f3a4a8 / #0f9b36 / #ffffff), used throughout.
+// Flat black-and-white palette — one neutral accent (white), everything else
+// is white/grey/black. No gradients, no glow. Fresh base for theme experiments.
 export const Colors = {
-  background: '#060606',
-  surface: '#121212',
-  surfaceElevated: '#1A1A1A',
-  border: '#262626',
+  background: '#0A0A0A',
+  surface: '#141414',
+  surfaceElevated: '#1C1C1C',
+  border: '#2A2A2A',
 
-  primary: '#F3A4A8',
-  primaryLight: '#F7C1C4',
-  primaryGlow: 'rgba(243, 164, 168, 0.16)',
+  primary: '#FFFFFF',
+  primaryLight: '#E8E8E8',
+  primaryGlow: 'rgba(255, 255, 255, 0.08)',
 
-  accent: '#F3A4A8',
-  accentLight: '#F7C1C4',
-  accentGlow: 'rgba(243, 164, 168, 0.16)',
+  accent: '#FFFFFF',
+  accentLight: '#E8E8E8',
+  accentGlow: 'rgba(255, 255, 255, 0.08)',
 
-  success: '#0F9B36',
-  successGlow: 'rgba(15, 155, 54, 0.16)',
-  danger: '#F3A4A8',
-  dangerGlow: 'rgba(243, 164, 168, 0.16)',
+  success: '#4ADE80',
+  successGlow: 'rgba(74, 222, 128, 0.12)',
+  danger: '#F87171',
+  dangerGlow: 'rgba(248, 113, 113, 0.12)',
 
   textPrimary: '#FFFFFF',
   textSecondary: '#9B9B9B',
   textMuted: '#5C5C5C',
 
-  water: '#F3A4A8',
+  water: '#FFFFFF',
   waterSurface: 'rgba(255, 255, 255, 0.55)',
 
-  gradientPurple: ['#1A1A1A', '#060606'] as string[],
-  gradientFire: ['#F3A4A8', '#F7C1C4'] as string[],
-  gradientDark: ['#121212', '#060606'] as string[],
-  gradientSuccess: ['#0F9B36', '#0C7D2C'] as string[],
+  gradientPurple: ['#1C1C1C', '#0A0A0A'] as string[],
+  gradientFire: ['#F97316', '#EF4444'] as string[],
+  gradientDark: ['#141414', '#0A0A0A'] as string[],
+  gradientSuccess: ['#4ADE80', '#22C55E'] as string[],
 
   streakColors: {
     cold: '#5C5C5C',
-    warm: '#F3A4A8',
-    hot: '#F7C1C4',
-    blazing: '#0F9B36',
+    warm: '#F97316',
+    hot: '#FB923C',
+    blazing: '#EF4444',
   },
 };
 
