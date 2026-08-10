@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography } from '../constants/theme';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
@@ -122,13 +124,42 @@ export const AppNavigator: React.FC = () => {
     setScreen(s);
   };
 
+  // Swipe left/right between tabs. activeOffsetX/failOffsetY mean the pan
+  // only "wins" once the drag is clearly horizontal, so nested horizontal
+  // scrollers (date strip, category chips) keep working normally.
+  const screenRef = useRef(screen);
+  screenRef.current = screen;
+
+  const goRelative = (direction: 1 | -1) => {
+    const currentIndex = TAB_CONFIG.findIndex(t => t.id === screenRef.current);
+    if (currentIndex === -1) return;
+    const nextIndex = currentIndex + direction;
+    if (nextIndex >= 0 && nextIndex < TAB_CONFIG.length) {
+      navigateTo(TAB_CONFIG[nextIndex].id);
+    }
+  };
+
+  const swipeGesture = Gesture.Pan()
+    .enabled(showTabs)
+    .activeOffsetX([-25, 25])
+    .failOffsetY([-20, 20])
+    .onEnd(event => {
+      'worklet';
+      if (Math.abs(event.translationX) < 60) return;
+      runOnJS(goRelative)(event.translationX < 0 ? 1 : -1);
+    });
+
   return (
     <View style={styles.root}>
-      {screen === 'onboarding' && <OnboardingScreen onComplete={handleOnboardingComplete} />}
-      {screen === 'todo' && <TodoScreen appState={appState} onStateChange={handleStateChange} userId={userIdRef.current ?? undefined} />}
-      {screen === 'focus' && <FocusScreen userId={userIdRef.current ?? undefined} />}
-      {screen === 'productivity' && <ProductivityScreen appState={appState} />}
-      {screen === 'leaderboard' && <LeaderboardScreen appState={appState} userId={userIdRef.current ?? undefined} />}
+      <GestureDetector gesture={swipeGesture}>
+        <View style={styles.swipeArea}>
+          {screen === 'onboarding' && <OnboardingScreen onComplete={handleOnboardingComplete} />}
+          {screen === 'todo' && <TodoScreen appState={appState} onStateChange={handleStateChange} userId={userIdRef.current ?? undefined} />}
+          {screen === 'focus' && <FocusScreen userId={userIdRef.current ?? undefined} />}
+          {screen === 'productivity' && <ProductivityScreen appState={appState} />}
+          {screen === 'leaderboard' && <LeaderboardScreen appState={appState} userId={userIdRef.current ?? undefined} />}
+        </View>
+      </GestureDetector>
 
       {showTabs && (
         <Animated.View style={[styles.tabBar, { opacity: tabFadeAnim }]}>
@@ -165,6 +196,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  swipeArea: {
+    flex: 1,
   },
   tabBar: {
     position: 'absolute',

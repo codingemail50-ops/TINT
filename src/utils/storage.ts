@@ -151,6 +151,21 @@ export function getConsistencyData(history: DayRecord[]): { day: string; value: 
   return last7;
 }
 
+// Lifetime minutes spent on completed tasks, grouped by category — used for
+// the Progress screen's "time by category" breakdown.
+export function getCategoryTime(history: DayRecord[]): { category: string; mins: number }[] {
+  const totals = new Map<string, number>();
+  for (const day of history) {
+    for (const task of day.tasks) {
+      if (!task.completed) continue;
+      totals.set(task.category, (totals.get(task.category) ?? 0) + task.duration);
+    }
+  }
+  return Array.from(totals.entries())
+    .map(([category, mins]) => ({ category, mins }))
+    .sort((a, b) => b.mins - a.mins);
+}
+
 export function getHeatmapData(history: DayRecord[]): { date: string; value: number }[] {
   const result: { date: string; value: number }[] = [];
   for (let i = 69; i >= 0; i--) {
