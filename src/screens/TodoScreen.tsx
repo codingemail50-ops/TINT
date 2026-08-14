@@ -7,16 +7,16 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
 import { Task, getCombinedPreset, ExamType } from '../data/examPresets';
 import { StorageService, AppState } from '../utils/storage';
 import { TaskItem } from '../components/TaskItem';
-import { FlameIcon } from '../components/FlameIcon';
+import { FlameBadge } from '../components/FlameBadge';
 import { Confetti } from '../components/Confetti';
 import { UCEEDCountdown, NIDCountdown, NIFTCountdown } from '../components/ExamCountdowns';
 import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog } from '../utils/supabaseStorage';
+import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '../utils/focusLog';
 
 const CATEGORIES = [
   'Study', 'Practice', 'Revision', 'Reading', 'Writing',
@@ -283,7 +283,7 @@ function buildDateStrip(history: AppState['history']) {
 export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId }) => {
   const [tasks, setTasks]           = useState<Task[]>([]);
   const [selectedDate, setSelectedDate] = useState(todayStr);
-  const [filter, setFilter] = useState<'all' | 'todo' | 'done'>('all');
+  const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
 
   // Per-task countdown timer — only one active at a time
   const [timerTaskId, setTimerTaskId]   = useState<string | null>(null);
@@ -338,6 +338,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
         await StorageService.saveTodayTasks(fresh);
       }
     })();
+    loadFocusLog().then(setFocusLog);
   }, []);
 
   const viewingPast = selectedDate !== todayStr;
@@ -345,18 +346,13 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
     ? appState.history.find(h => h.date === selectedDate)
     : null;
   const displayTasks = viewingPast ? (pastRecord?.tasks ?? []) : tasks;
-  const filteredTasks = filter === 'todo' ? displayTasks.filter(t => !t.completed)
-    : filter === 'done' ? displayTasks.filter(t => t.completed)
-    : displayTasks;
+  const todoGroup = displayTasks.filter(t => !t.completed && t.id !== timerTaskId);
+  const doneGroup = displayTasks.filter(t => t.completed);
+  const focusToday = computeFocusStats(focusLog).today;
 
   const completedCount = displayTasks.filter(t => t.completed).length;
   const totalCount     = displayTasks.length;
   const progress       = totalCount > 0 ? completedCount / totalCount : 0;
-
-  // Today's values for FlameIcon
-  const todayConsistency = tasks.length > 0
-    ? Math.round((tasks.filter(t => t.completed).length / tasks.length) * 100)
-    : 0;
 
   useEffect(() => {
     if (!viewingPast) {
@@ -397,13 +393,11 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
   // ── Per-task countdown timer ──────────────────────────────────────────────────
   const logFocusMinutes = async (mins: number) => {
     if (mins < 1) return;
-    try {
-      const raw = await AsyncStorage.getItem('tint_focus_log');
-      const log = raw ? JSON.parse(raw) : [];
-      const updatedLog = [...log, { date: new Date().toDateString(), mins }];
-      await AsyncStorage.setItem('tint_focus_log', JSON.stringify(updatedLog));
-      if (userId) void syncFocusLog(userId, updatedLog);
-    } catch {}
+    const log = await loadFocusLog();
+    const updatedLog = [...log, { date: new Date().toDateString(), mins }];
+    await saveFocusLog(updatedLog);
+    setFocusLog(updatedLog);
+    if (userId) void syncFocusLog(userId, updatedLog);
   };
 
   const stopTimerInterval = () => {
@@ -572,30 +566,44 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
       }]}>
         <View style={styles.headerTop}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.greeting}>{getGreeting()},</Text>
+            <Text style={styles.tagline}>There is no tomorrow</Text>
             <Text style={styles.userName}>{user?.name ?? 'Champion'}</Text>
           </View>
-          <FlameIcon streak={appState.streak} consistency={todayConsistency} size={52} />
+          <FlameBadge streak={appState.streak} size={46} />
         </View>
 
-        {/* Progress */}
-        <View style={styles.progressSection}>
-          <View style={styles.progressHeader}>
-            <Text style={styles.progressLabel}>
-              {viewingPast ? selectedDate : "Today's Progress"}
-            </Text>
-            <Text style={[styles.progressCount, { color: progressColor }]}>
-              {completedCount}/{totalCount}
-            </Text>
+        {!viewingPast && (
+          <View style={styles.pillRow}>
+            <View style={styles.pillCol}>
+              <View style={[styles.pill, { borderColor: Colors.blue[400] }]}>
+                <Ionicons name="flash" size={14} color={Colors.blue[400]} />
+                <Text style={[styles.pillVal, { color: Colors.blue[400] }]}>{focusToday}</Text>
+              </View>
+              <Text style={styles.pillLabel}>Focus</Text>
+            </View>
+            <View style={styles.pillCol}>
+              <View style={[styles.pill, { borderColor: Colors.success }]}>
+                <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
+                <Text style={[styles.pillVal, { color: Colors.success }]}>{completedCount}/{totalCount}</Text>
+              </View>
+              <Text style={styles.pillLabel}>Progress</Text>
+            </View>
           </View>
-          <View style={styles.progressTrack}>
-            <Animated.View style={[styles.progressFill, {
-              width: `${progress * 100}%` as any,
-              backgroundColor: progressColor,
-              shadowColor: progressColor,
-            }]} />
+        )}
+
+        {viewingPast && (
+          <View style={styles.progressSection}>
+            <View style={styles.progressHeader}>
+              <Text style={styles.progressLabel}>{selectedDate}</Text>
+              <Text style={[styles.progressCount, { color: progressColor }]}>
+                {completedCount}/{totalCount}
+              </Text>
+            </View>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${progress * 100}%` as any, backgroundColor: progressColor }]} />
+            </View>
           </View>
-        </View>
+        )}
       </Animated.View>
 
       {/* ── Exam countdowns ────────────────────────────────────────────────── */}
@@ -676,65 +684,66 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
           )}
         </View>
 
-        {!viewingPast && (
-          <>
-            <Text style={styles.longPressHint}>Long-press any task to edit its duration</Text>
-            <View style={styles.filterRow}>
-              {(['all', 'todo', 'done'] as const).map(f => (
-                <TouchableOpacity
-                  key={f}
-                  style={[styles.filterChip, filter === f && styles.filterChipActive]}
-                  onPress={() => { setFilter(f); buttonPress(); }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.filterChipText, filter === f && styles.filterChipTextActive]}>
-                    {f === 'all' ? 'All' : f === 'todo' ? 'To do' : 'Done'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+        {viewingPast ? (
+          displayTasks.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No tasks recorded</Text>
+              <Text style={styles.emptyDesc}>No study session was recorded for this day.</Text>
             </View>
-          </>
-        )}
-
-        {filteredTasks.length === 0 ? (
+          ) : (
+            displayTasks.map((task, index) => (
+              <TaskItem key={task.id} task={task} readOnly index={index} />
+            ))
+          )
+        ) : displayTasks.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>
-              {viewingPast ? 'No tasks recorded'
-                : filter === 'done' ? 'Nothing done yet'
-                : filter === 'todo' ? 'All caught up'
-                : 'No tasks yet'}
-            </Text>
-            <Text style={styles.emptyDesc}>
-              {viewingPast ? 'No study session was recorded for this day.'
-                : filter === 'done' ? 'Complete a task and it will show up here.'
-                : filter === 'todo' ? 'Every task is done — nice.'
-                : 'Tap "+ Add Task" to build your study plan.'}
-            </Text>
+            <Text style={styles.emptyTitle}>No tasks yet</Text>
+            <Text style={styles.emptyDesc}>Tap "+ Add Task" to build your study plan.</Text>
           </View>
         ) : (
-          filteredTasks.map((task, index) => (
-            task.id === timerTaskId ? (
-              <ActiveTimerRow
-                key={task.id}
-                task={task}
-                remaining={timerRemaining}
-                total={timerTotal}
-                running={timerRunning}
-                onTogglePause={toggleTimerPause}
-                onCancel={cancelTimer}
-              />
-            ) : (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onToggle={viewingPast ? undefined : handleTaskPress}
-                onDelete={(!viewingPast && task.isCustom) ? handleDelete : undefined}
-                onLongPress={viewingPast ? undefined : handleLongPress}
-                readOnly={viewingPast}
-                index={index}
-              />
-            )
-          ))
+          <>
+            <View style={[styles.blob, styles.blobTodo]}>
+              <Text style={[styles.blobLabel, styles.blobLabelTodo]}>To do</Text>
+              {timerTaskId && tasks.find(t => t.id === timerTaskId) && (
+                <ActiveTimerRow
+                  task={tasks.find(t => t.id === timerTaskId)!}
+                  remaining={timerRemaining}
+                  total={timerTotal}
+                  running={timerRunning}
+                  onTogglePause={toggleTimerPause}
+                  onCancel={cancelTimer}
+                />
+              )}
+              {todoGroup.length === 0 && !timerTaskId ? (
+                <Text style={styles.blobEmpty}>All caught up.</Text>
+              ) : (
+                todoGroup.map((task, index) => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    onToggle={handleTaskPress}
+                    onDelete={task.isCustom ? handleDelete : undefined}
+                    onLongPress={handleLongPress}
+                    index={index}
+                  />
+                ))
+              )}
+            </View>
+
+            {doneGroup.length > 0 && (
+              <View style={[styles.blob, styles.blobDone]}>
+                <Text style={[styles.blobLabel, styles.blobLabelDone]}>Done</Text>
+                {doneGroup.map((task, index) => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    onToggle={handleTaskPress}
+                    index={index}
+                  />
+                ))}
+              </View>
+            )}
+          </>
         )}
 
         {!viewingPast && completedCount > 0 && completedCount < totalCount && (
@@ -909,7 +918,21 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   greeting: { ...Typography.bodyMedium, color: Colors.textSecondary },
-  userName:  { fontSize: 24, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
+  tagline: {
+    fontFamily: Fonts.display, fontSize: 13, color: Colors.blue[400],
+    letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 2,
+  },
+  userName: { fontFamily: Fonts.retro, fontSize: 28, color: Colors.textPrimary, letterSpacing: 0.5 },
+
+  pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs },
+  pillCol: { alignItems: 'center', gap: 6 },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1.5, borderRadius: BorderRadius.full,
+    paddingHorizontal: 14, paddingVertical: 7,
+  },
+  pillVal: { fontFamily: Fonts.retro, fontSize: 16 },
+  pillLabel: { fontSize: 11, color: Colors.textSecondary },
   progressSection: { gap: 6 },
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   progressLabel: { ...Typography.labelSmall, color: Colors.textSecondary },
@@ -960,21 +983,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   listTitle: { ...Typography.headlineSmall, color: Colors.textPrimary, flex: 1, marginRight: Spacing.sm },
-  longPressHint: { ...Typography.bodySmall, color: Colors.textMuted, marginBottom: Spacing.sm },
   countdownStack: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm, gap: Spacing.sm },
-  filterRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
-  filterChip: {
-    paddingHorizontal: Spacing.md, paddingVertical: 6,
-    borderRadius: BorderRadius.full, backgroundColor: Colors.surface,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  filterChipActive: { backgroundColor: Colors.primaryGlow, borderColor: Colors.primary },
-  filterChipText: { ...Typography.labelSmall, color: Colors.textSecondary },
-  filterChipTextActive: { color: Colors.primaryLight },
+  blob: { borderRadius: BorderRadius.lg, padding: Spacing.md, marginBottom: Spacing.md },
+  blobTodo: { backgroundColor: 'rgba(30,90,134,0.10)', borderWidth: 1, borderColor: 'rgba(30,90,134,0.55)' },
+  blobDone: { backgroundColor: Colors.successGlow, borderWidth: 1, borderColor: Colors.success + '4D' },
+  blobLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: Spacing.sm, paddingLeft: 2 },
+  blobLabelTodo: { color: Colors.blue[500] },
+  blobLabelDone: { color: Colors.success },
+  blobEmpty: { ...Typography.bodySmall, color: Colors.textMuted, paddingVertical: Spacing.sm },
 
   addBtn: { borderRadius: BorderRadius.sm, overflow: 'hidden' },
-  addBtnGradient: { paddingHorizontal: Spacing.md, paddingVertical: 8, backgroundColor: Colors.primary },
-  addBtnText: { ...Typography.labelLarge, color: '#000', fontSize: 13 },
+  addBtnGradient: { paddingHorizontal: Spacing.md, paddingVertical: 8, backgroundColor: Colors.textPrimary },
+  addBtnText: { fontFamily: Fonts.retro, fontSize: 16, color: Colors.background, letterSpacing: 0.5 },
   backTodayBtn: {
     paddingHorizontal: Spacing.md,
     paddingVertical: 8,

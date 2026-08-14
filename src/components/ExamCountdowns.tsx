@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
 
 interface RemainingTime {
   days: number;
@@ -34,11 +33,10 @@ function formatDateStamp(d: Date): string {
 
 interface CountdownCardProps {
   examName: string;
-  icon: keyof typeof Ionicons.glyphMap;
   target: Date;
 }
 
-const CountdownCard: React.FC<CountdownCardProps> = ({ examName, icon, target }) => {
+const CountdownCard: React.FC<CountdownCardProps> = ({ examName, target }) => {
   const [remaining, setRemaining] = useState<RemainingTime>(() => getRemaining(target));
 
   useEffect(() => {
@@ -57,10 +55,7 @@ const CountdownCard: React.FC<CountdownCardProps> = ({ examName, icon, target })
 
   return (
     <View style={styles.card}>
-      <View style={styles.headerRow}>
-        <Ionicons name={icon} size={16} color={Colors.textSecondary} />
-        <Text style={styles.examLabel}>{examName} Countdown</Text>
-      </View>
+      <Text style={styles.examLabel}>{examName} Countdown</Text>
       <View style={styles.bottomRow}>
         <Text style={styles.countdownText}>
           {remaining.days}d  {pad(remaining.hours)}:{pad(remaining.mins)}:{pad(remaining.secs)}
@@ -73,17 +68,19 @@ const CountdownCard: React.FC<CountdownCardProps> = ({ examName, icon, target })
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.surfaceElevated,
+    backgroundColor: Colors.surface,
     borderRadius: BorderRadius.md,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.blue[800],
     padding: Spacing.md,
     marginBottom: Spacing.sm,
   },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: 6 },
-  examLabel: { ...Typography.labelSmall, fontWeight: '700', color: Colors.textSecondary },
-  bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  countdownText: { ...Typography.headlineMedium, color: Colors.textPrimary, fontVariant: ['tabular-nums'] },
+  examLabel: {
+    ...Typography.labelSmall, fontWeight: '700', color: Colors.blue[300],
+    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6,
+  },
+  bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  countdownText: { fontFamily: Fonts.retro, fontSize: 26, color: Colors.textPrimary, letterSpacing: 1 },
   dateStamp: { ...Typography.bodySmall, color: Colors.textMuted },
   passedText: { ...Typography.headlineSmall, color: Colors.success },
 });
@@ -94,33 +91,15 @@ interface CountdownProps {
 
 export const UCEEDCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
   if (!examTypes.includes('UCEED')) return null;
-  return (
-    <CountdownCard
-      examName="UCEED"
-      icon="pencil"
-      target={new Date('2027-01-17T09:00:00+05:30')}
-    />
-  );
+  return <CountdownCard examName="UCEED" target={new Date('2027-01-17T09:00:00+05:30')} />;
 };
 
 export const NIDCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
   if (!examTypes.includes('NID')) return null;
-  return (
-    <CountdownCard
-      examName="NID"
-      icon="color-palette"
-      target={new Date('2026-12-21T09:00:00+05:30')}
-    />
-  );
+  return <CountdownCard examName="NID" target={new Date('2026-12-21T09:00:00+05:30')} />;
 };
 
 export const NIFTCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
   if (!examTypes.includes('NIFT')) return null;
-  return (
-    <CountdownCard
-      examName="NIFT"
-      icon="shirt"
-      target={new Date('2027-02-08T09:00:00+05:30')}
-    />
-  );
+  return <CountdownCard examName="NIFT" target={new Date('2027-02-08T09:00:00+05:30')} />;
 };

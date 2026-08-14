@@ -16,6 +16,7 @@ import { syncFocusLog } from '../utils/supabaseStorage';
 import { StorageService } from '../utils/storage';
 import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '../utils/focusLog';
 import { PixelFlame } from '../components/PixelFlame';
+import { FlameBadge } from '../components/FlameBadge';
 
 const DURATIONS = [15, 25, 45, 60, 90];
 const DEFAULT_DURATION = 25;
@@ -349,10 +350,7 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
             <View style={styles.topBar}>
               <Text style={styles.wordmark}>There is no tomorrow</Text>
               <View style={styles.topRight}>
-                <View style={styles.flameBadge}>
-                  <PixelFlame size={16} state="static" />
-                  <Text style={styles.flameBadgeN}>{streak}</Text>
-                </View>
+                <FlameBadge streak={streak} size={38} />
                 <TouchableOpacity style={styles.closeBtn} onPress={openConfirm} activeOpacity={0.7}>
                   <Ionicons name="close" size={16} color={Colors.textSecondary} />
                 </TouchableOpacity>
@@ -522,13 +520,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5, textTransform: 'uppercase',
   },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  flameBadge: {
-    width: 38, height: 38, borderRadius: 8,
-    borderWidth: 1.5, borderColor: Colors.blue[400],
-    backgroundColor: 'rgba(115,181,221,0.1)',
-    alignItems: 'center', justifyContent: 'center', gap: 1,
-  },
-  flameBadgeN: { fontFamily: Fonts.retro, fontSize: 12, color: Colors.blue[400] },
   closeBtn: {
     width: 34, height: 34, borderRadius: 9,
     borderWidth: 1, borderColor: Colors.border,
