@@ -1,19 +1,24 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Animated, Modal, AppState as RNAppState, AppStateStatus,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable, Alert,
+  Animated, AppState as RNAppState, AppStateStatus, Dimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import Svg, { Circle } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path } from 'react-native-svg';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
 import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog } from '../utils/supabaseStorage';
+import { StorageService } from '../utils/storage';
+import { PixelFlame } from '../components/PixelFlame';
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 const DURATIONS = [15, 25, 45, 60, 90];
 const DEFAULT_DURATION = 25;
+const HOLD_MS = 3000;
 
 const FOCUS_APPS: { id: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: 'instagram', label: 'Instagram', icon: 'logo-instagram' },
@@ -35,10 +40,27 @@ interface FocusLogEntry {
   mins: number;
 }
 
-const RADIUS = 75;
-const STROKE_WIDTH = 10;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-const SVG_SIZE = (RADIUS + STROKE_WIDTH) * 2;
+// Scalloped blob outline — same wavy-radius technique agreed on in the mockups.
+function scallopPath(cx: number, cy: number, rBase: number, bumps = 15, amp = 5, n = 120): string {
+  const pts: [number, number][] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = (i / n) * 2 * Math.PI;
+    const r = rBase + amp * Math.sin(bumps * t);
+    pts.push([cx + r * Math.cos(t), cy + r * Math.sin(t)]);
+  }
+  return `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)} ` +
+    pts.slice(1).map(([x, y]) => `L ${x.toFixed(1)} ${y.toFixed(1)}`).join(' ') + ' Z';
+}
+
+const BLOB_SIZE = 240;
+const BLOB_WRAP = BLOB_SIZE + 24;
+const BLOB_R = 86;
+const BLOB_AMP = 5;
+const BLOB_PATH = scallopPath(BLOB_SIZE / 2, BLOB_SIZE / 2, BLOB_R, 15, BLOB_AMP);
+const TRACE_PATH = scallopPath(BLOB_SIZE / 2, BLOB_SIZE / 2, BLOB_R + 5, 15, BLOB_AMP);
+
+const SCREEN_H = Dimensions.get('window').height;
+const SHEET_HEIGHT = Math.min(560, SCREEN_H * 0.78);
 
 function formatMMSS(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -54,7 +76,7 @@ async function loadFocusLog(): Promise<FocusLogEntry[]> {
 }
 
 function startOfWeek(d: Date): Date {
-  const day = d.getDay(); // 0 = Sunday
+  const day = d.getDay();
   const result = new Date(d);
   result.setDate(d.getDate() - day);
   result.setHours(0, 0, 0, 0);
@@ -75,7 +97,15 @@ function computeStats(log: FocusLogEntry[]): { today: number; week: number; allT
   return { today, week, allTime };
 }
 
-// ── Main Screen ───────────────────────────────────────────────────────────────
+function holdHsl(t: number): { bg: string; border: string } {
+  const sat = 20 + t * 60;
+  const light = 25 - t * 8;
+  return {
+    bg: `hsl(350, ${sat}%, ${light}%)`,
+    border: `hsl(350, ${40 + t * 40}%, ${45 - t * 10}%)`,
+  };
+}
+
 interface Props {
   userId?: string;
 }
@@ -86,19 +116,28 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
   const [phase, setPhase] = useState<Phase>('setup');
   const [duration, setDuration] = useState(DEFAULT_DURATION);
   const [timeLeft, setTimeLeft] = useState(DEFAULT_DURATION * 60);
+  const [paused, setPaused] = useState(false);
+  const [streak, setStreak] = useState(0);
 
   const [blockedApps, setBlockedApps] = useState<string[]>(DEFAULT_BLOCKED_APPS);
-  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
 
   const endTimeRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wasPausedBeforeConfirm = useRef(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const sheetY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const { taskComplete, buttonPress } = useHaptics();
 
-  // ── Initial load ────────────────────────────────────────────────────────────
+  const [holdStyle, setHoldStyle] = useState(holdHsl(0));
+  const [holdLabel, setHoldLabel] = useState('Hold to end session');
+  const holdRAF = useRef<number | null>(null);
+  const holdStart = useRef(0);
+
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
 
@@ -109,10 +148,19 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
         else await AsyncStorage.setItem(KEYS.BLOCKED_APPS, JSON.stringify(DEFAULT_BLOCKED_APPS));
       } catch {}
       setFocusLog(await loadFocusLog());
+      const state = await StorageService.getAppState();
+      setStreak(state.streak);
     })();
   }, []);
 
-  // ── Timer tick + AppState background/foreground correction ────────────────
+  useEffect(() => {
+    Animated.timing(sheetY, {
+      toValue: sheetOpen ? 0 : SHEET_HEIGHT,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  }, [sheetOpen, sheetY]);
+
   const finishSession = useCallback(async () => {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
     endTimeRef.current = 0;
@@ -142,43 +190,93 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
 
   useEffect(() => {
     const onChange = (state: AppStateStatus) => {
-      if (state === 'active' && endTimeRef.current > 0) {
+      if (state === 'active' && endTimeRef.current > 0 && !paused) {
         tick();
       }
     };
     const sub = RNAppState.addEventListener('change', onChange);
     return () => sub.remove();
-  }, [tick]);
+  }, [tick, paused]);
 
   useEffect(() => {
-    if (phase === 'active') {
+    if (phase === 'active' && !paused) {
       intervalRef.current = setInterval(tick, 1000);
       return () => {
         if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
       };
     }
-  }, [phase, tick]);
+  }, [phase, paused, tick]);
 
-  // ── Actions ──────────────────────────────────────────────────────────────────
+  const resetToSetup = useCallback(() => {
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+    endTimeRef.current = 0;
+    setPaused(false);
+    setConfirmOpen(false);
+    setSheetOpen(false);
+    setTimeLeft(duration * 60);
+    setPhase('setup');
+  }, [duration]);
+
   const handleStart = async () => {
     await buttonPress();
     endTimeRef.current = Date.now() + duration * 60 * 1000;
     setTimeLeft(duration * 60);
+    setPaused(false);
     setPhase('active');
-  };
-
-  const handleEndSession = async () => {
-    await buttonPress();
-    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
-    endTimeRef.current = 0;
-    setTimeLeft(duration * 60);
-    setPhase('setup');
   };
 
   const handleStartAnother = async () => {
     await buttonPress();
     setTimeLeft(duration * 60);
     setPhase('setup');
+  };
+
+  const togglePause = async () => {
+    await buttonPress();
+    if (paused) {
+      endTimeRef.current = Date.now() + timeLeft * 1000;
+      setPaused(false);
+    } else {
+      const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      setPaused(true);
+    }
+  };
+
+  const openConfirm = async () => {
+    await buttonPress();
+    wasPausedBeforeConfirm.current = paused;
+    setPaused(true);
+    setConfirmOpen(true);
+  };
+
+  const closeConfirm = async () => {
+    await buttonPress();
+    setConfirmOpen(false);
+    setPaused(wasPausedBeforeConfirm.current);
+  };
+
+  const holdTick = useCallback(() => {
+    const elapsed = Date.now() - holdStart.current;
+    const t = Math.min(1, elapsed / HOLD_MS);
+    setHoldStyle(holdHsl(t));
+    if (t >= 1) {
+      setHoldLabel('Session ended');
+      resetToSetup();
+      return;
+    }
+    holdRAF.current = requestAnimationFrame(holdTick);
+  }, [resetToSetup]);
+
+  const startHold = () => {
+    holdStart.current = Date.now();
+    holdRAF.current = requestAnimationFrame(holdTick);
+  };
+
+  const cancelHold = () => {
+    if (holdRAF.current) cancelAnimationFrame(holdRAF.current);
+    setHoldStyle(holdHsl(0));
+    setHoldLabel('Hold to end session');
   };
 
   const toggleBlockedApp = async (id: string) => {
@@ -190,182 +288,217 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
     try { await AsyncStorage.setItem(KEYS.BLOCKED_APPS, JSON.stringify(updated)); } catch {}
   };
 
+  const addCustomApp = () => {
+    Alert.alert(
+      'Add custom apps',
+      'Blocking any app you choose needs system-level permission (Screen Time / Accessibility Service), which requires a native build. Coming soon.'
+    );
+  };
+
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetY([-20, 20])
+    .failOffsetX([-25, 25])
+    .onEnd(event => {
+      'worklet';
+      if (event.translationY < -50) runOnJS(setSheetOpen)(true);
+      else if (event.translationY > 50) runOnJS(setSheetOpen)(false);
+    });
+
   const stats = computeStats(focusLog);
 
   const totalSeconds = duration * 60;
   const pct = totalSeconds > 0 ? (totalSeconds - timeLeft) / totalSeconds : 0;
-  const strokeDashoffset = CIRCUMFERENCE * (1 - pct);
+  const traceDashoffset = 100 * (1 - pct);
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <Animated.ScrollView
-        style={{ opacity: fadeAnim }}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.title}>Focus</Text>
-        <Text style={styles.subtitle}>Deep work, distraction-free.</Text>
 
-        {phase === 'setup' && (
-          <>
-            {/* Duration chips */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Duration</Text>
-              <View style={styles.chipRow}>
-                {DURATIONS.map(d => (
-                  <TouchableOpacity
-                    key={d}
-                    style={[styles.chip, duration === d && styles.chipActive]}
-                    onPress={() => { setDuration(d); setTimeLeft(d * 60); buttonPress(); }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.chipText, duration === d && styles.chipTextActive]}>
-                      {d}m
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+      {phase !== 'active' && (
+        <Animated.ScrollView
+          style={{ opacity: fadeAnim }}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.title}>Focus</Text>
+          <Text style={styles.subtitle}>Deep work, distraction-free.</Text>
 
-            {/* Distraction block row */}
-            <TouchableOpacity
-              style={styles.blockRow}
-              onPress={() => { setShowBlockModal(true); buttonPress(); }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="ban" size={20} color={Colors.textPrimary} style={styles.blockRowIcon} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.blockRowTitle}>Distraction Block</Text>
-                <Text style={styles.blockRowSub}>
-                  {blockedApps.length > 0
-                    ? `${blockedApps.length} app${blockedApps.length === 1 ? '' : 's'} on your reminder list`
-                    : 'No apps selected'}
-                </Text>
-              </View>
-              <Text style={styles.blockRowChevron}>›</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.startBtn} onPress={handleStart} activeOpacity={0.8}>
-              <Text style={styles.startBtnText}>Start Focus Session</Text>
-            </TouchableOpacity>
-
-            {/* Stats */}
-            <View style={styles.statsRow}>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{stats.today}</Text>
-                <Text style={styles.statLabel}>Today</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{stats.week}</Text>
-                <Text style={styles.statLabel}>This Week</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{stats.allTime}</Text>
-                <Text style={styles.statLabel}>All-Time</Text>
-              </View>
-            </View>
-          </>
-        )}
-
-        {phase === 'active' && (
-          <View style={styles.activeWrapper}>
-            <View style={{ width: SVG_SIZE, height: SVG_SIZE }}>
-              <Svg width={SVG_SIZE} height={SVG_SIZE}>
-                <Circle
-                  cx={SVG_SIZE / 2}
-                  cy={SVG_SIZE / 2}
-                  r={RADIUS}
-                  stroke={Colors.border}
-                  strokeWidth={STROKE_WIDTH}
-                  fill="none"
-                />
-                <Circle
-                  cx={SVG_SIZE / 2}
-                  cy={SVG_SIZE / 2}
-                  r={RADIUS}
-                  stroke={Colors.primary}
-                  strokeWidth={STROKE_WIDTH}
-                  fill="none"
-                  strokeDasharray={CIRCUMFERENCE}
-                  strokeDashoffset={strokeDashoffset}
-                  strokeLinecap="round"
-                  rotation={-90}
-                  originX={SVG_SIZE / 2}
-                  originY={SVG_SIZE / 2}
-                />
-              </Svg>
-              <View style={styles.ringCenter}>
-                <Text style={styles.timeText}>{formatMMSS(timeLeft)}</Text>
-                <Text style={styles.timeSub}>remaining</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.endBtn} onPress={handleEndSession} activeOpacity={0.7}>
-              <Text style={styles.endBtnText}>End Session</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {phase === 'done' && (
-          <View style={styles.doneWrapper}>
-            <Ionicons name="flame" size={56} color={Colors.primary} style={styles.doneIcon} />
-            <Text style={styles.doneTitle}>Session Complete!</Text>
-            <Text style={styles.doneSub}>{duration} minutes of pure focus.</Text>
-            <TouchableOpacity style={styles.startBtn} onPress={handleStartAnother} activeOpacity={0.8}>
-              <Text style={styles.startBtnText}>Start Another</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </Animated.ScrollView>
-
-      {/* ── Distraction Block Modal ──────────────────────────────────────────── */}
-      <Modal
-        visible={showBlockModal}
-        animationType="slide"
-        transparent
-        presentationStyle="overFullScreen"
-        onRequestClose={() => setShowBlockModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowBlockModal(false)}
-        />
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHandle} />
-          <Text style={styles.modalTitle}>Distraction Block</Text>
-          <Text style={styles.modalDesc}>
-            A personal reminder list — apps to stay away from during this session.
-          </Text>
-
-          {FOCUS_APPS.map(app => {
-            const active = blockedApps.includes(app.id);
-            return (
-              <TouchableOpacity
-                key={app.id}
-                style={styles.appRow}
-                onPress={() => toggleBlockedApp(app.id)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name={app.icon} size={20} color={Colors.textPrimary} style={styles.appIcon} />
-                <Text style={styles.appLabel}>{app.label}</Text>
-                <View style={[styles.toggle, active && styles.toggleOn]}>
-                  <View style={[styles.toggleThumb, active && styles.toggleThumbOn]} />
+          {phase === 'setup' && (
+            <>
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Duration</Text>
+                <View style={styles.chipRow}>
+                  {DURATIONS.map(d => (
+                    <TouchableOpacity
+                      key={d}
+                      style={[styles.chip, duration === d && styles.chipActive]}
+                      onPress={() => { setDuration(d); setTimeLeft(d * 60); buttonPress(); }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.chipText, duration === d && styles.chipTextActive]}>
+                        {d}m
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              </TouchableOpacity>
-            );
-          })}
+              </View>
 
-          <TouchableOpacity
-            style={styles.doneBtnModal}
-            onPress={() => { setShowBlockModal(false); buttonPress(); }}
-            activeOpacity={0.8}
+              <TouchableOpacity style={styles.startBtn} onPress={handleStart} activeOpacity={0.8}>
+                <Text style={styles.startBtnText}>Start Focus Session</Text>
+              </TouchableOpacity>
+
+              <View style={styles.statsRow}>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>{stats.today}</Text>
+                  <Text style={styles.statLabel}>Today</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>{stats.week}</Text>
+                  <Text style={styles.statLabel}>This Week</Text>
+                </View>
+                <View style={styles.statCard}>
+                  <Text style={styles.statValue}>{stats.allTime}</Text>
+                  <Text style={styles.statLabel}>All-Time</Text>
+                </View>
+              </View>
+            </>
+          )}
+
+          {phase === 'done' && (
+            <View style={styles.doneWrapper}>
+              <PixelFlame size={64} state="static" style={styles.doneIcon} />
+              <Text style={styles.doneTitle}>Session Complete!</Text>
+              <Text style={styles.doneSub}>{duration} minutes of pure focus.</Text>
+              <TouchableOpacity style={styles.startBtn} onPress={handleStartAnother} activeOpacity={0.8}>
+                <Text style={styles.startBtnText}>Start Another</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </Animated.ScrollView>
+      )}
+
+      {phase === 'active' && (
+        <GestureDetector gesture={swipeGesture}>
+          <View style={styles.activeScreen}>
+            <View style={styles.topBar}>
+              <Text style={styles.wordmark}>There is no tomorrow</Text>
+              <View style={styles.topRight}>
+                <View style={styles.flameBadge}>
+                  <PixelFlame size={16} state="static" />
+                  <Text style={styles.flameBadgeN}>{streak}</Text>
+                </View>
+                <TouchableOpacity style={styles.closeBtn} onPress={openConfirm} activeOpacity={0.7}>
+                  <Ionicons name="close" size={16} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.hero}>
+              <View style={styles.blobWrap}>
+                <Svg width={BLOB_WRAP} height={BLOB_WRAP} viewBox={`0 0 ${BLOB_SIZE} ${BLOB_SIZE}`}>
+                  <Path d={BLOB_PATH} fill={Colors.blue[100]} />
+                  <Path
+                    d={TRACE_PATH}
+                    fill="none"
+                    stroke={Colors.blue[500]}
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeDasharray="100"
+                    strokeDashoffset={traceDashoffset}
+                    // @ts-ignore — pathLength is supported by react-native-svg at runtime
+                    pathLength={100}
+                  />
+                </Svg>
+                <View style={styles.blobContent}>
+                  <Text style={styles.blobTask}>Focus Session</Text>
+                  <Text style={styles.blobTime}>{formatMMSS(timeLeft)}</Text>
+                  <TouchableOpacity style={styles.pauseCircle} onPress={togglePause} activeOpacity={0.75}>
+                    <Ionicons name={paused ? 'play' : 'pause'} size={20} color={Colors.blue[100]} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {!sheetOpen && (
+              <View style={styles.swipeHint} pointerEvents="none">
+                <Ionicons name="chevron-up" size={16} color={Colors.textMuted} />
+                <Text style={styles.swipeHintText}>Swipe up for blocked apps</Text>
+              </View>
+            )}
+          </View>
+        </GestureDetector>
+      )}
+
+      {confirmOpen && (
+        <View style={StyleSheet.absoluteFillObject}>
+          <LinearGradient
+            colors={['rgba(6,6,8,0.2)', 'rgba(20,4,8,0.55)', 'rgba(30,4,10,0.92)']}
+            locations={[0, 0.45, 1]}
+            style={styles.confirmOverlay}
           >
-            <Text style={styles.doneBtnModalText}>Done</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.confirmClose} onPress={closeConfirm} activeOpacity={0.7}>
+              <Ionicons name="close" size={20} color="rgba(255,255,255,0.7)" />
+            </TouchableOpacity>
+            <Text style={styles.confirmTimer}>{formatMMSS(timeLeft)}</Text>
+
+            <View style={styles.confirmSheet}>
+              <View style={styles.confirmIcon}>
+                <Ionicons name="exit-outline" size={20} color={Colors.danger} />
+              </View>
+              <Text style={styles.confirmTitle}>Leave early?</Text>
+              <Text style={styles.confirmSub}>Don't give up — there's a reason you started this.</Text>
+
+              <Pressable
+                style={[styles.holdBtn, { backgroundColor: holdStyle.bg, borderColor: holdStyle.border }]}
+                onPressIn={startHold}
+                onPressOut={cancelHold}
+              >
+                <Text style={styles.holdLabel}>{holdLabel}</Text>
+              </Pressable>
+
+              <TouchableOpacity onPress={closeConfirm} activeOpacity={0.7}>
+                <Text style={styles.neverMind}>Never mind</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
         </View>
-      </Modal>
+      )}
+
+      {phase === 'active' && (
+        <Animated.View
+          style={[styles.appsSheet, { transform: [{ translateY: sheetY }] }]}
+          pointerEvents={sheetOpen ? 'auto' : 'none'}
+        >
+          <View style={styles.appsHandle} />
+          <Text style={styles.appsTitle}>Blocked Apps</Text>
+          <Text style={styles.appsSub}>Stay away from these while this session runs.</Text>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {FOCUS_APPS.map(app => {
+              const on = blockedApps.includes(app.id);
+              return (
+                <TouchableOpacity
+                  key={app.id}
+                  style={styles.appRow}
+                  onPress={() => toggleBlockedApp(app.id)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name={app.icon} size={20} color={Colors.textPrimary} />
+                  <Text style={styles.appName}>{app.label}</Text>
+                  <View style={[styles.appToggle, on && styles.appToggleOn]}>
+                    <View style={[styles.appToggleDot, on && styles.appToggleDotOn]} />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity style={styles.addAppRow} onPress={addCustomApp} activeOpacity={0.7}>
+              <View style={styles.addAppIcon}>
+                <Ionicons name="add" size={14} color={Colors.blue[400]} />
+              </View>
+              <Text style={styles.addAppText}>Add app to block</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </Animated.View>
+      )}
     </View>
   );
 };
@@ -392,22 +525,6 @@ const styles = StyleSheet.create({
   chipText: { ...Typography.labelLarge, color: Colors.textSecondary },
   chipTextActive: { color: Colors.primaryLight },
 
-  blockRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surfaceElevated,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg,
-    gap: Spacing.sm,
-  },
-  blockRowIcon: {},
-  blockRowTitle: { ...Typography.headlineSmall, color: Colors.textPrimary, fontSize: 15 },
-  blockRowSub: { ...Typography.bodySmall, color: Colors.textMuted, marginTop: 2 },
-  blockRowChevron: { fontSize: 24, color: Colors.textMuted },
-
   startBtn: {
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.md,
@@ -415,7 +532,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.xl,
   },
-  startBtnText: { ...Typography.headlineSmall, color: '#000', fontSize: 16 },
+  startBtnText: { ...Typography.headlineSmall, color: Colors.background, fontSize: 16 },
 
   statsRow: { flexDirection: 'row', gap: Spacing.sm },
   statCard: {
@@ -431,79 +548,102 @@ const styles = StyleSheet.create({
   statValue: { ...Typography.headlineLarge, color: Colors.primary },
   statLabel: { ...Typography.labelSmall, color: Colors.textSecondary },
 
-  // Active phase
-  activeWrapper: { alignItems: 'center', paddingVertical: Spacing.xl, gap: Spacing.xl },
-  ringCenter: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
+  // ── Active phase ──────────────────────────────────────────────────────────
+  activeScreen: { flex: 1, paddingTop: 56, paddingHorizontal: Spacing.lg },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  wordmark: {
+    fontFamily: Fonts.display, fontSize: 14, color: Colors.blue[400],
+    letterSpacing: 0.5, textTransform: 'uppercase',
   },
-  timeText: { fontSize: 40, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -1 },
-  timeSub: { ...Typography.labelSmall, color: Colors.textSecondary, marginTop: 4 },
-  endBtn: {
-    borderWidth: 1,
-    borderColor: Colors.danger,
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.xl,
+  topRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  flameBadge: {
+    width: 38, height: 38, borderRadius: 8,
+    borderWidth: 1.5, borderColor: Colors.blue[400],
+    backgroundColor: 'rgba(115,181,221,0.1)',
+    alignItems: 'center', justifyContent: 'center', gap: 1,
   },
-  endBtnText: { ...Typography.labelLarge, color: Colors.danger },
+  flameBadgeN: { fontFamily: Fonts.retro, fontSize: 12, color: Colors.blue[400] },
+  closeBtn: {
+    width: 34, height: 34, borderRadius: 9,
+    borderWidth: 1, borderColor: Colors.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
 
-  // Done phase
+  hero: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  blobWrap: { width: BLOB_WRAP, height: BLOB_WRAP, alignItems: 'center', justifyContent: 'center' },
+  blobContent: { position: 'absolute', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  blobTask: {
+    fontSize: 12, fontWeight: '700', color: Colors.blue[700],
+    textTransform: 'uppercase', letterSpacing: 0.5,
+  },
+  blobTime: { fontFamily: Fonts.retro, fontSize: 40, color: Colors.ink, letterSpacing: 1, marginBottom: 10 },
+  pauseCircle: {
+    width: 50, height: 50, borderRadius: 25,
+    backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center',
+  },
+
+  swipeHint: { alignItems: 'center', gap: 2, paddingBottom: 30 },
+  swipeHintText: { fontSize: 10.5, color: Colors.textMuted },
+
+  // ── Hold-to-end confirm overlay ──────────────────────────────────────────
+  confirmOverlay: { flex: 1, justifyContent: 'flex-end' },
+  confirmClose: { position: 'absolute', top: 24, right: 22 },
+  confirmTimer: {
+    position: 'absolute', top: 130, left: 0, right: 0, textAlign: 'center',
+    fontFamily: Fonts.retro, fontSize: 46, color: 'rgba(255,255,255,0.5)',
+  },
+  confirmSheet: {
+    backgroundColor: 'rgba(20,6,10,0.75)',
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    borderTopWidth: 1, borderTopColor: 'rgba(240,89,107,0.3)',
+    paddingHorizontal: 26, paddingTop: 28, paddingBottom: 34,
+    alignItems: 'center',
+  },
+  confirmIcon: {
+    width: 46, height: 46, borderRadius: 23,
+    borderWidth: 1.5, borderColor: Colors.danger,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
+  },
+  confirmTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, marginBottom: 6 },
+  confirmSub: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', lineHeight: 19, marginBottom: 22 },
+  holdBtn: {
+    width: '100%', paddingVertical: 15, borderRadius: 999,
+    borderWidth: 1.5, alignItems: 'center',
+  },
+  holdLabel: { fontFamily: Fonts.retro, fontSize: 16, letterSpacing: 0.5, color: Colors.textPrimary },
+  neverMind: { fontSize: 13, color: Colors.textSecondary, marginTop: 14 },
+
+  // ── Done phase ────────────────────────────────────────────────────────────
   doneWrapper: { alignItems: 'center', paddingVertical: Spacing.xxl, gap: Spacing.sm },
   doneIcon: { marginBottom: Spacing.sm },
   doneTitle: { ...Typography.headlineLarge, color: Colors.textPrimary },
   doneSub: { ...Typography.bodyMedium, color: Colors.textSecondary, marginBottom: Spacing.lg },
 
-  // Modal
-  modalOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.65)' },
-  modalSheet: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
+  // ── Blocked-apps swipe-up sheet ───────────────────────────────────────────
+  appsSheet: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: SHEET_HEIGHT,
     backgroundColor: Colors.surfaceElevated,
-    borderTopLeftRadius: BorderRadius.xl,
-    borderTopRightRadius: BorderRadius.xl,
-    padding: Spacing.xl,
-    paddingBottom: 44,
+    borderTopWidth: 1, borderTopColor: Colors.border,
+    borderTopLeftRadius: 26, borderTopRightRadius: 26,
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
   },
-  modalHandle: {
-    width: 36, height: 4,
-    backgroundColor: Colors.border,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: Spacing.lg,
-  },
-  modalTitle: { ...Typography.headlineLarge, color: Colors.textPrimary, marginBottom: 4 },
-  modalDesc: { ...Typography.bodySmall, color: Colors.textMuted, marginBottom: Spacing.lg },
+  appsHandle: { width: 38, height: 4, backgroundColor: Colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  appsTitle: { fontSize: 17, fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
+  appsSub: { fontSize: 12.5, color: Colors.textSecondary, marginBottom: 18 },
   appRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    gap: Spacing.sm,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  appIcon: { width: 28 },
-  appLabel: { ...Typography.bodyLarge, color: Colors.textPrimary, flex: 1 },
-  toggle: {
-    width: 44, height: 26,
-    borderRadius: 13,
-    backgroundColor: Colors.border,
-    padding: 3,
-    justifyContent: 'center',
+  appName: { flex: 1, fontSize: 14.5, color: Colors.textPrimary },
+  appToggle: { width: 40, height: 24, borderRadius: 12, backgroundColor: Colors.border, justifyContent: 'center' },
+  appToggleOn: { backgroundColor: Colors.blue[400] },
+  appToggleDot: { width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.textPrimary, marginLeft: 3 },
+  appToggleDotOn: { marginLeft: 19 },
+  addAppRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 },
+  addAppIcon: {
+    width: 24, height: 24, borderRadius: 12,
+    borderWidth: 1.5, borderColor: Colors.blue[400], borderStyle: 'dashed',
+    alignItems: 'center', justifyContent: 'center',
   },
-  toggleOn: { backgroundColor: Colors.primary },
-  toggleThumb: {
-    width: 20, height: 20,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-  },
-  toggleThumbOn: { alignSelf: 'flex-end' },
-  doneBtnModal: {
-    marginTop: Spacing.lg,
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-  },
-  doneBtnModalText: { ...Typography.headlineSmall, color: '#000', fontSize: 15 },
+  addAppText: { color: Colors.blue[400], fontSize: 14.5 },
 });
