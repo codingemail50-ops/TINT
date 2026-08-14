@@ -1,35 +1,60 @@
-// Flat black-and-white palette — one neutral accent (white), everything else
-// is white/grey/black. No gradients, no glow. Fresh base for theme experiments.
+// Retro/gamified theme: black→blue tonal scale, with a separate green scale
+// reserved ONLY for "done"/completed states. Display font is Anton (bold
+// poster headlines), retro/numeric font is VT323 (pixel timer digits).
+const blue = {
+  50: '#F3F8FC',
+  100: '#E5F0F9',
+  200: '#C6DFF1',
+  300: '#93C5E6',
+  400: '#73B5DD',
+  500: '#348DC3',
+  600: '#2470A5',
+  700: '#1E5A86',
+  800: '#1D4D6F',
+  900: '#1D415D',
+  950: '#132A3E',
+};
+
+// Reserved for completed/done states only — never used for structure or accents.
+const green = {
+  light: '#4BBC87',
+  deep: '#156747',
+  glow: 'rgba(75, 188, 135, 0.14)',
+};
+
 export const Colors = {
-  background: '#0A0A0A',
-  surface: '#141414',
-  surfaceElevated: '#1C1C1C',
-  border: '#2A2A2A',
+  background: '#060608',
+  surface: '#0F1720',
+  surfaceElevated: '#16212C',
+  border: '#223142',
 
-  primary: '#FFFFFF',
-  primaryLight: '#E8E8E8',
-  primaryGlow: 'rgba(255, 255, 255, 0.08)',
+  primary: blue[400],
+  primaryLight: blue[300],
+  primaryGlow: 'rgba(115, 181, 221, 0.12)',
 
-  accent: '#FFFFFF',
-  accentLight: '#E8E8E8',
-  accentGlow: 'rgba(255, 255, 255, 0.08)',
+  accent: blue[400],
+  accentLight: blue[300],
+  accentGlow: 'rgba(115, 181, 221, 0.12)',
 
-  success: '#4ADE80',
-  successGlow: 'rgba(74, 222, 128, 0.12)',
+  success: green.light,
+  successGlow: green.glow,
   danger: '#F87171',
   dangerGlow: 'rgba(248, 113, 113, 0.12)',
 
   textPrimary: '#FFFFFF',
   textSecondary: '#9B9B9B',
   textMuted: '#5C5C5C',
+  ink: '#0C1A26',
 
-  water: '#FFFFFF',
-  waterSurface: 'rgba(255, 255, 255, 0.55)',
+  water: blue[400],
+  waterSurface: 'rgba(115, 181, 221, 0.55)',
 
-  gradientPurple: ['#1C1C1C', '#0A0A0A'] as string[],
+  gradientPurple: [blue[950], '#060608'] as string[],
   gradientFire: ['#F97316', '#EF4444'] as string[],
-  gradientDark: ['#141414', '#0A0A0A'] as string[],
-  gradientSuccess: ['#4ADE80', '#22C55E'] as string[],
+  gradientDark: [blue[950], '#060608'] as string[],
+  gradientSuccess: [green.light, green.deep] as string[],
+  gradientBlue: [blue[300], blue[600]] as string[],
+  gradientScreenTime: ['#FFFFFF', '#9B9B9B'] as string[],
 
   streakColors: {
     cold: '#5C5C5C',
@@ -37,6 +62,9 @@ export const Colors = {
     hot: '#FB923C',
     blazing: '#EF4444',
   },
+
+  blue,
+  green,
 };
 
 export const Spacing = {
@@ -57,6 +85,11 @@ export const BorderRadius = {
   full: 9999,
 };
 
+export const Fonts = {
+  display: 'Anton_400Regular',
+  retro: 'VT323_400Regular',
+};
+
 export const Typography = {
   displayLarge: { fontSize: 40, fontWeight: '800' as const, letterSpacing: -1 },
   displayMedium: { fontSize: 30, fontWeight: '800' as const, letterSpacing: -0.5 },
@@ -69,4 +102,12 @@ export const Typography = {
   labelLarge: { fontSize: 14, fontWeight: '600' as const, letterSpacing: 0.5 },
   labelSmall: { fontSize: 11, fontWeight: '600' as const, letterSpacing: 1 },
   numeric: { fontSize: 32, fontWeight: '800' as const, letterSpacing: -1 },
+
+  // Retro pixel-font variants (VT323) — for timer digits, badges, wordmark
+  retroLarge: { fontSize: 40, fontFamily: 'VT323_400Regular' as const, letterSpacing: 1 },
+  retroMedium: { fontSize: 22, fontFamily: 'VT323_400Regular' as const, letterSpacing: 0.5 },
+  retroSmall: { fontSize: 15, fontFamily: 'VT323_400Regular' as const, letterSpacing: 0.5 },
+
+  // Display font (Anton) — bold poster headlines
+  displayHeavy: { fontSize: 28, fontFamily: 'Anton_400Regular' as const, letterSpacing: 0.5 },
 };
