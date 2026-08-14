@@ -14,6 +14,7 @@ import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/t
 import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog } from '../utils/supabaseStorage';
 import { StorageService } from '../utils/storage';
+import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '../utils/focusLog';
 import { PixelFlame } from '../components/PixelFlame';
 
 const DURATIONS = [15, 25, 45, 60, 90];
@@ -32,13 +33,7 @@ const DEFAULT_BLOCKED_APPS = ['instagram', 'youtube', 'tiktok'];
 
 const KEYS = {
   BLOCKED_APPS: 'tint_blocked_apps',
-  FOCUS_LOG: 'tint_focus_log',
 };
-
-interface FocusLogEntry {
-  date: string;
-  mins: number;
-}
 
 // Scalloped blob outline — same wavy-radius technique agreed on in the mockups.
 function scallopPath(cx: number, cy: number, rBase: number, bumps = 15, amp = 5, n = 120): string {
@@ -66,35 +61,6 @@ function formatMMSS(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
   const s = totalSeconds % 60;
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-}
-
-async function loadFocusLog(): Promise<FocusLogEntry[]> {
-  try {
-    const raw = await AsyncStorage.getItem(KEYS.FOCUS_LOG);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-function startOfWeek(d: Date): Date {
-  const day = d.getDay();
-  const result = new Date(d);
-  result.setDate(d.getDate() - day);
-  result.setHours(0, 0, 0, 0);
-  return result;
-}
-
-function computeStats(log: FocusLogEntry[]): { today: number; week: number; allTime: number } {
-  const todayStr = new Date().toDateString();
-  const weekStart = startOfWeek(new Date());
-
-  let today = 0, week = 0, allTime = 0;
-  for (const entry of log) {
-    allTime += entry.mins;
-    if (entry.date === todayStr) today += entry.mins;
-    const entryDate = new Date(entry.date);
-    if (!isNaN(entryDate.getTime()) && entryDate >= weekStart) week += entry.mins;
-  }
-  return { today, week, allTime };
 }
 
 function holdHsl(t: number): { bg: string; border: string } {
@@ -169,7 +135,7 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
 
     const entry: FocusLogEntry = { date: new Date().toDateString(), mins: duration };
     const updatedLog = [...(await loadFocusLog()), entry];
-    try { await AsyncStorage.setItem(KEYS.FOCUS_LOG, JSON.stringify(updatedLog)); } catch {}
+    await saveFocusLog(updatedLog);
     setFocusLog(updatedLog);
 
     await taskComplete();
@@ -304,7 +270,7 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
       else if (event.translationY > 50) runOnJS(setSheetOpen)(false);
     });
 
-  const stats = computeStats(focusLog);
+  const stats = computeFocusStats(focusLog);
 
   const totalSeconds = duration * 60;
   const pct = totalSeconds > 0 ? (totalSeconds - timeLeft) / totalSeconds : 0;
