@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography } from '../constants/theme';
+import { LoginScreen } from '../screens/LoginScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { TodoScreen } from '../screens/TodoScreen';
 import { FocusScreen } from '../screens/FocusScreen';
@@ -18,8 +19,10 @@ import {
   checkUserExists,
 } from '../utils/supabaseStorage';
 
-// Every device gets an anonymous Supabase user behind the scenes — no login
-// screen needed. Onboarding (name + exam) is the only "sign in" a user sees.
+// Every device still gets an anonymous Supabase session created behind the
+// scenes on first launch — LoginScreen's "Sign Up" upgrades that same
+// session to a real account (same user id) rather than discarding it, so a
+// guest who later signs up doesn't lose anything already saved locally.
 async function ensureSession(): Promise<string | null> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -37,7 +40,7 @@ async function ensureSession(): Promise<string | null> {
   }
 }
 
-type Screen = 'boot' | 'onboarding' | 'todo' | 'focus' | 'productivity' | 'leaderboard';
+type Screen = 'boot' | 'login' | 'onboarding' | 'todo' | 'focus' | 'productivity' | 'leaderboard';
 
 const TAB_CONFIG = [
   { id: 'todo' as Screen, label: 'Today', icon: 'checkbox' as const },
