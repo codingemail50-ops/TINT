@@ -66,3 +66,84 @@ select id, name, avatar, exams, streak, history, total_tasks_completed
 from public.user_data;
 
 grant select on public.leaderboard_view to authenticated;
+
+-- ── friend_requests ──────────────────────────────────────────────────────
+-- One row per request, from_user -> to_user. An accepted row IS the
+-- friendship (no separate friendships table to keep in sync) — see the
+-- friendships view below, which reads both directions of accepted rows.
+create table if not exists public.friend_requests (
+  id uuid primary key default gen_random_uuid(),
+  from_user uuid not null references auth.users(id) on delete cascade,
+  to_user uuid not null references auth.users(id) on delete cascade,
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'declined')),
+  created_at timestamptz default now(),
+  responded_at timestamptz,
+  constraint no_self_request check (from_user <> to_user),
+  unique (from_user, to_user)
+);
+
+alter table public.friend_requests enable row level security;
+
+-- Either side of a request can see it; only the sender can create one;
+-- either side can update it (accept/decline the incoming one, or cancel
+-- one you sent) -- the app is responsible for only offering the buttons
+-- that make sense for which side of the row the current user is on, RLS
+-- here just guards against touching a request that isn't yours at all.
+drop policy if exists "see requests you're part of" on public.friend_requests;
+create policy "see requests you're part of"
+  on public.friend_requests for select
+  using (auth.uid() = from_user or auth.uid() = to_user);
+
+drop policy if exists "send requests as yourself" on public.friend_requests;
+create policy "send requests as yourself"
+  on public.friend_requests for insert
+  with check (auth.uid() = from_user);
+
+drop policy if exists "respond to requests you're part of" on public.friend_requests;
+create policy "respond to requests you're part of"
+  on public.friend_requests for update
+  using (auth.uid() = from_user or auth.uid() = to_user)
+  with check (auth.uid() = from_user or auth.uid() = to_user);
+
+drop policy if exists "cancel requests you're part of" on public.friend_requests;
+create policy "cancel requests you're part of"
+  on public.friend_requests for delete
+  using (auth.uid() = from_user or auth.uid() = to_user);
+
+-- ── friendships ───────────────────────────────────────────────────────────
+-- Symmetric view over accepted requests: querying `where user_id =
+-- auth.uid()` gets your friends regardless of who originally sent the
+-- request. security_invoker=true (unlike leaderboard_view) so this stays
+-- subject to the caller's own RLS on friend_requests -- you can only ever
+-- see rows you were already allowed to see there.
+create or replace view public.friendships
+with (security_invoker = true) as
+select from_user as user_id, to_user as friend_id, created_at
+from public.friend_requests where status = 'accepted'
+union all
+select to_user as user_id, from_user as friend_id, created_at
+from public.friend_requests where status = 'accepted';
+
+grant select on public.friendships to authenticated;
+
+-- ── friends_leaderboard_view ─────────────────────────────────────────────
+-- Public-safe columns (same boundary as leaderboard_view) joined against
+-- friendships, so the app can query "just my friends" instead of
+-- everyone. No security_invoker: needs owner privileges to read across
+-- user_data like leaderboard_view does, but friendships itself (joined in)
+-- still enforces "only rows for auth.uid()" since callers can't pass an
+-- arbitrary user_id into a view -- this view is a function of auth.uid()
+-- alone, called with `select * from friends_leaderboard_view()`.
+create or replace function public.friends_leaderboard()
+returns table (id uuid, name text, avatar text, exams text[], streak int, history jsonb, total_tasks_completed int)
+language sql
+security definer
+set search_path = public
+as $$
+  select u.id, u.name, u.avatar, u.exams, u.streak, u.history, u.total_tasks_completed
+  from public.user_data u
+  join public.friendships f on f.friend_id = u.id
+  where f.user_id = auth.uid();
+$$;
+
+grant execute on function public.friends_leaderboard() to authenticated;

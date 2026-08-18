@@ -189,6 +189,18 @@ export interface CloudLeaderboardRow {
   tasksCompleted: number;
 }
 
+function toLeaderboardRow(row: UserDataRow): CloudLeaderboardRow {
+  return {
+    id: row.id,
+    name: row.name || 'Anonymous',
+    avatar: row.avatar || 'star',
+    exams: Array.isArray(row.exams) ? row.exams : [],
+    streak: row.streak ?? 0,
+    consistency: computeLifetimeConsistency(Array.isArray(row.history) ? row.history : []),
+    tasksCompleted: row.total_tasks_completed ?? 0,
+  };
+}
+
 export async function loadLeaderboard(): Promise<CloudLeaderboardRow[]> {
   try {
     // leaderboard_view (see supabase/schema.sql) exposes only public-safe
@@ -205,17 +217,122 @@ export async function loadLeaderboard(): Promise<CloudLeaderboardRow[]> {
       return [];
     }
 
-    return (data as UserDataRow[]).map(row => ({
-      id: row.id,
-      name: row.name || 'Anonymous',
-      avatar: row.avatar || 'star',
-      exams: Array.isArray(row.exams) ? row.exams : [],
-      streak: row.streak ?? 0,
-      consistency: computeLifetimeConsistency(Array.isArray(row.history) ? row.history : []),
-      tasksCompleted: row.total_tasks_completed ?? 0,
-    }));
+    return (data as UserDataRow[]).map(toLeaderboardRow);
   } catch (err) {
     console.error('[supabaseStorage] loadLeaderboard exception:', err);
+    return [];
+  }
+}
+
+// ── Friends ───────────────────────────────────────────────────────────────
+export interface FriendRequestRow {
+  id: string;
+  fromUser: string;
+  toUser: string;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: string;
+}
+
+interface RawFriendRequestRow {
+  id: string;
+  from_user: string;
+  to_user: string;
+  status: 'pending' | 'accepted' | 'declined';
+  created_at: string;
+}
+
+function toFriendRequest(row: RawFriendRequestRow): FriendRequestRow {
+  return { id: row.id, fromUser: row.from_user, toUser: row.to_user, status: row.status, createdAt: row.created_at };
+}
+
+export async function sendFriendRequest(fromUserId: string, toUserId: string): Promise<{ error?: string }> {
+  try {
+    const { error } = await supabase
+      .from('friend_requests')
+      .insert({ from_user: fromUserId, to_user: toUserId });
+    if (error) {
+      console.error('[supabaseStorage] sendFriendRequest error:', error.message);
+      return { error: error.message };
+    }
+    return {};
+  } catch (err) {
+    console.error('[supabaseStorage] sendFriendRequest exception:', err);
+    return { error: 'Something went wrong.' };
+  }
+}
+
+export async function respondToFriendRequest(requestId: string, accept: boolean): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('friend_requests')
+      .update({ status: accept ? 'accepted' : 'declined', responded_at: new Date().toISOString() })
+      .eq('id', requestId);
+    if (error) console.error('[supabaseStorage] respondToFriendRequest error:', error.message);
+  } catch (err) {
+    console.error('[supabaseStorage] respondToFriendRequest exception:', err);
+  }
+}
+
+export async function cancelFriendRequest(requestId: string): Promise<void> {
+  try {
+    const { error } = await supabase.from('friend_requests').delete().eq('id', requestId);
+    if (error) console.error('[supabaseStorage] cancelFriendRequest error:', error.message);
+  } catch (err) {
+    console.error('[supabaseStorage] cancelFriendRequest exception:', err);
+  }
+}
+
+// Pending requests sent TO this user (need a response).
+export async function loadIncomingRequests(userId: string): Promise<FriendRequestRow[]> {
+  try {
+    const { data, error } = await supabase
+      .from('friend_requests')
+      .select('*')
+      .eq('to_user', userId)
+      .eq('status', 'pending');
+    if (error || !data) {
+      if (error) console.error('[supabaseStorage] loadIncomingRequests error:', error.message);
+      return [];
+    }
+    return (data as RawFriendRequestRow[]).map(toFriendRequest);
+  } catch (err) {
+    console.error('[supabaseStorage] loadIncomingRequests exception:', err);
+    return [];
+  }
+}
+
+// Requests this user sent that are still pending (shown as "Requested").
+export async function loadOutgoingRequests(userId: string): Promise<FriendRequestRow[]> {
+  try {
+    const { data, error } = await supabase
+      .from('friend_requests')
+      .select('*')
+      .eq('from_user', userId)
+      .eq('status', 'pending');
+    if (error || !data) {
+      if (error) console.error('[supabaseStorage] loadOutgoingRequests error:', error.message);
+      return [];
+    }
+    return (data as RawFriendRequestRow[]).map(toFriendRequest);
+  } catch (err) {
+    console.error('[supabaseStorage] loadOutgoingRequests exception:', err);
+    return [];
+  }
+}
+
+// Friends-only leaderboard via the friends_leaderboard() SQL function —
+// scoped to the caller's own accepted friendships, no userId param needed
+// since it reads auth.uid() on the database side.
+export async function loadFriendsLeaderboard(): Promise<CloudLeaderboardRow[]> {
+  try {
+    const { data, error } = await supabase.rpc('friends_leaderboard');
+    if (error || !data) {
+      if (error) console.error('[supabaseStorage] loadFriendsLeaderboard error:', error.message);
+      return [];
+    }
+    return (data as UserDataRow[]).map(toLeaderboardRow);
+  } catch (err) {
+    console.error('[supabaseStorage] loadFriendsLeaderboard exception:', err);
     return [];
   }
 }
