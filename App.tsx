@@ -7,6 +7,7 @@ import { VT323_400Regular } from '@expo-google-fonts/vt323';
 import { Anton_400Regular } from '@expo-google-fonts/anton';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { Colors } from './src/constants/theme';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 
 // Font loading is a nice-to-have, not a hard requirement — if it fails or
 // hangs (seen on some devices), the app must still render with system
@@ -34,11 +35,13 @@ export default function App() {
   }
 
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <SafeAreaProvider>
-        <AppNavigator />
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={styles.root}>
+        <SafeAreaProvider>
+          <AppNavigator />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
 

@@ -37,23 +37,35 @@ const KEYS = {
 };
 
 // Scalloped blob outline — same wavy-radius technique agreed on in the mockups.
-function scallopPath(cx: number, cy: number, rBase: number, bumps = 15, amp = 5, n = 120): string {
+// Returns both the path string and its points, so callers can measure its
+// actual perimeter (react-native-svg has no `pathLength` normalization —
+// unlike web SVG, it strokes in real path units, so dasharray/dashoffset
+// need the real length, not an assumed 0-100 scale).
+function scallopPath(cx: number, cy: number, rBase: number, bumps = 15, amp = 5, n = 120) {
   const pts: [number, number][] = [];
   for (let i = 0; i <= n; i++) {
     const t = (i / n) * 2 * Math.PI;
     const r = rBase + amp * Math.sin(bumps * t);
     pts.push([cx + r * Math.cos(t), cy + r * Math.sin(t)]);
   }
-  return `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)} ` +
+  const d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)} ` +
     pts.slice(1).map(([x, y]) => `L ${x.toFixed(1)} ${y.toFixed(1)}`).join(' ') + ' Z';
+  let length = 0;
+  for (let i = 1; i < pts.length; i++) {
+    length += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  }
+  length += Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]);
+  return { d, length };
 }
 
 const BLOB_SIZE = 240;
 const BLOB_WRAP = BLOB_SIZE + 24;
 const BLOB_R = 86;
 const BLOB_AMP = 5;
-const BLOB_PATH = scallopPath(BLOB_SIZE / 2, BLOB_SIZE / 2, BLOB_R, 15, BLOB_AMP);
-const TRACE_PATH = scallopPath(BLOB_SIZE / 2, BLOB_SIZE / 2, BLOB_R + 5, 15, BLOB_AMP);
+const BLOB_PATH = scallopPath(BLOB_SIZE / 2, BLOB_SIZE / 2, BLOB_R, 15, BLOB_AMP).d;
+const TRACE_SCALLOP = scallopPath(BLOB_SIZE / 2, BLOB_SIZE / 2, BLOB_R + 5, 15, BLOB_AMP);
+const TRACE_PATH = TRACE_SCALLOP.d;
+const TRACE_LENGTH = TRACE_SCALLOP.length;
 
 const SCREEN_H = Dimensions.get('window').height;
 const SHEET_HEIGHT = Math.min(560, SCREEN_H * 0.78);
@@ -275,7 +287,7 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
 
   const totalSeconds = duration * 60;
   const pct = totalSeconds > 0 ? (totalSeconds - timeLeft) / totalSeconds : 0;
-  const traceDashoffset = 100 * (1 - pct);
+  const traceDashoffset = TRACE_LENGTH * (1 - pct);
 
   return (
     <View style={styles.container}>
@@ -367,10 +379,8 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
                     stroke={Colors.blue[500]}
                     strokeWidth={2.5}
                     strokeLinecap="round"
-                    strokeDasharray="100"
+                    strokeDasharray={TRACE_LENGTH}
                     strokeDashoffset={traceDashoffset}
-                    // @ts-ignore — pathLength is supported by react-native-svg at runtime
-                    pathLength={100}
                   />
                 </Svg>
                 <View style={styles.blobContent}>
