@@ -538,25 +538,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
           <FlameBadge streak={appState.streak} size={46} onPress={onNavigateFocus} />
         </View>
 
-        {!viewingPast && (
-          <View style={styles.pillRow}>
-            <View style={styles.pillCol}>
-              <View style={[styles.pill, { borderColor: Colors.blue[400] }]}>
-                <Ionicons name="flash" size={14} color={Colors.blue[400]} />
-                <Text style={[styles.pillVal, { color: Colors.blue[400] }]}>{focusToday}</Text>
-              </View>
-              <Text style={styles.pillLabel}>Focus</Text>
-            </View>
-            <View style={styles.pillCol}>
-              <View style={[styles.pill, { borderColor: Colors.success }]}>
-                <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
-                <Text style={[styles.pillVal, { color: Colors.success }]}>{completedCount}/{totalCount}</Text>
-              </View>
-              <Text style={styles.pillLabel}>Progress</Text>
-            </View>
-          </View>
-        )}
-
         {viewingPast && (
           <View style={styles.progressSection}>
             <View style={styles.progressHeader}>
@@ -572,15 +553,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
         )}
       </Animated.View>
 
-      {/* ── Exam countdowns ────────────────────────────────────────────────── */}
-      {!viewingPast && (examTypes.length > 0) && (
-        <View style={styles.countdownStack}>
-          <UCEEDCountdown examTypes={examTypes} />
-          <NIDCountdown examTypes={examTypes} />
-          <NIFTCountdown examTypes={examTypes} />
-        </View>
-      )}
-
       {/* ── Task list ──────────────────────────────────────────────────────── */}
       <ScrollView
         style={styles.scroll}
@@ -589,9 +561,39 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
         keyboardShouldPersistTaps="handled"
       >
         {!viewingPast && (
-          <TouchableOpacity style={styles.heroFlame} onPress={onNavigateFocus} activeOpacity={0.85}>
-            <PixelFlame size={140} state="static" />
-          </TouchableOpacity>
+          <>
+            {/* Fire — the hero, like Opal's crystal */}
+            <TouchableOpacity style={styles.heroFlame} onPress={onNavigateFocus} activeOpacity={0.85}>
+              <PixelFlame size={150} state="flicker" />
+            </TouchableOpacity>
+
+            {/* Exam countdown, right under the hero */}
+            {examTypes.length > 0 && (
+              <View style={styles.countdownStack}>
+                <UCEEDCountdown examTypes={examTypes} />
+                <NIDCountdown examTypes={examTypes} />
+                <NIFTCountdown examTypes={examTypes} />
+              </View>
+            )}
+
+            {/* Focus / progress stats row */}
+            <View style={styles.pillRow}>
+              <View style={styles.pillCol}>
+                <View style={[styles.pill, { borderColor: Colors.blue[400] }]}>
+                  <Ionicons name="flash" size={14} color={Colors.blue[400]} />
+                  <Text style={[styles.pillVal, { color: Colors.blue[400] }]}>{focusToday}</Text>
+                </View>
+                <Text style={styles.pillLabel}>Focus</Text>
+              </View>
+              <View style={styles.pillCol}>
+                <View style={[styles.pill, { borderColor: Colors.success }]}>
+                  <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
+                  <Text style={[styles.pillVal, { color: Colors.success }]}>{completedCount}/{totalCount}</Text>
+                </View>
+                <Text style={styles.pillLabel}>Progress</Text>
+              </View>
+            </View>
+          </>
         )}
 
         <View style={styles.listHeader}>
@@ -856,7 +858,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 24,
   },
 
-  pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs },
+  pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginBottom: Spacing.xl },
   pillCol: { alignItems: 'center', gap: 6 },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -886,7 +888,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   listTitle: { ...Typography.headlineSmall, color: Colors.textPrimary, flex: 1, marginRight: Spacing.sm },
-  countdownStack: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm, gap: Spacing.sm },
+  countdownStack: { gap: Spacing.sm, marginBottom: Spacing.sm },
   blob: { borderRadius: BorderRadius.xl, padding: Spacing.lg, marginBottom: Spacing.lg },
   blobTodo: { backgroundColor: Colors.blue[950], borderWidth: 1, borderColor: Colors.blue[700] },
   blobDone: { backgroundColor: Colors.surfaceElevated, borderWidth: 1, borderColor: Colors.green.deep },

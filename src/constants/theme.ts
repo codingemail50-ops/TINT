@@ -30,16 +30,16 @@ export const Colors = {
 
   primary: blue[400],
   primaryLight: blue[300],
-  primaryGlow: 'rgba(115, 181, 221, 0.12)',
+  primaryGlow: blue[950],
 
   accent: blue[400],
   accentLight: blue[300],
-  accentGlow: 'rgba(115, 181, 221, 0.12)',
+  accentGlow: blue[950],
 
   success: green.light,
   successGlow: green.glow,
   danger: '#F87171',
-  dangerGlow: 'rgba(248, 113, 113, 0.12)',
+  dangerGlow: '#3D1A18',
 
   textPrimary: '#FFFFFF',
   textSecondary: '#9B9B9B',
@@ -78,10 +78,10 @@ export const Spacing = {
 };
 
 export const BorderRadius = {
-  sm: 8,
-  md: 14,
-  lg: 20,
-  xl: 28,
+  sm: 10,
+  md: 16,
+  lg: 24,
+  xl: 32,
   full: 9999,
 };
 
