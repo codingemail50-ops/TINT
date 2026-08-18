@@ -76,14 +76,9 @@ function formatMMSS(totalSeconds: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-function holdHsl(t: number): { bg: string; border: string } {
-  const sat = 20 + t * 60;
-  const light = 25 - t * 8;
-  return {
-    bg: `hsl(350, ${sat}%, ${light}%)`,
-    border: `hsl(350, ${40 + t * 40}%, ${45 - t * 10}%)`,
-  };
-}
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const HOLD_BG_RANGE = ['hsl(350, 20%, 25%)', 'hsl(350, 80%, 17%)'];
+const HOLD_BORDER_RANGE = ['hsl(350, 40%, 45%)', 'hsl(350, 80%, 35%)'];
 
 interface Props {
   userId?: string;
@@ -112,10 +107,8 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
   const sheetY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const { taskComplete, buttonPress } = useHaptics();
 
-  const [holdStyle, setHoldStyle] = useState(holdHsl(0));
+  const holdAnim = useRef(new Animated.Value(0)).current;
   const [holdLabel, setHoldLabel] = useState('Hold to end session');
-  const holdRAF = useRef<number | null>(null);
-  const holdStart = useRef(0);
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
@@ -235,27 +228,28 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
     setPaused(wasPausedBeforeConfirm.current);
   };
 
-  const holdTick = useCallback(() => {
-    const elapsed = Date.now() - holdStart.current;
-    const t = Math.min(1, elapsed / HOLD_MS);
-    setHoldStyle(holdHsl(t));
-    if (t >= 1) {
-      setHoldLabel('Session ended');
-      resetToSetup();
-      return;
-    }
-    holdRAF.current = requestAnimationFrame(holdTick);
-  }, [resetToSetup]);
-
+  // Driven by Animated (not per-frame setState) so the color build-up runs
+  // on its own timing loop instead of forcing a full component re-render
+  // ~60x/second — that churn was resetting the native touch responder
+  // mid-hold on-device, cutting the gesture short before the 3s completed.
   const startHold = () => {
-    holdStart.current = Date.now();
-    holdRAF.current = requestAnimationFrame(holdTick);
+    setHoldLabel('Hold to end session');
+    holdAnim.setValue(0);
+    Animated.timing(holdAnim, {
+      toValue: 1,
+      duration: HOLD_MS,
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      if (finished) {
+        setHoldLabel('Session ended');
+        resetToSetup();
+      }
+    });
   };
 
   const cancelHold = () => {
-    if (holdRAF.current) cancelAnimationFrame(holdRAF.current);
-    setHoldStyle(holdHsl(0));
-    setHoldLabel('Hold to end session');
+    holdAnim.stopAnimation();
+    Animated.timing(holdAnim, { toValue: 0, duration: 150, useNativeDriver: false }).start();
   };
 
   const toggleBlockedApp = async (id: string) => {
@@ -422,13 +416,16 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
               <Text style={styles.confirmTitle}>Leave early?</Text>
               <Text style={styles.confirmSub}>Don't give up — there's a reason you started this.</Text>
 
-              <Pressable
-                style={[styles.holdBtn, { backgroundColor: holdStyle.bg, borderColor: holdStyle.border }]}
+              <AnimatedPressable
+                style={[styles.holdBtn, {
+                  backgroundColor: holdAnim.interpolate({ inputRange: [0, 1], outputRange: HOLD_BG_RANGE }),
+                  borderColor: holdAnim.interpolate({ inputRange: [0, 1], outputRange: HOLD_BORDER_RANGE }),
+                }]}
                 onPressIn={startHold}
                 onPressOut={cancelHold}
               >
                 <Text style={styles.holdLabel}>{holdLabel}</Text>
-              </Pressable>
+              </AnimatedPressable>
 
               <TouchableOpacity onPress={closeConfirm} activeOpacity={0.7}>
                 <Text style={styles.neverMind}>Never mind</Text>

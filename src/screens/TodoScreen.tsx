@@ -12,6 +12,7 @@ import { Task, getCombinedPreset, ExamType } from '../data/examPresets';
 import { StorageService, AppState } from '../utils/storage';
 import { TaskItem } from '../components/TaskItem';
 import { FlameBadge } from '../components/FlameBadge';
+import { PixelFlame } from '../components/PixelFlame';
 import { Confetti } from '../components/Confetti';
 import { UCEEDCountdown, NIDCountdown, NIFTCountdown } from '../components/ExamCountdowns';
 import { useHaptics } from '../hooks/useHaptics';
@@ -257,30 +258,12 @@ interface Props {
   appState: AppState;
   onStateChange: (s: AppState) => void;
   userId?: string;
+  onNavigateFocus: () => void;
 }
 
 const todayStr = new Date().toDateString();
 
-function buildDateStrip(history: AppState['history']) {
-  const items: { dateStr: string; dayLetter: string; dayNum: number; isToday: boolean; consistency: number }[] = [];
-  const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-  for (let i = 14; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toDateString();
-    const record  = history.find(h => h.date === dateStr);
-    items.push({
-      dateStr,
-      dayLetter: DAYS[d.getDay()],
-      dayNum: d.getDate(),
-      isToday: i === 0,
-      consistency: record?.consistency ?? -1,
-    });
-  }
-  return items;
-}
-
-export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId }) => {
+export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, onNavigateFocus }) => {
   const [tasks, setTasks]           = useState<Task[]>([]);
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
@@ -316,15 +299,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
 
   const user        = appState.user;
   const examTypes   = (user?.examTypes ?? []) as ExamType[];
-  const examLabel   = examTypes.length > 0 ? examTypes.join(' + ') : 'Your';
-
-  const getGreeting = () => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Good morning';
-    if (h < 17) return 'Good afternoon';
-    if (h < 21) return 'Good evening';
-    return 'Late night grind';
-  };
 
   // Load today's tasks
   useEffect(() => {
@@ -359,14 +333,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
       Animated.timing(headerGlow, { toValue: progress, duration: 500, useNativeDriver: false }).start();
     }
   }, [progress, viewingPast]);
-
-  const dateStrip = useMemo(() => buildDateStrip(appState.history), [appState.history, tasks]);
-
-  const dateScrollRef = useRef<ScrollView>(null);
-  useEffect(() => {
-    // Scroll to today on mount
-    setTimeout(() => dateScrollRef.current?.scrollToEnd({ animated: false }), 100);
-  }, []);
 
   // ── Task completion (shared by instant un-toggle and timer completion) ───────
   const applyCompletion = useCallback(async (id: string, completed: boolean) => {
@@ -566,10 +532,10 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
       }]}>
         <View style={styles.headerTop}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.tagline}>There is no tomorrow</Text>
-            <Text style={styles.userName}>{user?.name ?? 'Champion'}</Text>
+            <Text style={styles.tagline}>THERE IS</Text>
+            <Text style={styles.tagline}>NO TOMORROW</Text>
           </View>
-          <FlameBadge streak={appState.streak} size={46} />
+          <FlameBadge streak={appState.streak} size={46} onPress={onNavigateFocus} />
         </View>
 
         {!viewingPast && (
@@ -615,44 +581,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
         </View>
       )}
 
-      {/* ── Date Strip ─────────────────────────────────────────────────────── */}
-      <View style={styles.dateStripWrapper}>
-        <ScrollView
-          ref={dateScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.dateStrip}
-        >
-          {dateStrip.map(item => {
-            const isSelected = selectedDate === item.dateStr;
-            const hasData    = item.consistency >= 0;
-            const dotColor   = item.consistency >= 80 ? Colors.success
-              : item.consistency >= 50 ? Colors.accent
-              : item.consistency >= 0  ? Colors.danger
-              : 'transparent';
-
-            return (
-              <TouchableOpacity
-                key={item.dateStr}
-                style={[styles.dateCell, isSelected && styles.dateCellSelected]}
-                onPress={() => setSelectedDate(item.dateStr)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.dateDayLetter, isSelected && styles.dateCellTextActive]}>
-                  {item.dayLetter}
-                </Text>
-                <Text style={[styles.dateDayNum, isSelected && styles.dateCellTextActive]}>
-                  {item.dayNum}
-                </Text>
-                {hasData && !item.isToday && (
-                  <View style={[styles.dateDot, { backgroundColor: dotColor }]} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
       {/* ── Task list ──────────────────────────────────────────────────────── */}
       <ScrollView
         style={styles.scroll}
@@ -660,10 +588,16 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId })
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {!viewingPast && (
+          <TouchableOpacity style={styles.heroFlame} onPress={onNavigateFocus} activeOpacity={0.85}>
+            <PixelFlame size={140} state="static" />
+          </TouchableOpacity>
+        )}
+
         <View style={styles.listHeader}>
-          <Text style={styles.listTitle} numberOfLines={1}>
-            {viewingPast ? 'Past tasks' : `${examLabel} Plan`}
-          </Text>
+          {viewingPast && (
+            <Text style={styles.listTitle} numberOfLines={1}>Past tasks</Text>
+          )}
           {viewingPast ? (
             <TouchableOpacity
               style={styles.backTodayBtn}
@@ -917,12 +851,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  greeting: { ...Typography.bodyMedium, color: Colors.textSecondary },
   tagline: {
-    fontFamily: Fonts.display, fontSize: 13, color: Colors.blue[400],
-    letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 2,
+    fontFamily: Fonts.display, fontSize: 20, color: Colors.blue[400],
+    letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 24,
   },
-  userName: { fontFamily: Fonts.retro, fontSize: 28, color: Colors.textPrimary, letterSpacing: 0.5 },
 
   pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.xs },
   pillCol: { alignItems: 'center', gap: 6 },
@@ -943,53 +875,24 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 6,
   },
 
-  // Date strip
-  dateStripWrapper: {
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    backgroundColor: Colors.surface,
-  },
-  dateStrip: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    gap: 6,
-  },
-  dateCell: {
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: BorderRadius.sm,
-    minWidth: 36,
-    gap: 2,
-  },
-  dateCellSelected: {
-    backgroundColor: Colors.primaryGlow,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-  },
-  dateDayLetter: { ...Typography.labelSmall, color: Colors.textMuted, fontSize: 10 },
-  dateDayNum: { fontSize: 14, fontWeight: '700', color: Colors.textSecondary },
-  dateCellTextActive: { color: Colors.primaryLight },
-  dateDot: { width: 5, height: 5, borderRadius: 3 },
-
   // Scroll / list
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md },
+  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg },
+  heroFlame: { alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.xl },
   listHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: Spacing.sm,
   },
   listTitle: { ...Typography.headlineSmall, color: Colors.textPrimary, flex: 1, marginRight: Spacing.sm },
   countdownStack: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm, gap: Spacing.sm },
-  blob: { borderRadius: BorderRadius.lg, padding: Spacing.md, marginBottom: Spacing.md },
-  blobTodo: { backgroundColor: 'rgba(30,90,134,0.10)', borderWidth: 1, borderColor: 'rgba(30,90,134,0.55)' },
-  blobDone: { backgroundColor: Colors.successGlow, borderWidth: 1, borderColor: Colors.success + '4D' },
-  blobLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: Spacing.sm, paddingLeft: 2 },
-  blobLabelTodo: { color: Colors.blue[500] },
-  blobLabelDone: { color: Colors.success },
+  blob: { borderRadius: BorderRadius.xl, padding: Spacing.lg, marginBottom: Spacing.lg },
+  blobTodo: { backgroundColor: Colors.blue[950], borderWidth: 1, borderColor: Colors.blue[700] },
+  blobDone: { backgroundColor: Colors.surfaceElevated, borderWidth: 1, borderColor: Colors.green.deep },
+  blobLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: Spacing.md, paddingLeft: 2 },
+  blobLabelTodo: { color: Colors.blue[300] },
+  blobLabelDone: { color: Colors.green.light },
   blobEmpty: { ...Typography.bodySmall, color: Colors.textMuted, paddingVertical: Spacing.sm },
 
   addBtn: { borderRadius: BorderRadius.sm, overflow: 'hidden' },

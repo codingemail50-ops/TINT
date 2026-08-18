@@ -2,17 +2,17 @@
 // reserved ONLY for "done"/completed states. Display font is Anton (bold
 // poster headlines), retro/numeric font is VT323 (pixel timer digits).
 const blue = {
-  50: '#F3F8FC',
-  100: '#E5F0F9',
-  200: '#C6DFF1',
-  300: '#93C5E6',
-  400: '#73B5DD',
-  500: '#348DC3',
-  600: '#2470A5',
-  700: '#1E5A86',
-  800: '#1D4D6F',
-  900: '#1D415D',
-  950: '#132A3E',
+  50: '#F4F7FB',
+  100: '#E9EEF5',
+  200: '#CEDAE9',
+  300: '#A2BAD7',
+  400: '#7096C0',
+  500: '#4E79A9',
+  600: '#3C608D',
+  700: '#314D73',
+  800: '#2B415E',
+  900: '#293A51',
+  950: '#1B2536',
 };
 
 // Reserved for completed/done states only — never used for structure or accents.

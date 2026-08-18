@@ -157,7 +157,7 @@ export const AppNavigator: React.FC = () => {
       <GestureDetector gesture={swipeGesture}>
         <View style={styles.swipeArea}>
           {screen === 'onboarding' && <OnboardingScreen onComplete={handleOnboardingComplete} />}
-          {screen === 'todo' && <TodoScreen appState={appState} onStateChange={handleStateChange} userId={userIdRef.current ?? undefined} />}
+          {screen === 'todo' && <TodoScreen appState={appState} onStateChange={handleStateChange} userId={userIdRef.current ?? undefined} onNavigateFocus={() => navigateTo('focus')} />}
           {screen === 'focus' && <FocusScreen userId={userIdRef.current ?? undefined} />}
           {screen === 'productivity' && <ProductivityScreen appState={appState} />}
           {screen === 'leaderboard' && <LeaderboardScreen appState={appState} userId={userIdRef.current ?? undefined} />}
