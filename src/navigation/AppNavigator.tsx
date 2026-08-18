@@ -94,10 +94,33 @@ export const AppNavigator: React.FC = () => {
         setScreen('todo');
         Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
       } else {
-        setScreen('onboarding');
+        setScreen('login');
       }
     })();
   }, []);
+
+  const handleGuest = () => {
+    setScreen('onboarding');
+  };
+
+  const handleAuthed = async (hasProfile: boolean) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    userIdRef.current = user?.id ?? userIdRef.current;
+
+    if (hasProfile && userIdRef.current) {
+      const loaded = await loadUserFromSupabase(userIdRef.current);
+      if (loaded) {
+        setAppState(loaded);
+        setShowTabs(true);
+        setScreen('todo');
+        Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+        return;
+      }
+    }
+    // Fresh sign-up (or a login with no cloud profile row yet) — collect
+    // name/avatar/exams same as the guest path does.
+    setScreen('onboarding');
+  };
 
   const handleOnboardingComplete = () => {
     StorageService.getAppState().then(async state => {
@@ -110,7 +133,12 @@ export const AppNavigator: React.FC = () => {
         userIdRef.current = await ensureSession();
       }
       if (userIdRef.current && state.user) {
-        void saveNewUserToSupabase(userIdRef.current, '', state.user);
+        // Real signups reach onboarding with an email already attached to
+        // the auth session (LoginScreen's Sign Up flow) — persist that
+        // instead of always writing an empty string, so user_data.email
+        // actually gets populated for accounts that have one.
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        void saveNewUserToSupabase(userIdRef.current, authUser?.email ?? '', state.user);
       }
     });
   };
@@ -156,6 +184,7 @@ export const AppNavigator: React.FC = () => {
     <View style={styles.root}>
       <GestureDetector gesture={swipeGesture}>
         <View style={styles.swipeArea}>
+          {screen === 'login' && <LoginScreen onAuthed={handleAuthed} onGuest={handleGuest} />}
           {screen === 'onboarding' && <OnboardingScreen onComplete={handleOnboardingComplete} />}
           {screen === 'todo' && <TodoScreen appState={appState} onStateChange={handleStateChange} userId={userIdRef.current ?? undefined} onNavigateFocus={() => navigateTo('focus')} />}
           {screen === 'focus' && <FocusScreen userId={userIdRef.current ?? undefined} />}
