@@ -191,8 +191,11 @@ export interface CloudLeaderboardRow {
 
 export async function loadLeaderboard(): Promise<CloudLeaderboardRow[]> {
   try {
+    // leaderboard_view (see supabase/schema.sql) exposes only public-safe
+    // columns — never query user_data directly here, since RLS restricts
+    // that table to the owning user's own row.
     const { data, error } = await supabase
-      .from('user_data')
+      .from('leaderboard_view')
       .select('id, name, avatar, exams, streak, history, total_tasks_completed')
       .order('streak', { ascending: false })
       .limit(100);
