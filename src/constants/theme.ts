@@ -22,6 +22,22 @@ const green = {
   glow: 'rgba(75, 188, 135, 0.14)',
 };
 
+// Black/grey/white tonal scale — the dominant palette on every screen
+// besides Today; blue is an accent on top of this, not the base.
+const gray = {
+  50: '#FAFAFA',
+  100: '#F5F5F5',
+  200: '#E6E6E6',
+  300: '#D6D6D6',
+  400: '#A5A5A5',
+  500: '#767676',
+  600: '#575757',
+  700: '#434343',
+  800: '#292929',
+  900: '#1A1A1A',
+  950: '#000000',
+};
+
 export const Colors = {
   background: '#060608',
   surface: '#0F1720',
@@ -42,8 +58,8 @@ export const Colors = {
   dangerGlow: '#3D1A18',
 
   textPrimary: '#FFFFFF',
-  textSecondary: '#9B9B9B',
-  textMuted: '#5C5C5C',
+  textSecondary: gray[400],
+  textMuted: gray[600],
   ink: '#0C1A26',
 
   water: blue[400],
@@ -65,6 +81,7 @@ export const Colors = {
 
   blue,
   green,
+  gray,
 };
 
 export const Spacing = {

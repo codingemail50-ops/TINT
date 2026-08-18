@@ -128,9 +128,15 @@ export interface FlamePalette {
   shades: [string, string, string, string]; // index 0 = outer, 3 = core
 }
 
-export const FLAME_PALETTES: Record<'cold' | 'warm' | 'hot' | 'blazing', FlamePalette> = {
+export const FLAME_PALETTES = {
+  // Intensity progression — usable later for "color builds with today's
+  // focus minutes" (cold -> warm -> hot -> blazing as the day fills in).
   cold:    { outline: '#0B0F14', shades: ['#3A4650', '#5C6E7A', '#8FA3AD', '#C9D6DB'] },
   warm:    { outline: '#3D0F02', shades: ['#8A230D', '#D85A17', '#F5941F', '#FFD84D'] },
   hot:     { outline: '#3D0602', shades: ['#9A1505', '#E8420F', '#FF8A1F', '#FFE066'] },
   blazing: { outline: '#33020A', shades: ['#7A0B1E', '#D81B3F', '#FF5C3D', '#FFF0A8'] },
-};
+  // Aesthetic skins — same silhouette, fully different color story, same
+  // idea as Opal's gold/black and blue/ice egg re-skins.
+  gold:    { outline: '#1A1204', shades: ['#5C4308', '#A67C0E', '#E0A81A', '#FFE694'] },
+  ice:     { outline: '#08151F', shades: ['#1D4E6E', '#3A87B0', '#7FC4E0', '#EAF8FF'] },
+} satisfies Record<string, FlamePalette>;

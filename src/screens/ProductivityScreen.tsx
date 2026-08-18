@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
 import { AppState, getHeatmapData } from '../utils/storage';
 import { FocusLogEntry, loadFocusLog, getLast7DaysFocus } from '../utils/focusLog';
@@ -11,38 +10,57 @@ import { REALITY_CHECK_MESSAGES } from '../data/examPresets';
 
 interface Props { appState: AppState }
 
-// ── Focus-time capsule chart (7 days, gridlines, dot markers for small values) ──
-const DOT_THRESHOLD = 15;
-const CHART_H = 140;
+// ── Focus-time gradient area chart (smooth curve through 7 days) ────────────
+const CHART_H = 150;
+const CHART_W = Dimensions.get('window').width - (Spacing.xl + Spacing.md) * 2;
+
+// Catmull-Rom -> cubic-bezier smoothing so the line curves through each
+// day's point instead of joining them with hard angles.
+function smoothPaths(points: { x: number; y: number }[]): { line: string; area: string } {
+  if (points.length < 2) return { line: '', area: '' };
+  const seg: string[] = [`M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`];
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i === 0 ? i : i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = p1.y + (p2.y - p0.y) / 6;
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = p2.y - (p3.y - p1.y) / 6;
+    seg.push(`C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`);
+  }
+  const line = seg.join(' ');
+  const area = `${line} L ${points[points.length - 1].x.toFixed(1)} ${CHART_H} L ${points[0].x.toFixed(1)} ${CHART_H} Z`;
+  return { line, area };
+}
 
 const FocusTimeChart: React.FC<{ data: { day: string; mins: number }[] }> = ({ data }) => {
   const maxVal = Math.max(...data.map(d => d.mins), 1);
-  const topHours = Math.max(1, Math.ceil(maxVal / 60));
-  const topMin = topHours * 60;
+  const topMin = Math.max(1, Math.ceil(maxVal / 60)) * 60;
+
+  const points = data.map((d, i) => ({
+    x: (i / (data.length - 1)) * CHART_W,
+    y: CHART_H - (d.mins / topMin) * (CHART_H - 10) - 4,
+  }));
+  const { line, area } = smoothPaths(points);
 
   return (
     <View>
-      <View style={[chartSt.chartArea, { height: CHART_H }]}>
+      <View style={[chartSt.chartArea, { height: CHART_H, width: CHART_W }]}>
         {[0.25, 0.5, 0.75, 1].map(f => (
           <View key={f} style={[chartSt.gridline, { bottom: CHART_H * f }]} />
         ))}
-        <View style={chartSt.barRow}>
-          {data.map((d, i) => {
-            const h = Math.round((d.mins / topMin) * CHART_H);
-            return (
-              <View key={i} style={chartSt.barCol}>
-                {d.mins < DOT_THRESHOLD ? (
-                  <View style={chartSt.dot} />
-                ) : (
-                  <LinearGradient
-                    colors={[Colors.blue[300], Colors.blue[600]]}
-                    style={[chartSt.bar, { height: Math.max(h, 8) }]}
-                  />
-                )}
-              </View>
-            );
-          })}
-        </View>
+        <Svg width={CHART_W} height={CHART_H} style={StyleSheet.absoluteFillObject}>
+          <Defs>
+            <SvgLinearGradient id="focusFill" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={Colors.blue[400]} stopOpacity={0.75} />
+              <Stop offset="1" stopColor="#6C4FA0" stopOpacity={0.12} />
+            </SvgLinearGradient>
+          </Defs>
+          <Path d={area} fill="url(#focusFill)" />
+          <Path d={line} fill="none" stroke={Colors.blue[400]} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
       </View>
       <View style={chartSt.dayRow}>
         {data.map((d, i) => (
@@ -56,10 +74,6 @@ const FocusTimeChart: React.FC<{ data: { day: string; mins: number }[] }> = ({ d
 const chartSt = StyleSheet.create({
   chartArea: { justifyContent: 'flex-end' },
   gridline: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: Colors.border },
-  barRow: { flexDirection: 'row', alignItems: 'flex-end', height: '100%', gap: 8 },
-  barCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%' },
-  bar: { width: '62%', borderRadius: 999 },
-  dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: Colors.blue[700], marginBottom: 2 },
   dayRow: { flexDirection: 'row', marginTop: Spacing.sm },
   dayLabel: { flex: 1, textAlign: 'center', fontSize: 11, color: Colors.textMuted },
 });
