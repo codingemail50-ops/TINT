@@ -17,6 +17,7 @@ import { StorageService } from '../utils/storage';
 import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '../utils/focusLog';
 import { PixelFlame } from '../components/PixelFlame';
 import { FlameBadge } from '../components/FlameBadge';
+import { openPermissionSettings, getSelfReportedGrants, setSelfReportedGrant, BlockingPermission } from '../utils/appBlocking';
 
 const DURATIONS = [15, 25, 45, 60, 90];
 const DEFAULT_DURATION = 25;
@@ -31,6 +32,12 @@ const FOCUS_APPS: { id: string; label: string; icon: keyof typeof Ionicons.glyph
   { id: 'snapchat', label: 'Snapchat', icon: 'logo-snapchat' },
 ];
 const DEFAULT_BLOCKED_APPS = ['instagram', 'youtube', 'tiktok'];
+
+const PERMISSIONS: { id: BlockingPermission; label: string; description: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: 'usageAccess', label: 'Usage Access', description: 'Lets TINT see which app is open right now.', icon: 'bar-chart-outline' },
+  { id: 'accessibility', label: 'Accessibility', description: 'Lets TINT close a blocked app the moment it opens.', icon: 'shield-checkmark-outline' },
+  { id: 'overlay', label: 'Display over other apps', description: 'Lets TINT show a block screen over the app.', icon: 'layers-outline' },
+];
 
 const KEYS = {
   BLOCKED_APPS: 'tint_blocked_apps',
@@ -110,6 +117,10 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
   const holdAnim = useRef(new Animated.Value(0)).current;
   const [holdLabel, setHoldLabel] = useState('Hold to end session');
 
+  const [grants, setGrants] = useState<Record<BlockingPermission, boolean>>({
+    usageAccess: false, accessibility: false, overlay: false,
+  });
+
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
 
@@ -122,6 +133,7 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
       setFocusLog(await loadFocusLog());
       const state = await StorageService.getAppState();
       setStreak(state.streak);
+      setGrants(await getSelfReportedGrants());
     })();
   }, []);
 
@@ -264,8 +276,24 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
   const addCustomApp = () => {
     Alert.alert(
       'Add custom apps',
-      'Blocking any app you choose needs system-level permission (Screen Time / Accessibility Service), which requires a native build. Coming soon.'
+      'Picking any app on your phone (not just this list) needs a native app-picker, which requires a custom build. Coming soon.'
     );
+  };
+
+  const handleGrantPermission = async (permission: BlockingPermission) => {
+    await buttonPress();
+    try {
+      await openPermissionSettings(permission);
+    } catch {
+      Alert.alert('Not available', 'This permission can only be granted on an Android build outside Expo Go.');
+    }
+  };
+
+  const handleToggleGrant = async (permission: BlockingPermission) => {
+    await buttonPress();
+    const next = !grants[permission];
+    setGrants(prev => ({ ...prev, [permission]: next }));
+    await setSelfReportedGrant(permission, next);
   };
 
   const swipeGesture = Gesture.Pan()
@@ -444,6 +472,26 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
           <Text style={styles.appsTitle}>Blocked Apps</Text>
           <Text style={styles.appsSub}>Stay away from these while this session runs.</Text>
           <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={styles.permTitle}>Permissions</Text>
+            <Text style={styles.permSub}>Grant these once so blocking can actually work on your phone.</Text>
+            {PERMISSIONS.map(perm => (
+              <View key={perm.id} style={styles.permRow}>
+                <Ionicons name={perm.icon} size={20} color={Colors.textPrimary} />
+                <View style={styles.permTextWrap}>
+                  <Text style={styles.appName}>{perm.label}</Text>
+                  <Text style={styles.permDescription}>{perm.description}</Text>
+                </View>
+                <TouchableOpacity onPress={() => handleGrantPermission(perm.id)} activeOpacity={0.7}>
+                  <Text style={styles.permGrantText}>Grant</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleToggleGrant(perm.id)} activeOpacity={0.7}>
+                  <View style={[styles.appToggle, grants[perm.id] && styles.appToggleOn]}>
+                    <View style={[styles.appToggleDot, grants[perm.id] && styles.appToggleDotOn]} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            ))}
+            <Text style={[styles.permTitle, styles.appsListTitle]}>Apps</Text>
             {FOCUS_APPS.map(app => {
               const on = blockedApps.includes(app.id);
               return (
@@ -594,6 +642,16 @@ const styles = StyleSheet.create({
   appsHandle: { width: 38, height: 4, backgroundColor: Colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   appsTitle: { fontSize: 17, fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
   appsSub: { fontSize: 12.5, color: Colors.textSecondary, marginBottom: 18 },
+  permTitle: { fontSize: 12.5, fontWeight: '700', color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  appsListTitle: { marginTop: 16 },
+  permSub: { fontSize: 12, color: Colors.textSecondary, marginBottom: 10 },
+  permRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  permTextWrap: { flex: 1 },
+  permDescription: { fontSize: 11.5, color: Colors.textSecondary, marginTop: 2 },
+  permGrantText: { color: Colors.blue[400], fontSize: 13.5, fontWeight: '600', marginRight: 2 },
   appRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.border,
