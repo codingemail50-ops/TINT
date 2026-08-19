@@ -118,10 +118,11 @@ export function buildFlameFrame(seed: number): FlameFrame {
   };
 }
 
-// Three frames with slightly different tip/toe seeds — cycling through
-// them is what actually reads as "flicker" (silhouette changes), not just
-// a recolor or scale pulse.
-export const FLAME_FRAMES: FlameFrame[] = [-0.6, 0.5, -0.15].map(buildFlameFrame);
+// Five frames with different tip/toe seeds — cycling through them is what
+// actually reads as "flicker" (silhouette changes), not just a recolor or
+// scale pulse. Five instead of three so the loop is less noticeably
+// repetitive, combined with randomized timing in PixelFlame.
+export const FLAME_FRAMES: FlameFrame[] = [-0.6, 0.35, -0.15, 0.6, -0.4].map(buildFlameFrame);
 
 export interface FlamePalette {
   outline: string;
