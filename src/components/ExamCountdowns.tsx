@@ -76,11 +76,11 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   examLabel: {
-    ...Typography.labelSmall, fontWeight: '700', color: Colors.blue[300],
+    ...Typography.labelSmall, fontFamily: Fonts.bold, color: Colors.blue[300],
     textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6,
   },
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  countdownText: { fontFamily: Fonts.retro, fontSize: 26, color: Colors.textPrimary, letterSpacing: 1 },
+  countdownText: { fontFamily: Fonts.retro, fontSize: 26, color: Colors.textPrimary, letterSpacing: -0.5 },
   dateStamp: { ...Typography.bodySmall, color: Colors.textMuted },
   passedText: { ...Typography.headlineSmall, color: Colors.success },
 });

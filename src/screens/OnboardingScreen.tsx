@@ -6,7 +6,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, BorderRadius } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { EXAM_TYPES, ExamType, AVATARS } from '../data/examPresets';
 import { StorageService } from '../utils/storage';
 import { useHaptics } from '../hooks/useHaptics';
@@ -277,13 +277,13 @@ export const OnboardingScreen: React.FC<Props> = ({ onComplete }) => {
 
 const stepS = StyleSheet.create({
   container: { flex: 1, justifyContent: 'center', gap: Spacing.sm },
-  stepNum: { fontSize: 72, fontWeight: '900', color: Colors.primary + '18', letterSpacing: -3, marginBottom: -Spacing.xl, lineHeight: 80 },
+  stepNum: { fontSize: 72, fontFamily: Fonts.bold, color: Colors.primary + '18', letterSpacing: -3, marginBottom: -Spacing.xl, lineHeight: 80 },
   avatarChip: { width: 60, height: 60, borderRadius: 30, backgroundColor: Colors.surfaceElevated, borderWidth: 2, borderColor: Colors.primary + '55', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  title: { fontSize: 30, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
-  sub: { fontSize: 14, color: Colors.textSecondary, lineHeight: 21, marginBottom: Spacing.sm },
-  input: { backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md, paddingHorizontal: Spacing.md, paddingVertical: 16, color: Colors.textPrimary, fontSize: 17, borderWidth: 1.5, borderColor: Colors.border, fontWeight: '500' },
+  title: { fontSize: 30, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.5 },
+  sub: { fontSize: 14, color: Colors.textSecondary, lineHeight: 21, marginBottom: Spacing.sm, fontFamily: Fonts.regular },
+  input: { backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md, paddingHorizontal: Spacing.md, paddingVertical: 16, color: Colors.textPrimary, fontSize: 17, borderWidth: 1.5, borderColor: Colors.border, fontFamily: Fonts.medium },
   inputErr: { borderColor: Colors.danger + '88' },
-  error: { fontSize: 13, color: Colors.danger, marginTop: -4 },
+  error: { fontSize: 13, color: Colors.danger, marginTop: -4, fontFamily: Fonts.regular },
 });
 
 const avatarS = StyleSheet.create({
@@ -293,7 +293,7 @@ const avatarS = StyleSheet.create({
   carousel: { paddingHorizontal: Spacing.xl, gap: 10, paddingVertical: 4 },
   cell: { width: AVATAR_CELL, height: AVATAR_CELL, borderRadius: BorderRadius.md, backgroundColor: Colors.surfaceElevated, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   cellActive: { borderColor: Colors.primary },
-  hint: { fontSize: 12, color: Colors.textMuted, textAlign: 'center', letterSpacing: 0.4 },
+  hint: { fontSize: 12, color: Colors.textMuted, textAlign: 'center', letterSpacing: 0.4, fontFamily: Fonts.regular },
 });
 
 const examS = StyleSheet.create({
@@ -309,14 +309,14 @@ const examS = StyleSheet.create({
     position: 'relative',
   },
   cardActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryGlow },
-  label: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
+  label: { fontSize: 20, fontFamily: Fonts.bold, color: Colors.textPrimary },
   labelActive: { color: Colors.primary },
-  desc: { fontSize: 11, color: Colors.textSecondary, lineHeight: 16 },
+  desc: { fontSize: 11, color: Colors.textSecondary, lineHeight: 16, fontFamily: Fonts.regular },
   checkbox: { position: 'absolute', top: 10, right: 10, width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
   checkboxActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  checkmark: { color: '#000', fontSize: 13, fontWeight: '800' },
+  checkmark: { color: '#000', fontSize: 13, fontFamily: Fonts.bold },
   comboNote: { backgroundColor: Colors.primary + '18', borderRadius: BorderRadius.md, padding: Spacing.sm, borderWidth: 1, borderColor: Colors.primary + '33' },
-  comboText: { fontSize: 13, color: Colors.primaryLight, lineHeight: 20 },
+  comboText: { fontSize: 13, color: Colors.primaryLight, lineHeight: 20, fontFamily: Fonts.regular },
 });
 
 const styles = StyleSheet.create({
@@ -330,13 +330,13 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.border },
   dotActive: { backgroundColor: Colors.primary + '88' },
   dotCurrent: { backgroundColor: Colors.primary, width: 16 },
-  dotLabel: { fontSize: 10, fontWeight: '600', color: Colors.textMuted, letterSpacing: 0.5 },
+  dotLabel: { fontSize: 10, fontFamily: Fonts.semibold, color: Colors.textMuted, letterSpacing: 0.5 },
   content: { flex: 1, paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm },
   footer: { flexDirection: 'row', paddingHorizontal: Spacing.xl, paddingBottom: Platform.OS === 'web' ? 32 : 44, paddingTop: Spacing.md, gap: Spacing.sm, alignItems: 'center' },
   backBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.md },
-  backText: { fontSize: 15, color: Colors.textSecondary, fontWeight: '500' },
+  backText: { fontSize: 15, color: Colors.textSecondary, fontFamily: Fonts.medium },
   nextBtn: { flex: 1, borderRadius: BorderRadius.md, overflow: 'hidden' },
   nextBtnDisabled: { opacity: 0.45 },
   nextGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
-  nextText: { fontSize: 17, fontWeight: '700', color: '#000', letterSpacing: 0.2 },
+  nextText: { fontSize: 17, fontFamily: Fonts.bold, color: '#000', letterSpacing: 0.2 },
 });

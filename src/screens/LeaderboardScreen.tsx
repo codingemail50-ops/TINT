@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
 import { LeaderboardEntry } from '../data/leaderboard';
 import { LeaderboardCard } from '../components/LeaderboardCard';
 import { AppState } from '../utils/storage';
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     marginHorizontal: -Spacing.xl, paddingHorizontal: Spacing.xl,
   },
-  screenTitle: { fontSize: 28, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
+  screenTitle: { fontSize: 28, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.5 },
   screenSub:   { ...Typography.bodyMedium, color: Colors.textSecondary, marginTop: 4 },
 
   // Exam tabs
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   userRankName:  { ...Typography.headlineSmall, color: Colors.textPrimary },
   userRankMeta:  { ...Typography.bodySmall, color: Colors.textSecondary },
   userRankRight: { alignItems: 'flex-end' },
-  userRankNumber: { fontSize: 32, fontWeight: '900', letterSpacing: -1, color: Colors.primary },
+  userRankNumber: { fontSize: 32, fontFamily: Fonts.bold, letterSpacing: -1, color: Colors.primary },
   userRankLabel:  { ...Typography.labelSmall, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
 
   // Podium
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   podiumCrown:  { marginBottom: 2 },
   podiumName: {
     ...Typography.bodySmall, color: Colors.textPrimary,
-    fontWeight: '600', textAlign: 'center', fontSize: 11,
+    fontFamily: Fonts.semibold, textAlign: 'center', fontSize: 11,
   },
   podiumPedestal: {
     width: '100%',

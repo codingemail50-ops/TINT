@@ -150,8 +150,8 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.display, fontSize: 13, color: Colors.blue[400],
     letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: Spacing.sm,
   },
-  title: { fontSize: 26, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
-  sub: { fontSize: 14, color: Colors.textSecondary, lineHeight: 20 },
+  title: { fontSize: 26, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.5 },
+  sub: { fontSize: 14, color: Colors.textSecondary, lineHeight: 20, fontFamily: Fonts.regular },
 
   form: { gap: Spacing.sm },
   input: {
@@ -161,10 +161,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     color: Colors.textPrimary,
     fontSize: 16,
+    fontFamily: Fonts.regular,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  error: { color: Colors.danger, fontSize: 13 },
+  error: { color: Colors.danger, fontSize: 13, fontFamily: Fonts.regular },
 
   submitBtn: {
     backgroundColor: Colors.primary,
@@ -174,12 +175,12 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   submitBtnDisabled: { opacity: 0.4 },
-  submitText: { fontSize: 16, fontWeight: '700', color: Colors.background },
+  submitText: { fontSize: 16, fontFamily: Fonts.bold, color: Colors.background },
 
   switchRow: { alignItems: 'center' },
-  switchText: { fontSize: 14, color: Colors.textSecondary },
-  switchLink: { color: Colors.blue[400], fontWeight: '600' },
+  switchText: { fontSize: 14, color: Colors.textSecondary, fontFamily: Fonts.regular },
+  switchLink: { color: Colors.blue[400], fontFamily: Fonts.semibold },
 
   guestRow: { alignItems: 'center', paddingTop: Spacing.md },
-  guestText: { fontSize: 13, color: Colors.textMuted, textDecorationLine: 'underline' },
+  guestText: { fontSize: 13, color: Colors.textMuted, textDecorationLine: 'underline', fontFamily: Fonts.regular },
 });

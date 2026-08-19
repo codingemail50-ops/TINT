@@ -61,7 +61,7 @@ const chartSt = StyleSheet.create({
   barCol: { flex: 1, alignItems: 'center' },
   bar: { backgroundColor: Colors.gray[200], borderRadius: 3 },
   dayRow: { flexDirection: 'row', marginTop: Spacing.sm },
-  dayLabel: { flex: 1, textAlign: 'center', fontSize: 11, color: Colors.textMuted },
+  dayLabel: { flex: 1, textAlign: 'center', fontSize: 11, color: Colors.textMuted, fontFamily: Fonts.regular },
 });
 
 // ── Current-streak-only heatmap, monochrome ──────────────────────────────────
@@ -143,7 +143,7 @@ const StreakHeatmap: React.FC<{ history: AppState['history'] }> = ({ history }) 
 const heatSt = StyleSheet.create({
   wrapper: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
   dayLabels: { paddingTop: 2 },
-  dayLabel: { fontSize: 9, color: Colors.textMuted, width: 10, textAlign: 'right' },
+  dayLabel: { fontSize: 9, color: Colors.textMuted, width: 10, textAlign: 'right', fontFamily: Fonts.regular },
   grid: { flexDirection: 'row' },
   col: { flexDirection: 'column' },
   cell: { borderRadius: 3, alignItems: 'center', justifyContent: 'center' },
@@ -217,14 +217,14 @@ const donutSt = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.lg },
   center: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   centerVal: { fontFamily: Fonts.retro, fontSize: 30, color: Colors.textPrimary },
-  centerUnit: { fontSize: 10, color: Colors.textMuted, marginTop: -2 },
+  centerUnit: { fontSize: 10, color: Colors.textMuted, marginTop: -2, fontFamily: Fonts.regular },
   legend: { flex: 1, gap: 8 },
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
   legendText: { flex: 1, ...Typography.bodySmall, color: Colors.textSecondary },
   legendMins: { ...Typography.bodySmall, color: Colors.textMuted, fontSize: 11 },
   empty: { alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: Colors.textMuted, textAlign: 'center', fontSize: 12, lineHeight: 18 },
+  emptyText: { color: Colors.textMuted, textAlign: 'center', fontSize: 12, lineHeight: 18, fontFamily: Fonts.regular },
 });
 
 const TIMEFRAMES: { id: FocusTimeframe; label: string }[] = [
@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
   },
   tab: { flex: 1, paddingVertical: 8, borderRadius: BorderRadius.full, alignItems: 'center' },
   tabActive: { backgroundColor: Colors.gray[100] },
-  tabText: { ...Typography.bodySmall, fontWeight: '600', color: Colors.textSecondary },
+  tabText: { ...Typography.bodySmall, fontFamily: Fonts.semibold, color: Colors.textSecondary },
   tabTextActive: { color: Colors.background },
 
   sectionLabel: { ...Typography.labelSmall, color: Colors.textSecondary, marginBottom: Spacing.sm },
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border,
     gap: 4,
   },
-  statValue: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
+  statValue: { fontSize: 22, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.5 },
   statLabel: { ...Typography.bodySmall, color: Colors.textSecondary },
 
   sectionCard: {

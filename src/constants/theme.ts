@@ -1,6 +1,9 @@
-// Retro/gamified theme: black→blue tonal scale, with a separate green scale
-// reserved ONLY for "done"/completed states. Display font is Anton (bold
-// poster headlines), retro/numeric font is VT323 (pixel timer digits).
+// Minimal OLED-dark theme: black→blue tonal scale, with a separate green
+// scale reserved ONLY for "done"/completed states. One typeface throughout
+// (Inter — the closest license-safe equivalent to SF Pro; Apple's actual
+// SF Pro font may only ship in software for Apple platforms, and this app
+// targets Google Play) at a few consistent weights, and a tight 12-18px
+// corner-radius scale used everywhere instead of one-off values per screen.
 const blue = {
   50: '#F4F7FB',
   100: '#E9EEF5',
@@ -94,37 +97,47 @@ export const Spacing = {
   xxxl: 64,
 };
 
+// 12-18px is the working range for every card/sheet/button in the app —
+// sm/full sit outside it deliberately for small chips and fully-round pills.
 export const BorderRadius = {
-  sm: 10,
-  md: 16,
-  lg: 24,
-  xl: 32,
+  sm: 12,
+  md: 14,
+  lg: 16,
+  xl: 18,
   full: 9999,
 };
 
 export const Fonts = {
-  display: 'Anton_400Regular',
-  retro: 'VT323_400Regular',
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+  semibold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+
+  // Legacy aliases — kept so existing call sites (Fonts.display / Fonts.retro)
+  // don't need touching; both now resolve to Inter weights instead of the
+  // old Anton/VT323 pixel fonts.
+  display: 'Inter_600SemiBold',
+  retro: 'Inter_500Medium',
 };
 
 export const Typography = {
-  displayLarge: { fontSize: 40, fontWeight: '800' as const, letterSpacing: -1 },
-  displayMedium: { fontSize: 30, fontWeight: '800' as const, letterSpacing: -0.5 },
-  headlineLarge: { fontSize: 24, fontWeight: '700' as const, letterSpacing: -0.3 },
-  headlineMedium: { fontSize: 20, fontWeight: '700' as const },
-  headlineSmall: { fontSize: 18, fontWeight: '600' as const },
-  bodyLarge: { fontSize: 16, fontWeight: '400' as const, lineHeight: 24 },
-  bodyMedium: { fontSize: 14, fontWeight: '400' as const, lineHeight: 20 },
-  bodySmall: { fontSize: 12, fontWeight: '400' as const, lineHeight: 18 },
-  labelLarge: { fontSize: 14, fontWeight: '600' as const, letterSpacing: 0.5 },
-  labelSmall: { fontSize: 11, fontWeight: '600' as const, letterSpacing: 1 },
-  numeric: { fontSize: 32, fontWeight: '800' as const, letterSpacing: -1 },
+  displayLarge: { fontFamily: Fonts.semibold, fontSize: 40, letterSpacing: -1 },
+  displayMedium: { fontFamily: Fonts.semibold, fontSize: 30, letterSpacing: -0.5 },
+  headlineLarge: { fontFamily: Fonts.semibold, fontSize: 24, letterSpacing: -0.3 },
+  headlineMedium: { fontFamily: Fonts.semibold, fontSize: 20 },
+  headlineSmall: { fontFamily: Fonts.semibold, fontSize: 18 },
+  bodyLarge: { fontFamily: Fonts.regular, fontSize: 16, lineHeight: 24 },
+  bodyMedium: { fontFamily: Fonts.regular, fontSize: 14, lineHeight: 20 },
+  bodySmall: { fontFamily: Fonts.regular, fontSize: 12, lineHeight: 18 },
+  labelLarge: { fontFamily: Fonts.medium, fontSize: 14, letterSpacing: 0.5 },
+  labelSmall: { fontFamily: Fonts.medium, fontSize: 11, letterSpacing: 1 },
+  numeric: { fontFamily: Fonts.medium, fontSize: 32, letterSpacing: -1 },
 
-  // Retro pixel-font variants (VT323) — for timer digits, badges, wordmark
-  retroLarge: { fontSize: 40, fontFamily: 'VT323_400Regular' as const, letterSpacing: 1 },
-  retroMedium: { fontSize: 22, fontFamily: 'VT323_400Regular' as const, letterSpacing: 0.5 },
-  retroSmall: { fontSize: 15, fontFamily: 'VT323_400Regular' as const, letterSpacing: 0.5 },
+  // Large numeric displays (timer digits, stat totals) — tight tracking,
+  // same typeface as everything else, just a heavier numeric-only role.
+  retroLarge: { fontFamily: Fonts.medium, fontSize: 40, letterSpacing: -1 },
+  retroMedium: { fontFamily: Fonts.medium, fontSize: 22, letterSpacing: -0.5 },
+  retroSmall: { fontFamily: Fonts.medium, fontSize: 15, letterSpacing: -0.3 },
 
-  // Display font (Anton) — bold poster headlines
-  displayHeavy: { fontSize: 28, fontFamily: 'Anton_400Regular' as const, letterSpacing: 0.5 },
+  displayHeavy: { fontFamily: Fonts.semibold, fontSize: 28, letterSpacing: -0.3 },
 };

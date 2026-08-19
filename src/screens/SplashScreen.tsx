@@ -1,16 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Colors, Spacing } from '../constants/theme';
+import { Colors, Spacing, Fonts } from '../constants/theme';
 import { StorageService } from '../utils/storage';
 import { MOTIVATIONAL_QUOTES } from '../data/examPresets';
 
 const { width: W, height: H } = Dimensions.get('window');
-
-// Heavy poster-style font — Impact on web, bold system on native
-const DISPLAY_FONT = Platform.OS === 'web'
-  ? 'Impact, "Arial Narrow Bold", "Arial Black", sans-serif'
-  : undefined;
 
 // The 4 letters of TINT and the words they expand into
 const EXPANSIONS = [
@@ -273,8 +268,7 @@ const styles = StyleSheet.create({
   },
   tintLetter: {
     fontSize: 88,
-    fontWeight: '900',
-    fontFamily: DISPLAY_FONT,
+    fontFamily: Fonts.bold,
     color: Colors.textPrimary,
     letterSpacing: -2,
   },
@@ -307,8 +301,7 @@ const styles = StyleSheet.create({
   },
   expandedLetter: {
     fontSize: 74,
-    fontWeight: '900',
-    fontFamily: DISPLAY_FONT,
+    fontFamily: Fonts.bold,
     color: Colors.textPrimary,
     letterSpacing: -1,
     lineHeight: 82,
@@ -321,8 +314,7 @@ const styles = StyleSheet.create({
   },
   expandedWord: {
     fontSize: 42,
-    fontWeight: '900',
-    fontFamily: DISPLAY_FONT,
+    fontFamily: Fonts.bold,
     color: Colors.textPrimary,
     letterSpacing: 1,
     lineHeight: 48,
@@ -338,11 +330,11 @@ const styles = StyleSheet.create({
   quoteBox: { alignItems: 'center', gap: 10, paddingHorizontal: Spacing.xl },
   quoteLine: { width: 44, height: 1, backgroundColor: Colors.primary + '66' },
   quoteText: {
-    fontSize: 14, color: Colors.textSecondary,
+    fontSize: 14, color: Colors.textSecondary, fontFamily: Fonts.regular,
     textAlign: 'center', lineHeight: 22, fontStyle: 'italic',
   },
   quoteAuthor: {
-    fontSize: 11, fontWeight: '600',
+    fontSize: 11, fontFamily: Fonts.semibold,
     color: Colors.textMuted, letterSpacing: 1.5, textTransform: 'uppercase',
   },
 

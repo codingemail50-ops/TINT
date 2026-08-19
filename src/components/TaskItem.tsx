@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
 import { Task } from '../data/examPresets';
 
 interface Props {
@@ -112,15 +112,15 @@ const styles = StyleSheet.create({
   },
   checkbox: {
     width: 30, height: 30,
-    borderRadius: 10, borderWidth: 2,
+    borderRadius: BorderRadius.sm, borderWidth: 2,
     alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
   },
-  checkmark: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  checkmark: { color: '#fff', fontSize: 16, fontFamily: Fonts.bold },
   content: { flex: 1, gap: 8 },
-  title: { ...Typography.bodyLarge, color: Colors.textPrimary, fontWeight: '500', fontSize: 17 },
+  title: { ...Typography.bodyLarge, color: Colors.textPrimary, fontFamily: Fonts.medium, fontSize: 17 },
   titleCompleted: { color: Colors.textMuted, textDecorationLine: 'line-through' },
-  repeatBadge: { color: Colors.accent, fontSize: 13 },
+  repeatBadge: { color: Colors.accent, fontSize: 13, fontFamily: Fonts.regular },
   meta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   categoryBadge: {
     paddingHorizontal: 10, paddingVertical: 4,
@@ -134,5 +134,5 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderRadius: 14, backgroundColor: Colors.danger + '22',
   },
-  deleteText: { color: Colors.danger, fontSize: 18, fontWeight: '700', lineHeight: 22 },
+  deleteText: { color: Colors.danger, fontSize: 18, fontFamily: Fonts.bold, lineHeight: 22 },
 });

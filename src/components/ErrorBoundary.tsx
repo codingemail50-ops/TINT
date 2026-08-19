@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { Colors, Spacing } from '../constants/theme';
+import { Colors, Spacing, Fonts } from '../constants/theme';
 
 interface Props { children: React.ReactNode }
 interface State { error: Error | null }
@@ -33,7 +33,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.xl, paddingTop: 64 },
-  title: { fontSize: 22, fontWeight: '800', color: Colors.danger, marginBottom: Spacing.md },
-  message: { fontSize: 15, color: Colors.textPrimary, marginBottom: Spacing.lg },
+  title: { fontSize: 22, fontFamily: Fonts.bold, color: Colors.danger, marginBottom: Spacing.md },
+  message: { fontSize: 15, color: Colors.textPrimary, fontFamily: Fonts.regular, marginBottom: Spacing.lg },
   stack: { fontSize: 11, color: Colors.textSecondary, fontFamily: 'monospace' as any },
 });

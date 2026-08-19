@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
 import { LeaderboardEntry } from '../data/leaderboard';
 
 interface Props {
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   },
   name: {
     ...Typography.bodyLarge,
-    fontWeight: '600',
+    fontFamily: Fonts.semibold,
     color: Colors.textPrimary,
   },
   examBadge: {
@@ -154,6 +154,7 @@ const styles = StyleSheet.create({
   statDot: {
     color: Colors.textMuted,
     fontSize: 10,
+    fontFamily: Fonts.regular,
   },
   consistencyBar: {
     width: 4,
