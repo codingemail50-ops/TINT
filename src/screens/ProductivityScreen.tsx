@@ -1,49 +1,27 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
 import { AppState, getHeatmapData } from '../utils/storage';
-import { FocusLogEntry, loadFocusLog, getLast7DaysFocus } from '../utils/focusLog';
+import { FocusLogEntry, loadFocusLog, FocusTimeframe, FocusBucket, getFocusSummary } from '../utils/focusLog';
 import { REALITY_CHECK_MESSAGES } from '../data/examPresets';
 
 interface Props { appState: AppState }
 
-// ── Focus-time gradient area chart (smooth curve through 7 days) ────────────
+function formatHours(mins: number): string {
+  const h = mins / 60;
+  return h >= 10 || Number.isInteger(h) ? `${Math.round(h)}h` : `${h.toFixed(1)}h`;
+}
+
+// ── Time-spent bar chart, monochrome ─────────────────────────────────────────
 const CHART_H = 150;
 const CHART_W = Dimensions.get('window').width - (Spacing.xl + Spacing.md) * 2;
 
-// Catmull-Rom -> cubic-bezier smoothing so the line curves through each
-// day's point instead of joining them with hard angles.
-function smoothPaths(points: { x: number; y: number }[]): { line: string; area: string } {
-  if (points.length < 2) return { line: '', area: '' };
-  const seg: string[] = [`M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`];
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i === 0 ? i : i - 1];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[i + 2 < points.length ? i + 2 : i + 1];
-    const c1x = p1.x + (p2.x - p0.x) / 6;
-    const c1y = p1.y + (p2.y - p0.y) / 6;
-    const c2x = p2.x - (p3.x - p1.x) / 6;
-    const c2y = p2.y - (p3.y - p1.y) / 6;
-    seg.push(`C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`);
-  }
-  const line = seg.join(' ');
-  const area = `${line} L ${points[points.length - 1].x.toFixed(1)} ${CHART_H} L ${points[0].x.toFixed(1)} ${CHART_H} Z`;
-  return { line, area };
-}
-
-const FocusTimeChart: React.FC<{ data: { day: string; mins: number }[] }> = ({ data }) => {
-  const maxVal = Math.max(...data.map(d => d.mins), 1);
-  const topMin = Math.max(1, Math.ceil(maxVal / 60)) * 60;
-
-  const points = data.map((d, i) => ({
-    x: (i / (data.length - 1)) * CHART_W,
-    y: CHART_H - (d.mins / topMin) * (CHART_H - 10) - 4,
-  }));
-  const { line, area } = smoothPaths(points);
+const TimeBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
+  const maxVal = Math.max(...buckets.map(b => b.mins), 1);
+  const barW = Math.max(3, Math.min(20, CHART_W / buckets.length - 4));
 
   return (
     <View>
@@ -51,20 +29,22 @@ const FocusTimeChart: React.FC<{ data: { day: string; mins: number }[] }> = ({ d
         {[0.25, 0.5, 0.75, 1].map(f => (
           <View key={f} style={[chartSt.gridline, { bottom: CHART_H * f }]} />
         ))}
-        <Svg width={CHART_W} height={CHART_H} style={StyleSheet.absoluteFillObject}>
-          <Defs>
-            <SvgLinearGradient id="focusFill" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={Colors.blue[400]} stopOpacity={0.75} />
-              <Stop offset="1" stopColor="#6C4FA0" stopOpacity={0.12} />
-            </SvgLinearGradient>
-          </Defs>
-          <Path d={area} fill="url(#focusFill)" />
-          <Path d={line} fill="none" stroke={Colors.blue[400]} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
-        </Svg>
+        <View style={chartSt.barRow}>
+          {buckets.map((b, i) => (
+            <View key={i} style={chartSt.barCol}>
+              <View
+                style={[
+                  chartSt.bar,
+                  { height: Math.max(2, (b.mins / maxVal) * (CHART_H - 8)), width: barW },
+                ]}
+              />
+            </View>
+          ))}
+        </View>
       </View>
       <View style={chartSt.dayRow}>
-        {data.map((d, i) => (
-          <Text key={i} style={chartSt.dayLabel}>{d.day}</Text>
+        {buckets.map((b, i) => (
+          <Text key={i} style={chartSt.dayLabel}>{b.label}</Text>
         ))}
       </View>
     </View>
@@ -74,15 +54,21 @@ const FocusTimeChart: React.FC<{ data: { day: string; mins: number }[] }> = ({ d
 const chartSt = StyleSheet.create({
   chartArea: { justifyContent: 'flex-end' },
   gridline: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: Colors.border },
+  // Each bucket gets an equal-width flex column (matching dayRow's flex:1
+  // labels below) so the bar always sits centered under its own label,
+  // regardless of how many buckets the timeframe produces.
+  barRow: { flexDirection: 'row', alignItems: 'flex-end', height: '100%' },
+  barCol: { flex: 1, alignItems: 'center' },
+  bar: { backgroundColor: Colors.gray[200], borderRadius: 3 },
   dayRow: { flexDirection: 'row', marginTop: Spacing.sm },
   dayLabel: { flex: 1, textAlign: 'center', fontSize: 11, color: Colors.textMuted },
 });
 
-// ── Current-streak-only fire heatmap ─────────────────────────────────────────
-function blueShade(v: number): string {
+// ── Current-streak-only heatmap, monochrome ──────────────────────────────────
+function grayShade(v: number): string {
   if (v < 0) return Colors.surface;
-  if (v === 0) return '#141D27';
-  const stops = ['#16212C', '#1D415D', '#2470A5', '#348DC3', '#73B5DD'];
+  if (v === 0) return Colors.gray[900];
+  const stops = [Colors.gray[900], Colors.gray[700], Colors.gray[500], Colors.gray[300], Colors.gray[100]];
   const t = Math.min(v / 100, 1);
   const idx = Math.min(Math.floor(t * (stops.length - 1)), stops.length - 2);
   return stops[idx + 1];
@@ -136,12 +122,12 @@ const StreakHeatmap: React.FC<{ history: AppState['history'] }> = ({ history }) 
                 const isToday = di === heatVals.length - 1;
                 const inStreak = currentStreakLen >= 2 && di >= streakStart;
                 const bg = inStreak
-                  ? (isToday ? Colors.streakColors.hot : 'rgba(251,146,60,0.35)')
-                  : blueShade(heatVals[di].value);
+                  ? (isToday ? Colors.textPrimary : Colors.gray[300])
+                  : grayShade(heatVals[di].value);
                 return (
                   <View key={row} style={[heatSt.cell, { width: HEAT_CELL, height: HEAT_CELL, backgroundColor: bg }]}>
                     {inStreak && isToday && (
-                      <Ionicons name="flame" size={10} color="#FFD23F" />
+                      <Ionicons name="checkmark" size={10} color={Colors.background} />
                     )}
                   </View>
                 );
@@ -167,7 +153,7 @@ const heatSt = StyleSheet.create({
 const PIE_SIZE = 150;
 const PIE_R = 60;
 const PIE_STROKE = 20;
-const PIE_SHADES = [Colors.blue[300], Colors.blue[500], Colors.blue[700], Colors.blue[400], Colors.blue[600], Colors.blue[800]];
+const PIE_SHADES = [Colors.gray[100], Colors.gray[300], Colors.gray[500], Colors.gray[200], Colors.gray[400], Colors.gray[600]];
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
@@ -241,15 +227,27 @@ const donutSt = StyleSheet.create({
   emptyText: { color: Colors.textMuted, textAlign: 'center', fontSize: 12, lineHeight: 18 },
 });
 
+const TIMEFRAMES: { id: FocusTimeframe; label: string }[] = [
+  { id: 'week', label: 'Week' },
+  { id: 'month', label: 'Month' },
+  { id: 'year', label: 'Year' },
+  { id: 'allTime', label: 'All Time' },
+];
+
+function formatCount(n: number): string {
+  return n >= 10 ? String(Math.round(n)) : n.toFixed(1);
+}
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
   const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
+  const [timeframe, setTimeframe] = useState<FocusTimeframe>('month');
 
   useEffect(() => {
     loadFocusLog().then(setFocusLog);
   }, []);
 
-  const last7Focus = useMemo(() => getLast7DaysFocus(focusLog), [focusLog]);
+  const summary = useMemo(() => getFocusSummary(focusLog, timeframe), [focusLog, timeframe]);
 
   const consistencyLast7 = useMemo(() => {
     let sum = 0, count = 0;
@@ -283,28 +281,57 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
       <StatusBar style="light" />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-        <View style={styles.statGrid}>
+        <Text style={styles.title}>Insights</Text>
+        <Text style={styles.subtitle}>{summary.periodLabel}</Text>
+
+        <View style={styles.tabRow}>
+          {TIMEFRAMES.map(tf => (
+            <TouchableOpacity
+              key={tf.id}
+              style={[styles.tab, timeframe === tf.id && styles.tabActive]}
+              onPress={() => setTimeframe(tf.id)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabText, timeframe === tf.id && styles.tabTextActive]}>{tf.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.sectionLabel}>Summary</Text>
+        <View style={styles.summaryGrid}>
           <View style={styles.statCard}>
-            <Ionicons name="checkmark-circle" size={20} color={Colors.blue[400]} />
-            <Text style={styles.statValue}>{appState.totalTasksCompleted}</Text>
-            <Text style={styles.statLabel}>Tasks Done</Text>
+            <Ionicons name="time-outline" size={18} color={Colors.textPrimary} />
+            <Text style={styles.statValue}>{formatHours(summary.totalMins)}</Text>
+            <Text style={styles.statLabel}>Time focused</Text>
           </View>
           <View style={styles.statCard}>
-            <Ionicons name="stats-chart" size={20} color={Colors.blue[400]} />
-            <Text style={styles.statValue}>{consistencyLast7}%</Text>
-            <Text style={styles.statLabel}>7-Day Avg</Text>
+            <Ionicons name="layers-outline" size={18} color={Colors.textPrimary} />
+            <Text style={styles.statValue}>{summary.sessionCount}</Text>
+            <Text style={styles.statLabel}>Focus Sessions</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Ionicons name="hourglass-outline" size={18} color={Colors.textPrimary} />
+            <Text style={styles.statValue}>{formatHours(summary.avgMinsPerDay)}</Text>
+            <Text style={styles.statLabel}>Avg Duration / Day</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Ionicons name="stats-chart-outline" size={18} color={Colors.textPrimary} />
+            <Text style={styles.statValue}>{formatCount(summary.avgSessionsPerDay)}</Text>
+            <Text style={styles.statLabel}>Avg Sessions / Day</Text>
           </View>
         </View>
 
+        <Text style={styles.sectionLabel}>Time Spent</Text>
         <View style={styles.sectionCard}>
-          <FocusTimeChart data={last7Focus} />
-          <Text style={styles.chartCaption}>Screen-time comparison needs a native build — coming soon.</Text>
+          <TimeBarChart buckets={summary.buckets} />
         </View>
 
+        <Text style={styles.sectionLabel}>Current Streak</Text>
         <View style={styles.sectionCard}>
           <StreakHeatmap history={appState.history} />
         </View>
 
+        <Text style={styles.sectionLabel}>Today by Category</Text>
         <View style={styles.sectionCard}>
           <CategoryDonut data={categoryTime} />
         </View>
@@ -315,7 +342,7 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
               <Ionicons
                 name={consistencyLast7 >= 70 ? 'flash' : consistencyLast7 >= 50 ? 'warning' : 'alert-circle'}
                 size={20}
-                color={consistencyLast7 >= 70 ? Colors.blue[300] : Colors.danger}
+                color={consistencyLast7 >= 70 ? Colors.gray[200] : Colors.danger}
               />
               <Text style={styles.realityMessage}>{realityCheck.message}</Text>
             </View>
@@ -333,16 +360,30 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 56 },
 
-  statGrid: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
+  title: { ...Typography.displayMedium, color: Colors.textPrimary },
+  subtitle: { ...Typography.bodyMedium, color: Colors.textSecondary, marginTop: 4, marginBottom: Spacing.lg },
+
+  tabRow: {
+    flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: BorderRadius.full,
+    padding: 3, marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.border,
+  },
+  tab: { flex: 1, paddingVertical: 8, borderRadius: BorderRadius.full, alignItems: 'center' },
+  tabActive: { backgroundColor: Colors.gray[100] },
+  tabText: { ...Typography.bodySmall, fontWeight: '600', color: Colors.textSecondary },
+  tabTextActive: { color: Colors.background },
+
+  sectionLabel: { ...Typography.labelSmall, color: Colors.textSecondary, marginBottom: Spacing.sm },
+
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.lg },
   statCard: {
-    flex: 1,
+    flexBasis: '48%', flexGrow: 1,
     backgroundColor: Colors.surfaceElevated,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     borderWidth: 1, borderColor: Colors.border,
     gap: 4,
   },
-  statValue: { fontSize: 24, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
+  statValue: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.5 },
   statLabel: { ...Typography.bodySmall, color: Colors.textSecondary },
 
   sectionCard: {
@@ -350,9 +391,8 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     borderWidth: 1, borderColor: Colors.border,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
   },
-  chartCaption: { fontSize: 10.5, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.sm },
 
   realityCard: {
     borderRadius: BorderRadius.lg, overflow: 'hidden',
