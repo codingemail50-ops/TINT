@@ -21,7 +21,7 @@ import { KnurledDial } from '../components/KnurledDial';
 import { openPermissionSettings, getSelfReportedGrants, setSelfReportedGrant, BlockingPermission } from '../utils/appBlocking';
 
 const DEFAULT_DURATION = 25;
-const HOLD_MS = 3000;
+const HOLD_MS = 2000;
 
 function formatDuration(mins: number): string {
   const h = Math.floor(mins / 60);
@@ -304,7 +304,7 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
   // Driven by Animated (not per-frame setState) so the color build-up runs
   // on its own timing loop instead of forcing a full component re-render
   // ~60x/second — that churn was resetting the native touch responder
-  // mid-hold on-device, cutting the gesture short before the 3s completed.
+  // mid-hold on-device, cutting the gesture short before HOLD_MS completed.
   const startHold = () => {
     setHoldLabel('Hold to end session');
     holdAnim.setValue(0);
@@ -391,7 +391,7 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
                 <KnurledDial
                   size={BLOB_WRAP}
                   minValue={5}
-                  maxValue={120}
+                  maxValue={240}
                   step={5}
                   value={duration}
                   onChange={d => { setDuration(d); setTimeLeft(d * 60); }}

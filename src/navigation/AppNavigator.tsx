@@ -75,6 +75,10 @@ export const AppNavigator: React.FC = () => {
   // to createAccount in login mode, without collecting avatar/exam/goal —
   // this flag is what tells createAccount which mode to open in.
   const [loginShortcut, setLoginShortcut] = useState(false);
+  // Tapping the wordmark on Home opens the login page directly (temporary
+  // dev shortcut, to be removed later) — this remembers to send them back
+  // to Today rather than reusing the onboarding shortcut's no-back-button flow.
+  const [loginFromHome, setLoginFromHome] = useState(false);
   const tabFadeAnim = useRef(new Animated.Value(0)).current;
   const userIdRef = useRef<string | null>(null);
   const draftRef = useRef<OnboardingDraft>({ avatar: 'star', examTypes: [], dailyFocusGoalMins: 60 });
@@ -126,6 +130,12 @@ export const AppNavigator: React.FC = () => {
 
   const handleLoginShortcut = () => {
     setLoginShortcut(true);
+    setScreen('createAccount');
+  };
+
+  const handleOpenLoginFromHome = () => {
+    setLoginShortcut(true);
+    setLoginFromHome(true);
     setScreen('createAccount');
   };
 
@@ -235,7 +245,12 @@ export const AppNavigator: React.FC = () => {
               onSignedUp={handleSignedUp}
               onGuest={handleGuestNamed}
               onLoggedIn={handleLoggedIn}
-              onBack={loginShortcut ? undefined : () => setScreen('focusGoal')}
+              onBack={
+                loginFromHome
+                  ? () => { setLoginFromHome(false); setLoginShortcut(false); setScreen('todo'); }
+                  : loginShortcut ? undefined : () => setScreen('focusGoal')
+              }
+              initialMode={loginShortcut ? 'login' : 'signup'}
             />
           )}
           {screen === 'todo' && (
@@ -246,6 +261,7 @@ export const AppNavigator: React.FC = () => {
               onNavigateFocus={() => navigateTo('focus')}
               onNavigateProfile={() => navigateTo('profile')}
               onNavigateAnalytics={() => navigateTo('productivity')}
+              onNavigateLogin={handleOpenLoginFromHome}
             />
           )}
           {screen === 'focus' && <FocusScreen userId={userIdRef.current ?? undefined} />}

@@ -36,6 +36,10 @@ export const KnurledDial: React.FC<Props> = ({
   const knobOffset = (size - knobD) / 2;
   const capR = knobR * 0.6;
   const knurlCount = 44;
+  // Finger rotation is scaled down before it accumulates into a detent step —
+  // without this the dial felt twitchy, jumping several minutes per small
+  // flick. <1 means more physical rotation is needed per value change.
+  const ROTATION_SENSITIVITY = 0.45;
   const knurlInner = knobR - size * 0.058;
   const knurlOuter = knobR - size * 0.0115;
   const degreesPerStep = 360 / knurlCount;
@@ -94,7 +98,7 @@ export const KnurledDial: React.FC<Props> = ({
         let delta = angle - lastAngle.value;
         if (delta > 180) delta -= 360;
         if (delta < -180) delta += 360;
-        accum.value += delta;
+        accum.value += delta * ROTATION_SENSITIVITY;
         while (accum.value >= degreesPerStep) {
           accum.value -= degreesPerStep;
           runOnJS(bumpValue)(1);

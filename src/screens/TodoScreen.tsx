@@ -172,11 +172,13 @@ interface Props {
   onNavigateFocus: () => void;
   onNavigateProfile: () => void;
   onNavigateAnalytics: () => void;
+  /** Temporary dev shortcut to the login page, tappable off the wordmark — remove later. */
+  onNavigateLogin?: () => void;
 }
 
 const todayStr = new Date().toDateString();
 
-export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, onNavigateFocus, onNavigateProfile, onNavigateAnalytics }) => {
+export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, onNavigateFocus, onNavigateProfile, onNavigateAnalytics, onNavigateLogin }) => {
   const [tasks, setTasks]           = useState<Task[]>([]);
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
@@ -380,10 +382,15 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
         }),
       }]}>
         <View style={styles.headerTop}>
-          <View style={{ flex: 1 }}>
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            onPress={onNavigateLogin}
+            activeOpacity={onNavigateLogin ? 0.6 : 1}
+            disabled={!onNavigateLogin}
+          >
             <Text style={styles.tagline}>THERE IS</Text>
             <Text style={styles.tagline}>NO TOMORROW</Text>
-          </View>
+          </TouchableOpacity>
           <FlameBadge streak={appState.streak} size={46} onPress={onNavigateProfile} />
         </View>
 

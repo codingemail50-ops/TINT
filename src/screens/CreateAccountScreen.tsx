@@ -20,6 +20,7 @@ interface Props {
    *  to skip the rest of onboarding (avatar/goal already set) or not. */
   onLoggedIn: (hasProfile: boolean) => void;
   onBack?: () => void;
+  initialMode?: Mode;
 }
 
 function friendlyError(message: string): string {
@@ -37,8 +38,8 @@ function friendlyError(message: string): string {
 
 // Screen 3 of onboarding — username + email/password (or stay anonymous),
 // plus a placeholder for Google sign-in until that's wired up for real.
-export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLoggedIn, onBack }) => {
-  const [mode, setMode] = useState<Mode>('signup');
+export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLoggedIn, onBack, initialMode = 'signup' }) => {
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -95,7 +96,7 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.container}>
         <StatusBar style="light" />
-        {onBack && mode === 'signup' && (
+        {onBack && (
           <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.7}>
             <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
