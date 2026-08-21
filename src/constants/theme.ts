@@ -31,6 +31,15 @@ const gray = {
   950: '#000000',
 };
 
+// The one deliberate pop of color against the black/white base — used
+// sparingly (CTAs, active states, brand accents), not as the base palette.
+const orange = {
+  light: '#FFA352',
+  DEFAULT: '#FF6A00',
+  deep: '#C84E00',
+  glow: 'rgba(255, 106, 0, 0.16)',
+};
+
 export const Colors = {
   background: '#060608',
   surface: gray[900],
@@ -44,6 +53,11 @@ export const Colors = {
   accent: gray[100],
   accentLight: gray[300],
   accentGlow: gray[700],
+
+  pop: orange.DEFAULT,
+  popLight: orange.light,
+  popDeep: orange.deep,
+  popGlow: orange.glow,
 
   success: green.light,
   successGlow: green.glow,
@@ -74,6 +88,7 @@ export const Colors = {
 
   green,
   gray,
+  orange,
 };
 
 export const Spacing = {
@@ -102,9 +117,13 @@ export const Fonts = {
   semibold: 'Inter_600SemiBold',
   bold: 'Inter_700Bold',
 
+  // The gamified pixel font — reserved for the brand wordmark and timer
+  // digits only. Everything else on screen stays Inter; this is a
+  // deliberate accent, not the base UI font.
+  pixel: 'VT323_400Regular',
+
   // Legacy aliases — kept so existing call sites (Fonts.display / Fonts.retro)
-  // don't need touching; both now resolve to Inter weights instead of the
-  // old Anton/VT323 pixel fonts.
+  // don't need touching; both resolve to Inter weights, not the pixel font.
   display: 'Inter_600SemiBold',
   retro: 'Inter_500Medium',
 };

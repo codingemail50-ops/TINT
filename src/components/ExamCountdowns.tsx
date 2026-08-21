@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6,
   },
   bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  countdownText: { fontFamily: Fonts.retro, fontSize: 26, color: Colors.textPrimary, letterSpacing: -0.5 },
+  countdownText: { fontFamily: Fonts.pixel, fontSize: 32, color: Colors.textPrimary, letterSpacing: 0 },
   dateStamp: { ...Typography.bodySmall, color: Colors.textMuted },
   passedText: { ...Typography.headlineSmall, color: Colors.success },
 });

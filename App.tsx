@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StyleSheet, View } from 'react-native';
 import { useFonts } from 'expo-font';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { VT323_400Regular } from '@expo-google-fonts/vt323';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { Colors } from './src/constants/theme';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
@@ -14,7 +15,7 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 const FONT_LOAD_TIMEOUT_MS = 4000;
 
 export default function App() {
-  const [fontsLoaded, fontError] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
+  const [fontsLoaded, fontError] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, VT323_400Regular });
   const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {

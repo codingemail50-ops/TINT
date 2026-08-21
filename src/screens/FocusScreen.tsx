@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   activeScreen: { flex: 1, paddingTop: 56, paddingHorizontal: Spacing.lg },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   wordmark: {
-    fontFamily: Fonts.display, fontSize: 14, color: Colors.gray[400],
+    fontFamily: Fonts.pixel, fontSize: 19, color: Colors.gray[400],
     letterSpacing: 0.5, textTransform: 'uppercase',
   },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
     fontSize: 12, fontFamily: Fonts.bold, color: Colors.gray[700],
     textTransform: 'uppercase', letterSpacing: 0.5,
   },
-  blobTime: { fontFamily: Fonts.retro, fontSize: 40, color: Colors.ink, letterSpacing: -1, marginBottom: 10 },
+  blobTime: { fontFamily: Fonts.pixel, fontSize: 52, color: Colors.ink, letterSpacing: 0, marginBottom: 10 },
   pauseCircle: {
     width: 50, height: 50, borderRadius: 25,
     backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center',
@@ -602,7 +602,7 @@ const styles = StyleSheet.create({
   confirmClose: { position: 'absolute', top: 24, right: 22 },
   confirmTimer: {
     position: 'absolute', top: 130, left: 0, right: 0, textAlign: 'center',
-    fontFamily: Fonts.retro, fontSize: 46, color: 'rgba(255,255,255,0.5)',
+    fontFamily: Fonts.pixel, fontSize: 58, color: 'rgba(255,255,255,0.5)',
   },
   confirmSheet: {
     backgroundColor: 'rgba(20,6,10,0.75)',

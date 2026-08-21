@@ -854,8 +854,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   tagline: {
-    fontFamily: Fonts.display, fontSize: 20, color: Colors.gray[300],
-    letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 24,
+    fontFamily: Fonts.pixel, fontSize: 26, color: Colors.gray[300],
+    letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 26,
   },
 
   pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginBottom: Spacing.xl },

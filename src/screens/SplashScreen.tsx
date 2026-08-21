@@ -267,10 +267,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   tintLetter: {
-    fontSize: 88,
-    fontFamily: Fonts.bold,
+    fontSize: 100,
+    fontFamily: Fonts.pixel,
     color: Colors.textPrimary,
-    letterSpacing: -2,
+    letterSpacing: 0,
   },
 
   // Rays
@@ -300,10 +300,10 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   expandedLetter: {
-    fontSize: 74,
-    fontFamily: Fonts.bold,
+    fontSize: 84,
+    fontFamily: Fonts.pixel,
     color: Colors.textPrimary,
-    letterSpacing: -1,
+    letterSpacing: 0,
     lineHeight: 82,
     width: 52,
     textAlign: 'center',
@@ -313,8 +313,8 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   expandedWord: {
-    fontSize: 42,
-    fontFamily: Fonts.bold,
+    fontSize: 48,
+    fontFamily: Fonts.pixel,
     color: Colors.textPrimary,
     letterSpacing: 1,
     lineHeight: 48,
