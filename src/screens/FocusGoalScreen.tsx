@@ -3,32 +3,31 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useSharedValue } from 'react-native-reanimated';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Line, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { useHaptics } from '../hooks/useHaptics';
 
 const DIAL_SIZE = 260;
-const RING_R = 108;
-const RING_STROKE = 16;
-const START_ANGLE = -135;
-const SWEEP = 270;
+const KNOB_R = 100;
+const KNOB_D = KNOB_R * 2;
+const KNOB_OFFSET = (DIAL_SIZE - KNOB_D) / 2;
+const CAP_R = KNOB_R * 0.6;
+const KNURL_COUNT = 44;
+const KNURL_INNER = KNOB_R - 15;
+const KNURL_OUTER = KNOB_R - 3;
+
 const MIN_MINS = 15;
 const MAX_MINS = 180;
 const STEP_MINS = 5;
 const DEFAULT_MINS = 60;
-// Degrees of finger rotation needed to advance one step — tuned so a
-// full drag around the dial covers the whole range without feeling twitchy.
-const DEGREES_PER_STEP = 8;
+// Degrees of finger rotation needed to advance one step — tuned so a full
+// drag around the dial covers the whole range without feeling twitchy, and
+// so each step lands roughly on a knurl tooth for a "detented" feel.
+const DEGREES_PER_STEP = 360 / KNURL_COUNT;
 
 function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-}
-function arcPath(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
-  const s = polarToCartesian(cx, cy, r, startAngle);
-  const e = polarToCartesian(cx, cy, r, endAngle);
-  const largeArc = endAngle - startAngle <= 180 ? 0 : 1;
-  return `M ${s.x.toFixed(2)} ${s.y.toFixed(2)} A ${r} ${r} 0 ${largeArc} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}`;
 }
 // Angle of a touch point relative to the dial's center, using the same
 // "0 = up, clockwise positive" convention as polarToCartesian above.
@@ -37,6 +36,16 @@ function angleOfTouch(x: number, y: number): number {
   const dy = y - DIAL_SIZE / 2;
   return (Math.atan2(dx, -dy) * 180) / Math.PI;
 }
+
+// The ridged/knurled edge, like a hardware volume or macro-pad knob —
+// computed once, not per render, since it never changes shape (only the
+// disc it's drawn on rotates).
+const KNURL_LINES = Array.from({ length: KNURL_COUNT }, (_, i) => {
+  const angle = (360 / KNURL_COUNT) * i;
+  const inner = polarToCartesian(KNOB_R, KNOB_R, KNURL_INNER, angle);
+  const outer = polarToCartesian(KNOB_R, KNOB_R, KNURL_OUTER, angle);
+  return { x1: inner.x, y1: inner.y, x2: outer.x, y2: outer.y };
+});
 
 function formatGoal(mins: number): string {
   const h = Math.floor(mins / 60);
@@ -53,10 +62,12 @@ interface Props {
 }
 
 // Screen 2 of onboarding (also reused from the Profile screen to change the
-// goal later) — a rotary dial: drag clockwise to raise the daily focus
-// goal, counter-clockwise to lower it, with a haptic tick per 5-minute step.
+// goal later) — a rotary dial styled like a hardware macro-pad/volume knob:
+// a knurled disc that actually turns under your finger, with a fixed
+// pointer notch on the housing and a haptic tick on every detent.
 export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, onComplete, onBack }) => {
   const [mins, setMins] = useState(initialMins);
+  const [turns, setTurns] = useState(0); // unbounded rotation count, for the knob's visual spin
   const { dialTick, buttonPress } = useHaptics();
 
   // Shared values, not plain refs — these get mutated from inside UI-thread
@@ -67,14 +78,19 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
   const accum = useSharedValue(0);
   const minsRef = useRef(mins);
   minsRef.current = mins;
+  const turnsRef = useRef(0);
 
   const bumpValue = (direction: 1 | -1) => {
+    // The knob itself spins freely (like a real encoder) even after the
+    // value clamps at MIN/MAX, so it never feels like it's hit a wall.
+    turnsRef.current += direction;
+    setTurns(turnsRef.current);
     const next = Math.min(MAX_MINS, Math.max(MIN_MINS, minsRef.current + direction * STEP_MINS));
     if (next !== minsRef.current) {
       minsRef.current = next;
       setMins(next);
-      void dialTick();
     }
+    void dialTick();
   };
 
   const pan = Gesture.Pan()
@@ -107,9 +123,7 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
       lastAngle.value = null;
     });
 
-  const progress = (mins - MIN_MINS) / (MAX_MINS - MIN_MINS);
-  const knobAngle = START_ANGLE + progress * SWEEP;
-  const knob = polarToCartesian(DIAL_SIZE / 2, DIAL_SIZE / 2, RING_R, knobAngle);
+  const knobRotation = turns * DEGREES_PER_STEP;
 
   const handleContinue = () => {
     buttonPress();
@@ -133,26 +147,36 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
       <View style={styles.dialWrap}>
         <GestureDetector gesture={pan}>
           <View style={{ width: DIAL_SIZE, height: DIAL_SIZE }}>
-            <Svg width={DIAL_SIZE} height={DIAL_SIZE}>
-              <Path
-                d={arcPath(DIAL_SIZE / 2, DIAL_SIZE / 2, RING_R, START_ANGLE, START_ANGLE + SWEEP)}
-                stroke={Colors.surfaceElevated}
-                strokeWidth={RING_STROKE}
-                strokeLinecap="round"
-                fill="none"
-              />
-              <Path
-                d={arcPath(DIAL_SIZE / 2, DIAL_SIZE / 2, RING_R, START_ANGLE, Math.max(knobAngle, START_ANGLE + 0.01))}
-                stroke={Colors.primary}
-                strokeWidth={RING_STROKE}
-                strokeLinecap="round"
-                fill="none"
-              />
-              <Circle cx={knob.x} cy={knob.y} r={RING_STROKE / 2 + 4} fill={Colors.textPrimary} />
-            </Svg>
+            {/* Fixed pointer notch on the "housing" — stays put while the knob spins under it */}
+            <View style={styles.pointerNotch} pointerEvents="none" />
+
+            <View
+              style={[
+                styles.knob,
+                { top: KNOB_OFFSET, left: KNOB_OFFSET, transform: [{ rotate: `${knobRotation}deg` }] },
+              ]}
+              pointerEvents="none"
+            >
+              <Svg width={KNOB_D} height={KNOB_D}>
+                <Defs>
+                  <RadialGradient id="knobFace" cx="35%" cy="30%" r="75%">
+                    <Stop offset="0" stopColor={Colors.gray[600]} />
+                    <Stop offset="1" stopColor={Colors.gray[900]} />
+                  </RadialGradient>
+                </Defs>
+                <Circle cx={KNOB_R} cy={KNOB_R} r={KNOB_R - 2} fill="url(#knobFace)" stroke={Colors.gray[950]} strokeWidth={2} />
+                {KNURL_LINES.map((l, i) => (
+                  <Line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke={Colors.gray[950]} strokeWidth={2} strokeLinecap="round" />
+                ))}
+              </Svg>
+            </View>
+
+            {/* Static cap + readout, layered on top — doesn't spin with the knob */}
             <View style={styles.dialCenter} pointerEvents="none">
-              <Text style={styles.dialValue}>{formatGoal(mins)}</Text>
-              <Text style={styles.dialLabel}>per day</Text>
+              <View style={styles.cap}>
+                <Text style={styles.dialValue}>{formatGoal(mins)}</Text>
+                <Text style={styles.dialLabel}>per day</Text>
+              </View>
             </View>
           </View>
         </GestureDetector>
@@ -178,9 +202,19 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.5, marginBottom: 6 },
   sub: { fontSize: 14, color: Colors.textSecondary, lineHeight: 21, fontFamily: Fonts.regular },
   dialWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  knob: { position: 'absolute', width: KNOB_D, height: KNOB_D },
+  pointerNotch: {
+    position: 'absolute', top: KNOB_OFFSET - 9, left: DIAL_SIZE / 2 - 3, width: 6, height: 16,
+    borderRadius: 3, backgroundColor: Colors.gray[300],
+  },
   dialCenter: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  dialValue: { fontFamily: Fonts.pixel, fontSize: 46, color: Colors.textPrimary, letterSpacing: 0 },
-  dialLabel: { fontSize: 13, color: Colors.textMuted, fontFamily: Fonts.regular, marginTop: -4, textTransform: 'uppercase', letterSpacing: 1 },
+  cap: {
+    width: CAP_R * 2, height: CAP_R * 2, borderRadius: CAP_R,
+    backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.gray[950],
+    alignItems: 'center', justifyContent: 'center',
+  },
+  dialValue: { fontFamily: Fonts.pixel, fontSize: 40, color: Colors.textPrimary, letterSpacing: 0 },
+  dialLabel: { fontSize: 12, color: Colors.textMuted, fontFamily: Fonts.regular, marginTop: -4, textTransform: 'uppercase', letterSpacing: 1 },
   footer: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl, paddingTop: Spacing.sm },
   nextBtn: { borderRadius: BorderRadius.md, overflow: 'hidden' },
   nextGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.primary },
