@@ -58,7 +58,13 @@ export const KnurledDial: React.FC<Props> = ({
   valueRef.current = value;
   const turnsRef = useRef(0);
 
+  // Marked as its own worklet, not just a plain closure — it's called from
+  // inside the Gesture.Pan worklets below, and on native those run on the
+  // UI thread; a function without its own 'worklet' directive isn't
+  // guaranteed to be callable from there the way it is in the web polyfill
+  // (where everything runs on one thread), which is a real crash risk.
   const angleOfTouch = (x: number, y: number): number => {
+    'worklet';
     const dx = x - size / 2;
     const dy = y - size / 2;
     return (Math.atan2(dx, -dy) * 180) / Math.PI;

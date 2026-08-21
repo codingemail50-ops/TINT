@@ -84,6 +84,13 @@ const TRACE_LENGTH = TRACE_SCALLOP.length;
 
 const SCREEN_H = Dimensions.get('window').height;
 const SHEET_HEIGHT = Math.min(560, SCREEN_H * 0.78);
+// AppNavigator's bottom tab bar is always painted on top of whatever screen
+// is showing (it's a sibling rendered after the screen content, not part of
+// it), and FocusScreen is never shown without it — either as the Focus tab
+// itself, or as Today's task-linked overlay, both of which sit under the
+// same persistent tab bar. Anything anchored to the bottom of this screen
+// needs this much extra clearance or the tab bar paints over it.
+const TAB_BAR_CLEARANCE = 100;
 
 function formatMMSS(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -482,7 +489,7 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
       )}
 
       {confirmOpen && (
-        <View style={StyleSheet.absoluteFillObject}>
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={closeConfirm}>
           <LinearGradient
             colors={['rgba(6,6,8,0.2)', 'rgba(20,4,8,0.55)', 'rgba(30,4,10,0.92)']}
             locations={[0, 0.45, 1]}
@@ -493,6 +500,10 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
             </TouchableOpacity>
             <Text style={styles.confirmTimer}>{formatMMSS(timeLeft)}</Text>
 
+            {/* Plain View, not a Pressable — a tap anywhere on this card
+                (other than the hold button, which owns its own press
+                gesture and wins the touch responder) still bubbles up to
+                the full-screen Pressable above and continues the timer. */}
             <View style={styles.confirmSheet}>
               <View style={styles.confirmIcon}>
                 <Ionicons name="exit-outline" size={20} color={Colors.danger} />
@@ -511,12 +522,10 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
                 <Text style={styles.holdLabel}>{holdLabel}</Text>
               </AnimatedPressable>
 
-              <TouchableOpacity onPress={closeConfirm} activeOpacity={0.7}>
-                <Text style={styles.neverMind}>Never mind</Text>
-              </TouchableOpacity>
+              <Text style={styles.neverMind}>Tap anywhere to continue focusing</Text>
             </View>
           </LinearGradient>
-        </View>
+        </Pressable>
       )}
 
       {phase === 'active' && (
@@ -651,7 +660,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(20,6,10,0.75)',
     borderTopLeftRadius: BorderRadius.xl, borderTopRightRadius: BorderRadius.xl,
     borderTopWidth: 1, borderTopColor: 'rgba(240,89,107,0.3)',
-    paddingHorizontal: 26, paddingTop: 28, paddingBottom: 34,
+    paddingHorizontal: 26, paddingTop: 28, paddingBottom: 34 + TAB_BAR_CLEARANCE,
     alignItems: 'center',
   },
   confirmIcon: {
@@ -680,7 +689,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceElevated,
     borderTopWidth: 1, borderTopColor: Colors.border,
     borderTopLeftRadius: BorderRadius.xl, borderTopRightRadius: BorderRadius.xl,
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 + TAB_BAR_CLEARANCE,
   },
   appsHandle: { width: 38, height: 4, backgroundColor: Colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   appsTitle: { fontSize: 17, fontFamily: Fonts.bold, color: Colors.textPrimary, marginBottom: 4 },
