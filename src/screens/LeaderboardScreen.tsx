@@ -20,7 +20,6 @@ const EXAM_TABS: { id: ExamType; icon: keyof typeof Ionicons.glyphMap; label: st
 
 export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
   const headerAnim = useRef(new Animated.Value(0)).current;
-  const podiumAnim = useRef(new Animated.Value(0)).current;
 
   const user     = appState.user;
   const examTypes = (user?.examTypes ?? []) as ExamType[];
@@ -53,14 +52,10 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
   // Build tab-filtered leaderboard
   const tabList = buildTabLeaderboard(activeExam, cloudRows, userId, userEntry, examTypes);
 
-  const top3     = tabList.slice(0, 3);
   const userRank = tabList.findIndex(e => e.isCurrentUser) + 1;
 
   useEffect(() => {
-    Animated.stagger(200, [
-      Animated.timing(headerAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(podiumAnim,  { toValue: 1, tension: 60, friction: 10, useNativeDriver: true }),
-    ]).start();
+    Animated.timing(headerAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
   }, []);
 
   return (
@@ -125,48 +120,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
           </Animated.View>
         )}
 
-        {/* Podium */}
-        <Animated.View style={[styles.podiumSection, {
-          opacity:   podiumAnim,
-          transform: [{ scale: podiumAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] }) }],
-        }]}>
-          <Text style={styles.sectionTitle}>Top 3</Text>
-          <View style={styles.podium}>
-            {top3[1] && (
-              <View style={[styles.podiumBlock, styles.podiumSecond]}>
-                <Ionicons name={(top3[1].avatar || 'star') as any} size={26} color={Colors.textPrimary} />
-                <Text style={styles.podiumName} numberOfLines={1}>{top3[1].name}</Text>
-                <View style={[styles.podiumPedestal, { height: 64, backgroundColor: '#9CA3AF33' }]}>
-                  <Ionicons name="medal" size={20} color="#9CA3AF" />
-                  <Text style={styles.podiumConsistency}>{top3[1].consistency}%</Text>
-                </View>
-              </View>
-            )}
-            {top3[0] && (
-              <View style={[styles.podiumBlock, styles.podiumFirst]}>
-                <Ionicons name="ribbon" size={20} color="#F59E0B" style={styles.podiumCrown} />
-                <Ionicons name={(top3[0].avatar || 'star') as any} size={26} color={Colors.textPrimary} />
-                <Text style={styles.podiumName} numberOfLines={1}>{top3[0].name}</Text>
-                <View style={[styles.podiumPedestal, { height: 90, backgroundColor: '#F59E0B33' }]}>
-                  <Ionicons name="medal" size={20} color="#F59E0B" />
-                  <Text style={styles.podiumConsistency}>{top3[0].consistency}%</Text>
-                </View>
-              </View>
-            )}
-            {top3[2] && (
-              <View style={[styles.podiumBlock, styles.podiumThird]}>
-                <Ionicons name={(top3[2].avatar || 'star') as any} size={26} color={Colors.textPrimary} />
-                <Text style={styles.podiumName} numberOfLines={1}>{top3[2].name}</Text>
-                <View style={[styles.podiumPedestal, { height: 48, backgroundColor: '#CD7C3233' }]}>
-                  <Ionicons name="medal" size={20} color="#CD7C32" />
-                  <Text style={styles.podiumConsistency}>{top3[2].consistency}%</Text>
-                </View>
-              </View>
-            )}
-          </View>
-        </Animated.View>
-
-        {/* Full list */}
+        {/* Cascading staircase leaderboard */}
         <View style={styles.listSection}>
           <Text style={styles.sectionTitle}>All {activeExam} Students</Text>
           {tabList.map((entry, index) => (
@@ -290,30 +244,7 @@ const styles = StyleSheet.create({
   userRankNumber: { fontSize: 32, fontFamily: Fonts.bold, letterSpacing: -1, color: Colors.primary },
   userRankLabel:  { ...Typography.labelSmall, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
 
-  // Podium
-  podiumSection: { marginBottom: Spacing.xl },
-  sectionTitle:  { ...Typography.headlineSmall, color: Colors.textPrimary, marginBottom: Spacing.md },
-  podium: {
-    flexDirection: 'row', alignItems: 'flex-end',
-    justifyContent: 'center', gap: Spacing.xs, height: 180,
-  },
-  podiumBlock:  { flex: 1, alignItems: 'center', gap: 4 },
-  podiumFirst:  {},
-  podiumSecond: {},
-  podiumThird:  {},
-  podiumCrown:  { marginBottom: 2 },
-  podiumName: {
-    ...Typography.bodySmall, color: Colors.textPrimary,
-    fontFamily: Fonts.semibold, textAlign: 'center', fontSize: 11,
-  },
-  podiumPedestal: {
-    width: '100%',
-    borderTopLeftRadius: 8, borderTopRightRadius: 8,
-    alignItems: 'center', justifyContent: 'center',
-    gap: 4, paddingTop: 8,
-  },
-  podiumConsistency: { ...Typography.labelSmall, color: Colors.textSecondary, fontSize: 11 },
-
+  sectionTitle: { ...Typography.headlineSmall, color: Colors.textPrimary, marginBottom: Spacing.md },
   listSection: { marginBottom: Spacing.md },
 
   motivationFooter: {

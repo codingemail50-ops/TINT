@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
+import { Colors, Spacing, Fonts } from '../constants/theme';
 import { LeaderboardEntry } from '../data/leaderboard';
 
 interface Props {
@@ -10,12 +10,22 @@ interface Props {
   index: number;
 }
 
-const RANK_STYLES: Record<number, { bg: string; border: string; text: string }> = {
-  1: { bg: '#F59E0B22', border: '#F59E0B55', text: '#F59E0B' },
-  2: { bg: '#9CA3AF22', border: '#9CA3AF55', text: '#9CA3AF' },
-  3: { bg: '#CD7C3222', border: '#CD7C3255', text: '#CD7C32' },
-};
+// Top-3 medal colors are the one deliberate exception to the app's
+// greyscale palette (kept from before the greyscale conversion) — everything
+// else on this bar stays grey per the user's "keep the greyscale theme for
+// this too" instruction.
+const MEDAL_COLORS: Record<number, string> = { 1: '#F59E0B', 2: '#9CA3AF', 3: '#CD7C32' };
 
+const BAR_HEIGHT = 52;
+const AVATAR_SIZE = 48;
+const WIDTH_MAX = 96;
+const WIDTH_MIN = 54;
+const WIDTH_STEP = 5;
+
+// A single row of the cascading staircase leaderboard — bar width shrinks
+// with rank so the list reads as a descending flight of steps, avatar
+// overlaps the bar's flush left edge, and only the free (right) end is
+// rounded off, per the user's reference image.
 export const LeaderboardCard: React.FC<Props> = ({ entry, rank, index }) => {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -27,145 +37,78 @@ export const LeaderboardCard: React.FC<Props> = ({ entry, rank, index }) => {
     ]).start();
   }, []);
 
-  const rankStyle = RANK_STYLES[rank];
+  const barWidthPct = Math.max(WIDTH_MIN, WIDTH_MAX - (rank - 1) * WIDTH_STEP);
+  const medalColor = MEDAL_COLORS[rank];
   const isCurrentUser = entry.isCurrentUser;
 
   return (
     <Animated.View
       style={[
-        styles.container,
-        rankStyle && { backgroundColor: rankStyle.bg, borderColor: rankStyle.border },
-        isCurrentUser && styles.currentUser,
+        styles.row,
         {
           opacity: fadeAnim,
           transform: [{ translateX: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }],
         },
       ]}
     >
-      <View style={styles.rankContainer}>
-        {rankStyle ? (
-          <Ionicons name="medal" size={20} color={rankStyle.text} />
-        ) : (
-          <Text style={[styles.rankNumber, isCurrentUser && { color: Colors.primary }]}>#{rank}</Text>
-        )}
-      </View>
-
-      <View style={[styles.avatar, rankStyle && { borderColor: rankStyle.border }]}>
-        <Ionicons name={(entry.avatar || 'star') as any} size={20} color={Colors.textPrimary} />
-      </View>
-
-      <View style={styles.info}>
-        <View style={styles.nameRow}>
-          <Text style={[styles.name, isCurrentUser && { color: Colors.primary }]}>
-            {entry.name}
-            {isCurrentUser ? ' (You)' : ''}
+      <View style={[styles.bar, { width: `${barWidthPct}%` }, isCurrentUser && styles.barCurrentUser]}>
+        <View style={styles.barLeft}>
+          {medalColor ? (
+            <Ionicons name="medal" size={16} color={medalColor} />
+          ) : (
+            <Text style={styles.rankNumber}>#{rank}</Text>
+          )}
+          <Text style={[styles.name, isCurrentUser && styles.nameCurrentUser]} numberOfLines={1}>
+            {entry.name}{isCurrentUser ? ' (You)' : ''}
           </Text>
-          <View style={styles.examBadge}>
-            <Text style={styles.examText}>{entry.examType}</Text>
-          </View>
         </View>
-        <View style={styles.stats}>
-          <Ionicons name="flame" size={12} color={Colors.textSecondary} />
-          <Text style={styles.statItem}>{entry.streak}d</Text>
-          <Text style={styles.statDot}>·</Text>
-          <Text style={styles.statItem}>{entry.consistency}% consistent</Text>
-          <Text style={styles.statDot}>·</Text>
-          <Ionicons name="checkmark" size={12} color={Colors.textSecondary} />
-          <Text style={styles.statItem}>{entry.tasksCompleted}</Text>
-        </View>
+        <Text style={styles.value}>{entry.consistency}%</Text>
       </View>
 
-      <View style={styles.consistencyBar}>
-        <View style={[styles.consistencyFill, { height: `${entry.consistency}%` as any, backgroundColor: rankStyle?.text ?? Colors.primary }]} />
+      <View style={styles.avatar}>
+        <Ionicons name={(entry.avatar || 'star') as any} size={20} color={Colors.textPrimary} />
       </View>
     </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  row: { height: BAR_HEIGHT + 4, marginBottom: Spacing.sm + 2, position: 'relative', justifyContent: 'center' },
+  bar: {
+    height: BAR_HEIGHT,
     backgroundColor: Colors.surfaceElevated,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
     borderWidth: 1,
     borderColor: Colors.border,
-    gap: Spacing.sm,
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
+    borderTopRightRadius: BAR_HEIGHT / 2,
+    borderBottomRightRadius: BAR_HEIGHT / 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: AVATAR_SIZE + 6,
+    paddingRight: Spacing.md,
   },
-  currentUser: {
+  barCurrentUser: {
     borderColor: Colors.primary + '55',
     backgroundColor: Colors.primaryGlow,
   },
-  rankContainer: {
-    width: 32,
-    alignItems: 'center',
-  },
-  rankNumber: {
-    ...Typography.labelLarge,
-    color: Colors.textSecondary,
-  },
+  barLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexShrink: 1, paddingRight: Spacing.sm },
+  rankNumber: { fontSize: 13, fontFamily: Fonts.bold, color: Colors.textSecondary, width: 22 },
+  name: { fontSize: 14, fontFamily: Fonts.semibold, color: Colors.textPrimary, flexShrink: 1 },
+  nameCurrentUser: { color: Colors.primary },
+  value: { fontSize: 14, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.2 },
   avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    position: 'absolute',
+    left: 0,
+    top: 2,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
     backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-  },
-  info: {
-    flex: 1,
-    gap: 4,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  name: {
-    ...Typography.bodyLarge,
-    fontFamily: Fonts.semibold,
-    color: Colors.textPrimary,
-  },
-  examBadge: {
-    backgroundColor: Colors.primary + '22',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: BorderRadius.sm,
-  },
-  examText: {
-    ...Typography.labelSmall,
-    color: Colors.primaryLight,
-    fontSize: 10,
-  },
-  stats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flexWrap: 'wrap',
-  },
-  statItem: {
-    ...Typography.bodySmall,
-    color: Colors.textSecondary,
-  },
-  statDot: {
-    color: Colors.textMuted,
-    fontSize: 10,
-    fontFamily: Fonts.regular,
-  },
-  consistencyBar: {
-    width: 4,
-    height: 44,
-    backgroundColor: Colors.border,
-    borderRadius: 2,
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-  },
-  consistencyFill: {
-    width: '100%',
-    borderRadius: 2,
+    borderWidth: 3,
+    borderColor: Colors.background,
   },
 });
