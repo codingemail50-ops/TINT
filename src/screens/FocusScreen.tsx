@@ -17,11 +17,19 @@ import { StorageService } from '../utils/storage';
 import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '../utils/focusLog';
 import { PixelFlame } from '../components/PixelFlame';
 import { FlameBadge } from '../components/FlameBadge';
+import { KnurledDial } from '../components/KnurledDial';
 import { openPermissionSettings, getSelfReportedGrants, setSelfReportedGrant, BlockingPermission } from '../utils/appBlocking';
 
-const DURATIONS = [15, 25, 45, 60, 90];
 const DEFAULT_DURATION = 25;
 const HOLD_MS = 3000;
+
+function formatDuration(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h${m}m`;
+}
 
 const FOCUS_APPS: { id: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: 'instagram', label: 'Instagram', icon: 'logo-instagram' },
@@ -124,6 +132,8 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
   const wasPausedBeforeConfirm = useRef(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const dialFadeAnim = useRef(new Animated.Value(1)).current;
+  const blobEnterAnim = useRef(new Animated.Value(1)).current;
   const sheetY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const { taskComplete, buttonPress } = useHaptics();
 
@@ -226,20 +236,37 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
     }
     setTimeLeft(duration * 60);
     setPhase('setup');
-  }, [duration, externalTask, onExternalExit]);
+    dialFadeAnim.setValue(1);
+  }, [duration, externalTask, onExternalExit, dialFadeAnim]);
 
+  // A quick pixel-flicker on the dial, then a cut to the timer, which
+  // materializes in with a small scale/fade — reads as the dial
+  // "transforming" into the timer rather than a plain screen swap.
   const handleStart = async () => {
     await buttonPress();
-    endTimeRef.current = Date.now() + duration * 60 * 1000;
-    setTimeLeft(duration * 60);
-    setPaused(false);
-    setPhase('active');
+    dialFadeAnim.setValue(1);
+    Animated.sequence([
+      Animated.timing(dialFadeAnim, { toValue: 0.15, duration: 45, useNativeDriver: true }),
+      Animated.timing(dialFadeAnim, { toValue: 1, duration: 45, useNativeDriver: true }),
+      Animated.timing(dialFadeAnim, { toValue: 0.15, duration: 45, useNativeDriver: true }),
+      Animated.timing(dialFadeAnim, { toValue: 1, duration: 45, useNativeDriver: true }),
+      Animated.timing(dialFadeAnim, { toValue: 0.15, duration: 45, useNativeDriver: true }),
+      Animated.timing(dialFadeAnim, { toValue: 0, duration: 160, useNativeDriver: true }),
+    ]).start(() => {
+      endTimeRef.current = Date.now() + duration * 60 * 1000;
+      setTimeLeft(duration * 60);
+      setPaused(false);
+      setPhase('active');
+      blobEnterAnim.setValue(0);
+      Animated.timing(blobEnterAnim, { toValue: 1, duration: 320, useNativeDriver: true }).start();
+    });
   };
 
   const handleStartAnother = async () => {
     await buttonPress();
     setTimeLeft(duration * 60);
     setPhase('setup');
+    dialFadeAnim.setValue(1);
   };
 
   const togglePause = async () => {
@@ -353,23 +380,18 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
 
           {phase === 'setup' && (
             <>
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Duration</Text>
-                <View style={styles.chipRow}>
-                  {DURATIONS.map(d => (
-                    <TouchableOpacity
-                      key={d}
-                      style={[styles.chip, duration === d && styles.chipActive]}
-                      onPress={() => { setDuration(d); setTimeLeft(d * 60); buttonPress(); }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.chipText, duration === d && styles.chipTextActive]}>
-                        {d}m
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
+              <Animated.View style={[styles.dialSection, { opacity: dialFadeAnim }]}>
+                <KnurledDial
+                  size={BLOB_WRAP}
+                  minValue={5}
+                  maxValue={120}
+                  step={5}
+                  value={duration}
+                  onChange={d => { setDuration(d); setTimeLeft(d * 60); }}
+                  formatValue={formatDuration}
+                  unitLabel="focus"
+                />
+              </Animated.View>
 
               <TouchableOpacity style={styles.startBtn} onPress={handleStart} activeOpacity={0.8}>
                 <Text style={styles.startBtnText}>Start Focus Session</Text>
@@ -423,7 +445,10 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
             </View>
 
             <View style={styles.hero}>
-              <View style={styles.blobWrap}>
+              <Animated.View style={[
+                styles.blobWrap,
+                { opacity: blobEnterAnim, transform: [{ scale: blobEnterAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] },
+              ]}>
                 <Svg width={BLOB_WRAP} height={BLOB_WRAP} viewBox={`0 0 ${BLOB_SIZE} ${BLOB_SIZE}`}>
                   <Path d={BLOB_PATH} fill={Colors.gray[100]} />
                   <Path
@@ -443,7 +468,7 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
                     <Ionicons name={paused ? 'play' : 'pause'} size={20} color={Colors.gray[100]} />
                   </TouchableOpacity>
                 </View>
-              </View>
+              </Animated.View>
             </View>
 
             {!sheetOpen && (
@@ -560,20 +585,7 @@ const styles = StyleSheet.create({
   title: { ...Typography.displayMedium, color: Colors.textPrimary },
   subtitle: { ...Typography.bodyMedium, color: Colors.textSecondary, marginTop: 4, marginBottom: Spacing.xl },
 
-  section: { marginBottom: Spacing.lg },
-  sectionLabel: { ...Typography.labelSmall, color: Colors.textSecondary, marginBottom: Spacing.sm },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  chip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  chipActive: { backgroundColor: Colors.primaryGlow, borderColor: Colors.primary },
-  chipText: { ...Typography.labelLarge, color: Colors.textSecondary },
-  chipTextActive: { color: Colors.primaryLight },
+  dialSection: { alignItems: 'center', marginBottom: Spacing.lg },
 
   startBtn: {
     backgroundColor: Colors.primary,
