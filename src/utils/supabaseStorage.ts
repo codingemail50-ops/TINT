@@ -16,6 +16,7 @@ interface UserDataRow {
   history: AppState['history'];
   today_tasks: unknown;
   today_tasks_date: string | null;
+  daily_focus_goal_mins: number | null;
 }
 
 // ── Save a brand-new user to Supabase (upsert) ───────────────────────────────
@@ -38,6 +39,7 @@ export async function saveNewUserToSupabase(
       history: [],
       today_tasks: null,
       today_tasks_date: null,
+      daily_focus_goal_mins: profile.dailyFocusGoalMins,
     };
 
     const { error } = await supabase
@@ -77,6 +79,7 @@ export async function loadUserFromSupabase(userId: string): Promise<AppState | n
       examTypes: Array.isArray(row.exams) ? row.exams : [],
       avatar: row.avatar ?? 'star',
       createdAt: new Date().toISOString(),
+      dailyFocusGoalMins: row.daily_focus_goal_mins ?? 60,
     };
 
     const appState: AppState = {
@@ -121,6 +124,7 @@ export async function syncAppStateToSupabase(
       updates.name = appState.user.name;
       updates.avatar = appState.user.avatar;
       updates.exams = appState.user.examTypes;
+      updates.daily_focus_goal_mins = appState.user.dailyFocusGoalMins;
     }
 
     const { error } = await supabase
@@ -334,5 +338,43 @@ export async function loadFriendsLeaderboard(): Promise<CloudLeaderboardRow[]> {
   } catch (err) {
     console.error('[supabaseStorage] loadFriendsLeaderboard exception:', err);
     return [];
+  }
+}
+
+// Name search for "add a friend" — leaderboard_view is the same public-safe
+// column set already used for the global leaderboard, so this never touches
+// user_data directly (RLS there is locked to each user's own row).
+export async function findUsersByName(query: string): Promise<CloudLeaderboardRow[]> {
+  if (!query.trim()) return [];
+  try {
+    const { data, error } = await supabase
+      .from('leaderboard_view')
+      .select('id, name, avatar, exams, streak, history, total_tasks_completed')
+      .ilike('name', `%${query.trim()}%`)
+      .limit(10);
+    if (error || !data) {
+      if (error) console.error('[supabaseStorage] findUsersByName error:', error.message);
+      return [];
+    }
+    return (data as UserDataRow[]).map(toLeaderboardRow);
+  } catch (err) {
+    console.error('[supabaseStorage] findUsersByName exception:', err);
+    return [];
+  }
+}
+
+// Unfriend — deletes the accepted request row in whichever direction it was
+// originally sent. RLS's delete policy already permits either side of a
+// friendship to do this (auth.uid() = from_user or to_user).
+export async function removeFriend(userId: string, friendId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('friend_requests')
+      .delete()
+      .eq('status', 'accepted')
+      .or(`and(from_user.eq.${userId},to_user.eq.${friendId}),and(from_user.eq.${friendId},to_user.eq.${userId})`);
+    if (error) console.error('[supabaseStorage] removeFriend error:', error.message);
+  } catch (err) {
+    console.error('[supabaseStorage] removeFriend exception:', err);
   }
 }

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { supabase } from '../lib/supabase';
 import { useHaptics } from '../hooks/useHaptics';
@@ -11,9 +12,14 @@ import { useHaptics } from '../hooks/useHaptics';
 type Mode = 'signup' | 'login';
 
 interface Props {
-  /** Called after a successful sign-up or log-in, with whether a profile already exists in Supabase. */
-  onAuthed: (hasProfile: boolean) => void;
-  onGuest: () => void;
+  /** Signed up (or upgraded the anonymous session) with a username to attach. */
+  onSignedUp: (data: { name: string; email: string }) => void;
+  /** Stayed anonymous, but still picked a username. */
+  onGuest: (data: { name: string }) => void;
+  /** Logged into an existing account — hasProfile tells the caller whether
+   *  to skip the rest of onboarding (avatar/goal already set) or not. */
+  onLoggedIn: (hasProfile: boolean) => void;
+  onBack?: () => void;
 }
 
 function friendlyError(message: string): string {
@@ -29,15 +35,22 @@ function friendlyError(message: string): string {
   return message;
 }
 
-export const LoginScreen: React.FC<Props> = ({ onAuthed, onGuest }) => {
+// Screen 3 of onboarding — username + email/password (or stay anonymous),
+// plus a placeholder for Google sign-in until that's wired up for real.
+export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLoggedIn, onBack }) => {
   const [mode, setMode] = useState<Mode>('signup');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { buttonPress } = useHaptics();
 
-  const canSubmit = email.trim().length > 3 && password.length >= 6 && !loading;
+  const usernameOk = username.trim().length >= 2;
+  const canSubmit = !loading && (mode === 'login'
+    ? email.trim().length > 3 && password.length >= 6
+    : usernameOk && email.trim().length > 3 && password.length >= 6);
+  const canContinueGuest = mode === 'signup' && usernameOk && !loading;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -46,10 +59,6 @@ export const LoginScreen: React.FC<Props> = ({ onAuthed, onGuest }) => {
     setLoading(true);
     try {
       if (mode === 'signup') {
-        // Upgrade the existing anonymous session (created automatically on
-        // first launch) to a real account instead of creating a brand-new
-        // user — this keeps the same id, so any local/anonymous progress
-        // carries over rather than getting orphaned.
         const { data: { user: current } } = await supabase.auth.getUser();
         if (current?.is_anonymous) {
           const { error: upgradeErr } = await supabase.auth.updateUser({ email: email.trim(), password });
@@ -58,11 +67,11 @@ export const LoginScreen: React.FC<Props> = ({ onAuthed, onGuest }) => {
           const { error: signUpErr } = await supabase.auth.signUp({ email: email.trim(), password });
           if (signUpErr) throw signUpErr;
         }
-        onAuthed(false);
+        onSignedUp({ name: username.trim(), email: email.trim() });
       } else {
         const { error: loginErr } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (loginErr) throw loginErr;
-        onAuthed(true);
+        onLoggedIn(true);
       }
     } catch (err: any) {
       setError(friendlyError(err?.message ?? 'Something went wrong.'));
@@ -71,10 +80,26 @@ export const LoginScreen: React.FC<Props> = ({ onAuthed, onGuest }) => {
     }
   };
 
+  const handleGuest = async () => {
+    if (!canContinueGuest) return;
+    await buttonPress();
+    onGuest({ name: username.trim() });
+  };
+
+  const handleGoogle = () => {
+    buttonPress();
+    Alert.alert('Coming soon', 'Sign in with Google isn’t wired up yet — use email for now.');
+  };
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.container}>
         <StatusBar style="light" />
+        {onBack && mode === 'signup' && (
+          <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.7}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.header}>
           <Text style={styles.wordmark}>There is no tomorrow</Text>
@@ -87,6 +112,17 @@ export const LoginScreen: React.FC<Props> = ({ onAuthed, onGuest }) => {
         </View>
 
         <View style={styles.form}>
+          {mode === 'signup' && (
+            <TextInput
+              style={styles.input}
+              value={username}
+              onChangeText={setUsername}
+              placeholder="Username"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="words"
+              returnKeyType="next"
+            />
+          )}
           <TextInput
             style={styles.input}
             value={email}
@@ -123,6 +159,11 @@ export const LoginScreen: React.FC<Props> = ({ onAuthed, onGuest }) => {
               <Text style={styles.submitText}>{mode === 'signup' ? 'Sign Up' : 'Log In'}</Text>
             )}
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.googleBtn} onPress={handleGoogle} activeOpacity={0.85}>
+            <Ionicons name="logo-google" size={18} color={Colors.textPrimary} />
+            <Text style={styles.googleText}>Sign in with Google</Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -135,9 +176,11 @@ export const LoginScreen: React.FC<Props> = ({ onAuthed, onGuest }) => {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => { buttonPress(); onGuest(); }} style={styles.guestRow}>
-          <Text style={styles.guestText}>Continue as guest</Text>
-        </TouchableOpacity>
+        {mode === 'signup' && (
+          <TouchableOpacity onPress={handleGuest} disabled={!canContinueGuest} style={styles.guestRow}>
+            <Text style={[styles.guestText, !canContinueGuest && { opacity: 0.4 }]}>Continue as guest</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -145,6 +188,8 @@ export const LoginScreen: React.FC<Props> = ({ onAuthed, onGuest }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background, paddingHorizontal: Spacing.xl, justifyContent: 'center', gap: Spacing.xl },
+  backBtn: { position: 'absolute', top: 58, left: Spacing.xl },
+  backText: { fontSize: 15, color: Colors.textSecondary, fontFamily: Fonts.medium },
   header: { gap: Spacing.xs, marginBottom: Spacing.md },
   wordmark: {
     fontFamily: Fonts.pixel, fontSize: 18, color: Colors.gray[400],
@@ -176,6 +221,15 @@ const styles = StyleSheet.create({
   },
   submitBtnDisabled: { opacity: 0.4 },
   submitText: { fontSize: 16, fontFamily: Fonts.bold, color: Colors.background },
+
+  googleBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: BorderRadius.md,
+    paddingVertical: 14,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  googleText: { fontSize: 15, fontFamily: Fonts.semibold, color: Colors.textPrimary },
 
   switchRow: { alignItems: 'center' },
   switchText: { fontSize: 14, color: Colors.textSecondary, fontFamily: Fonts.regular },

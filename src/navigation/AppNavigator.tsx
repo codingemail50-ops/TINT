@@ -4,13 +4,16 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, BorderRadius } from '../constants/theme';
-import { LoginScreen } from '../screens/LoginScreen';
-import { OnboardingScreen } from '../screens/OnboardingScreen';
+import { AvatarExamScreen } from '../screens/AvatarExamScreen';
+import { FocusGoalScreen } from '../screens/FocusGoalScreen';
+import { CreateAccountScreen } from '../screens/CreateAccountScreen';
 import { TodoScreen } from '../screens/TodoScreen';
 import { FocusScreen } from '../screens/FocusScreen';
 import { ProductivityScreen } from '../screens/ProductivityScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
-import { StorageService, AppState } from '../utils/storage';
+import { ProfileScreen } from '../screens/ProfileScreen';
+import { StorageService, AppState, UserProfile } from '../utils/storage';
+import { ExamType } from '../data/examPresets';
 import { supabase } from '../lib/supabase';
 import {
   loadUserFromSupabase,
@@ -20,9 +23,9 @@ import {
 } from '../utils/supabaseStorage';
 
 // Every device still gets an anonymous Supabase session created behind the
-// scenes on first launch — LoginScreen's "Sign Up" upgrades that same
-// session to a real account (same user id) rather than discarding it, so a
-// guest who later signs up doesn't lose anything already saved locally.
+// scenes on first launch — signing up upgrades that same session to a real
+// account (same user id) rather than discarding it, so a guest who later
+// signs up doesn't lose anything already saved locally.
 async function ensureSession(): Promise<string | null> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -40,7 +43,9 @@ async function ensureSession(): Promise<string | null> {
   }
 }
 
-type Screen = 'boot' | 'login' | 'onboarding' | 'todo' | 'focus' | 'productivity' | 'leaderboard';
+type Screen =
+  | 'boot' | 'avatarExam' | 'focusGoal' | 'createAccount'
+  | 'todo' | 'focus' | 'productivity' | 'leaderboard' | 'profile';
 
 const TAB_CONFIG = [
   { id: 'todo' as Screen, label: 'Today', icon: 'checkbox' as const },
@@ -48,6 +53,12 @@ const TAB_CONFIG = [
   { id: 'productivity' as Screen, label: 'Progress', icon: 'stats-chart' as const },
   { id: 'leaderboard' as Screen, label: 'Rank', icon: 'trophy' as const },
 ];
+
+interface OnboardingDraft {
+  avatar: string;
+  examTypes: ExamType[];
+  dailyFocusGoalMins: number;
+}
 
 export const AppNavigator: React.FC = () => {
   const [screen, setScreen] = useState<Screen>('boot');
@@ -60,8 +71,13 @@ export const AppNavigator: React.FC = () => {
     totalTasksCompleted: 0,
   });
   const [showTabs, setShowTabs] = useState(false);
+  // The "Already have an account? Log in" shortcut on step 1 skips straight
+  // to createAccount in login mode, without collecting avatar/exam/goal —
+  // this flag is what tells createAccount which mode to open in.
+  const [loginShortcut, setLoginShortcut] = useState(false);
   const tabFadeAnim = useRef(new Animated.Value(0)).current;
   const userIdRef = useRef<string | null>(null);
+  const draftRef = useRef<OnboardingDraft>({ avatar: 'star', examTypes: [], dailyFocusGoalMins: 60 });
 
   // No splash animation — resolve session/local state directly on mount.
   useEffect(() => {
@@ -94,16 +110,65 @@ export const AppNavigator: React.FC = () => {
         setScreen('todo');
         Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
       } else {
-        setScreen('login');
+        setScreen('avatarExam');
       }
     })();
   }, []);
 
-  const handleGuest = () => {
-    setScreen('onboarding');
+  const navigateTo = (s: Screen) => setScreen(s);
+
+  // ── Onboarding flow: avatarExam -> focusGoal -> createAccount ────────────
+  const handleAvatarExamComplete = (data: { avatar: string; examTypes: ExamType[] }) => {
+    draftRef.current.avatar = data.avatar;
+    draftRef.current.examTypes = data.examTypes;
+    setScreen('focusGoal');
   };
 
-  const handleAuthed = async (hasProfile: boolean) => {
+  const handleLoginShortcut = () => {
+    setLoginShortcut(true);
+    setScreen('createAccount');
+  };
+
+  const handleFocusGoalComplete = (mins: number) => {
+    draftRef.current.dailyFocusGoalMins = mins;
+    setScreen('createAccount');
+  };
+
+  // Shared tail for both "signed up" and "stayed guest" — persists the full
+  // profile (avatar/exams/goal collected earlier + name/email from this
+  // step), then boots into the app the same way a returning user does.
+  const finishOnboarding = (user: UserProfile) => {
+    StorageService.saveUser(user)
+      .then(() => StorageService.getAppState())
+      .then(state => StorageService.saveAppState({ ...state, user }))
+      .then(() => StorageService.getAppState())
+      .then(async state => {
+        setAppState(state);
+        setShowTabs(true);
+        setScreen('todo');
+        Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+
+        if (!userIdRef.current) {
+          userIdRef.current = await ensureSession();
+        }
+        if (userIdRef.current && state.user) {
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          void saveNewUserToSupabase(userIdRef.current, authUser?.email ?? '', state.user);
+        }
+      });
+  };
+
+  const handleSignedUp = ({ name, email }: { name: string; email: string }) => {
+    const { avatar, examTypes, dailyFocusGoalMins } = draftRef.current;
+    finishOnboarding({ name, email, examTypes, avatar, createdAt: new Date().toISOString(), dailyFocusGoalMins });
+  };
+
+  const handleGuestNamed = ({ name }: { name: string }) => {
+    const { avatar, examTypes, dailyFocusGoalMins } = draftRef.current;
+    finishOnboarding({ name, email: '', examTypes, avatar, createdAt: new Date().toISOString(), dailyFocusGoalMins });
+  };
+
+  const handleLoggedIn = async (hasProfile: boolean) => {
     const { data: { user } } = await supabase.auth.getUser();
     userIdRef.current = user?.id ?? userIdRef.current;
 
@@ -117,30 +182,9 @@ export const AppNavigator: React.FC = () => {
         return;
       }
     }
-    // Fresh sign-up (or a login with no cloud profile row yet) — collect
-    // name/avatar/exams same as the guest path does.
-    setScreen('onboarding');
-  };
-
-  const handleOnboardingComplete = () => {
-    StorageService.getAppState().then(async state => {
-      setAppState(state);
-      setShowTabs(true);
-      setScreen('todo');
-      Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-
-      if (!userIdRef.current) {
-        userIdRef.current = await ensureSession();
-      }
-      if (userIdRef.current && state.user) {
-        // Real signups reach onboarding with an email already attached to
-        // the auth session (LoginScreen's Sign Up flow) — persist that
-        // instead of always writing an empty string, so user_data.email
-        // actually gets populated for accounts that have one.
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        void saveNewUserToSupabase(userIdRef.current, authUser?.email ?? '', state.user);
-      }
-    });
+    // Logged in but no cloud profile row yet — run through onboarding to collect one.
+    setLoginShortcut(false);
+    setScreen('avatarExam');
   };
 
   const handleStateChange = (newState: AppState) => {
@@ -149,10 +193,6 @@ export const AppNavigator: React.FC = () => {
     if (userIdRef.current) {
       void syncAppStateToSupabase(userIdRef.current, newState);
     }
-  };
-
-  const navigateTo = (s: Screen) => {
-    setScreen(s);
   };
 
   // Swipe left/right between tabs. activeOffsetX/failOffsetY mean the pan
@@ -184,12 +224,41 @@ export const AppNavigator: React.FC = () => {
     <View style={styles.root}>
       <GestureDetector gesture={swipeGesture}>
         <View style={styles.swipeArea}>
-          {screen === 'login' && <LoginScreen onAuthed={handleAuthed} onGuest={handleGuest} />}
-          {screen === 'onboarding' && <OnboardingScreen onComplete={handleOnboardingComplete} />}
-          {screen === 'todo' && <TodoScreen appState={appState} onStateChange={handleStateChange} userId={userIdRef.current ?? undefined} onNavigateFocus={() => navigateTo('focus')} />}
+          {screen === 'avatarExam' && (
+            <AvatarExamScreen onComplete={handleAvatarExamComplete} onLogin={handleLoginShortcut} />
+          )}
+          {screen === 'focusGoal' && (
+            <FocusGoalScreen onComplete={handleFocusGoalComplete} />
+          )}
+          {screen === 'createAccount' && (
+            <CreateAccountScreen
+              onSignedUp={handleSignedUp}
+              onGuest={handleGuestNamed}
+              onLoggedIn={handleLoggedIn}
+              onBack={loginShortcut ? undefined : () => setScreen('focusGoal')}
+            />
+          )}
+          {screen === 'todo' && (
+            <TodoScreen
+              appState={appState}
+              onStateChange={handleStateChange}
+              userId={userIdRef.current ?? undefined}
+              onNavigateFocus={() => navigateTo('focus')}
+              onNavigateProfile={() => navigateTo('profile')}
+              onNavigateAnalytics={() => navigateTo('productivity')}
+            />
+          )}
           {screen === 'focus' && <FocusScreen userId={userIdRef.current ?? undefined} />}
           {screen === 'productivity' && <ProductivityScreen appState={appState} />}
           {screen === 'leaderboard' && <LeaderboardScreen appState={appState} userId={userIdRef.current ?? undefined} />}
+          {screen === 'profile' && (
+            <ProfileScreen
+              appState={appState}
+              userId={userIdRef.current ?? undefined}
+              onStateChange={handleStateChange}
+              onBack={() => navigateTo('todo')}
+            />
+          )}
         </View>
       </GestureDetector>
 

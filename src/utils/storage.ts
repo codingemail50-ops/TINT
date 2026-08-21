@@ -7,6 +7,7 @@ export interface UserProfile {
   examTypes: string[]; // multi-select
   avatar: string;
   createdAt: string;
+  dailyFocusGoalMins: number;
 }
 
 export interface DayRecord {

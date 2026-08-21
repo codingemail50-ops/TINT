@@ -87,16 +87,29 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const HOLD_BG_RANGE = ['hsl(350, 20%, 25%)', 'hsl(350, 80%, 17%)'];
 const HOLD_BORDER_RANGE = ['hsl(350, 40%, 45%)', 'hsl(350, 80%, 35%)'];
 
+interface ExternalTask {
+  title: string;
+  durationMins: number;
+}
+
 interface Props {
   userId?: string;
+  /** When set, the screen skips the setup phase entirely and auto-starts a
+   *  session for this task (used by the Today screen's "tap a task" flow —
+   *  the same squiggly-circle Focus UI, just pre-loaded and running). */
+  externalTask?: ExternalTask;
+  /** Natural completion of an externalTask session — parent marks the task done. */
+  onExternalFinish?: (actualSeconds: number) => void;
+  /** Leaving an externalTask session (early exit, or dismissing the done screen). */
+  onExternalExit?: () => void;
 }
 
 type Phase = 'setup' | 'active' | 'done';
 
-export const FocusScreen: React.FC<Props> = ({ userId }) => {
-  const [phase, setPhase] = useState<Phase>('setup');
-  const [duration, setDuration] = useState(DEFAULT_DURATION);
-  const [timeLeft, setTimeLeft] = useState(DEFAULT_DURATION * 60);
+export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalFinish, onExternalExit }) => {
+  const [phase, setPhase] = useState<Phase>(externalTask ? 'active' : 'setup');
+  const [duration, setDuration] = useState(externalTask?.durationMins ?? DEFAULT_DURATION);
+  const [timeLeft, setTimeLeft] = useState((externalTask?.durationMins ?? DEFAULT_DURATION) * 60);
   const [paused, setPaused] = useState(false);
   const [streak, setStreak] = useState(0);
 
@@ -120,6 +133,12 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
   const [grants, setGrants] = useState<Record<BlockingPermission, boolean>>({
     usageAccess: false, accessibility: false, overlay: false,
   });
+
+  useEffect(() => {
+    if (externalTask) {
+      endTimeRef.current = Date.now() + externalTask.durationMins * 60 * 1000;
+    }
+  }, []);
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
@@ -161,7 +180,11 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
     if (userId) {
       syncFocusLog(userId, updatedLog);
     }
-  }, [duration, userId, taskComplete]);
+
+    if (externalTask) {
+      onExternalFinish?.(duration * 60);
+    }
+  }, [duration, userId, taskComplete, externalTask, onExternalFinish]);
 
   const tick = useCallback(() => {
     if (endTimeRef.current <= 0) return;
@@ -197,9 +220,13 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
     setPaused(false);
     setConfirmOpen(false);
     setSheetOpen(false);
+    if (externalTask) {
+      onExternalExit?.();
+      return;
+    }
     setTimeLeft(duration * 60);
     setPhase('setup');
-  }, [duration]);
+  }, [duration, externalTask, onExternalExit]);
 
   const handleStart = async () => {
     await buttonPress();
@@ -370,8 +397,12 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
               <PixelFlame size={64} state="static" style={styles.doneIcon} />
               <Text style={styles.doneTitle}>Session Complete!</Text>
               <Text style={styles.doneSub}>{duration} minutes of pure focus.</Text>
-              <TouchableOpacity style={styles.startBtn} onPress={handleStartAnother} activeOpacity={0.8}>
-                <Text style={styles.startBtnText}>Start Another</Text>
+              <TouchableOpacity
+                style={styles.startBtn}
+                onPress={externalTask ? onExternalExit : handleStartAnother}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.startBtnText}>{externalTask ? 'Back to Today' : 'Start Another'}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -406,7 +437,7 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
                   />
                 </Svg>
                 <View style={styles.blobContent}>
-                  <Text style={styles.blobTask}>Focus Session</Text>
+                  <Text style={styles.blobTask} numberOfLines={1}>{externalTask?.title ?? 'Focus Session'}</Text>
                   <Text style={styles.blobTime}>{formatMMSS(timeLeft)}</Text>
                   <TouchableOpacity style={styles.pauseCircle} onPress={togglePause} activeOpacity={0.75}>
                     <Ionicons name={paused ? 'play' : 'pause'} size={20} color={Colors.gray[100]} />

@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Animated, Easing, Modal, KeyboardAvoidingView,
+  TextInput, Animated, Modal, KeyboardAvoidingView,
   Platform, TouchableWithoutFeedback, Keyboard,
-  AppState as RNAppState, AppStateStatus,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +13,7 @@ import { TaskItem } from '../components/TaskItem';
 import { FlameBadge } from '../components/FlameBadge';
 import { PixelFlame } from '../components/PixelFlame';
 import { Confetti } from '../components/Confetti';
+import { FocusScreen } from './FocusScreen';
 import { UCEEDCountdown, NIDCountdown, NIFTCountdown } from '../components/ExamCountdowns';
 import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog } from '../utils/supabaseStorage';
@@ -164,119 +164,27 @@ const sliderSt = StyleSheet.create({
   presetTextActive: { color: Colors.primary },
 });
 
-// ── Active per-task timer row — water drains out as time runs down ──────────
-const ActiveTimerRow: React.FC<{
-  task: Task;
-  remaining: number;
-  total: number;
-  running: boolean;
-  onTogglePause: () => void;
-  onCancel: () => void;
-}> = ({ task, remaining, total, running, onTogglePause, onCancel }) => {
-  const fillPct = total > 0 ? remaining / total : 0; // starts full (1), drains to empty (0)
-  const mins = Math.floor(remaining / 60).toString().padStart(2, '0');
-  const secs = (remaining % 60).toString().padStart(2, '0');
-
-  const waterAnim = useRef(new Animated.Value(fillPct)).current;
-  const rippleAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(waterAnim, {
-      toValue: fillPct,
-      duration: 950,
-      easing: Easing.linear,
-      useNativeDriver: false,
-    }).start();
-  }, [fillPct]);
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(rippleAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(rippleAnim, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, []);
-
-  return (
-    <View style={timerRowSt.container}>
-      <TouchableOpacity style={timerRowSt.main} onPress={onTogglePause} activeOpacity={0.85}>
-        <View style={timerRowSt.waterTrack} pointerEvents="none">
-          <Animated.View style={[timerRowSt.waterFill, {
-            height: waterAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-            opacity: running ? 1 : 0.55,
-          }]}>
-            <Animated.View style={[timerRowSt.waterSurface, {
-              transform: [{ translateX: rippleAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 8] }) }],
-            }]} />
-          </Animated.View>
-        </View>
-
-        <View style={timerRowSt.headerRow}>
-          <Text style={timerRowSt.title} numberOfLines={1}>{task.title}</Text>
-          <Text style={timerRowSt.time}>{mins}:{secs}</Text>
-        </View>
-        <Text style={timerRowSt.hint}>{running ? 'Tap to pause' : 'Paused — tap to resume'}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={timerRowSt.cancelBtn}
-        onPress={onCancel}
-        hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-      >
-        <Text style={timerRowSt.cancelText}>Stop</Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
-
-const timerRowSt = StyleSheet.create({
-  container: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-    backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md,
-    borderWidth: 1, borderColor: Colors.primary, marginBottom: Spacing.sm,
-    overflow: 'hidden', padding: Spacing.xs,
-  },
-  main: { flex: 1, gap: 6, padding: Spacing.sm, position: 'relative', overflow: 'hidden', borderRadius: BorderRadius.sm },
-  waterTrack: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' },
-  waterFill: { width: '100%', backgroundColor: Colors.water + '4D' },
-  waterSurface: { height: 2, width: '112%', marginLeft: '-6%', backgroundColor: Colors.waterSurface },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.sm },
-  title: { ...Typography.bodyLarge, color: Colors.textPrimary, fontFamily: Fonts.semibold, flex: 1 },
-  time: { fontSize: 18, fontFamily: Fonts.bold, color: Colors.primary, fontVariant: ['tabular-nums'] },
-  hint: { ...Typography.labelSmall, color: Colors.textMuted, fontSize: 10 },
-  cancelBtn: {
-    paddingHorizontal: Spacing.sm, paddingVertical: 6,
-    borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: Colors.danger + '55',
-  },
-  cancelText: { ...Typography.labelSmall, color: Colors.danger },
-});
-
 // ── Main Screen ───────────────────────────────────────────────────────────────
 interface Props {
   appState: AppState;
   onStateChange: (s: AppState) => void;
   userId?: string;
   onNavigateFocus: () => void;
+  onNavigateProfile: () => void;
+  onNavigateAnalytics: () => void;
 }
 
 const todayStr = new Date().toDateString();
 
-export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, onNavigateFocus }) => {
+export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, onNavigateFocus, onNavigateProfile, onNavigateAnalytics }) => {
   const [tasks, setTasks]           = useState<Task[]>([]);
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
 
-  // Per-task countdown timer — only one active at a time
-  const [timerTaskId, setTimerTaskId]   = useState<string | null>(null);
-  const [timerRemaining, setTimerRemaining] = useState(0);
-  const [timerTotal, setTimerTotal]     = useState(0);
-  const [timerRunning, setTimerRunning] = useState(false);
-  const timerEndRef      = useRef(0);
-  const timerTaskIdRef   = useRef<string | null>(null);
-  const timerTotalRef    = useRef(0);
-  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Tapping an incomplete task pops up the Focus screen (same squiggly-circle
+  // UI as the Focus tab) pre-loaded with that task and running — this just
+  // tracks which task, if any, is currently running that way.
+  const [timerTaskId, setTimerTaskId] = useState<string | null>(null);
 
   // Add task modal
   const [showAddModal, setShowAddModal]     = useState(false);
@@ -366,80 +274,21 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     if (userId) void syncFocusLog(userId, updatedLog);
   };
 
-  const stopTimerInterval = () => {
-    if (timerIntervalRef.current) { clearInterval(timerIntervalRef.current); timerIntervalRef.current = null; }
-  };
-
-  const finishTimer = useCallback(() => {
-    stopTimerInterval();
-    const id = timerTaskIdRef.current;
-    const mins = Math.round(timerTotalRef.current / 60);
-    timerEndRef.current = 0;
-    timerTaskIdRef.current = null;
+  // Natural completion of a task-linked Focus session — mark the task done
+  // and log the focus minutes, same bookkeeping the old inline timer did.
+  const handleTaskSessionFinish = (actualSeconds: number) => {
+    if (!timerTaskId) return;
+    void applyCompletion(timerTaskId, true);
+    void logFocusMinutes(Math.round(actualSeconds / 60));
     setTimerTaskId(null);
-    setTimerRunning(false);
-    setTimerRemaining(0);
-    setTimerTotal(0);
-    if (id) {
-      void applyCompletion(id, true);
-      void logFocusMinutes(mins);
-    }
-  }, [applyCompletion]);
-
-  const tickTimer = useCallback(() => {
-    if (timerEndRef.current <= 0) return;
-    const remaining = Math.max(0, Math.round((timerEndRef.current - Date.now()) / 1000));
-    setTimerRemaining(remaining);
-    if (remaining <= 0) finishTimer();
-  }, [finishTimer]);
-
-  useEffect(() => {
-    if (timerRunning) {
-      timerIntervalRef.current = setInterval(tickTimer, 1000);
-      return () => stopTimerInterval();
-    }
-  }, [timerRunning, tickTimer]);
-
-  useEffect(() => {
-    const onChange = (state: AppStateStatus) => {
-      if (state === 'active' && timerEndRef.current > 0) tickTimer();
-    };
-    const sub = RNAppState.addEventListener('change', onChange);
-    return () => sub.remove();
-  }, [tickTimer]);
-
-  const startTaskTimer = (task: Task) => {
-    buttonPress();
-    const totalSeconds = task.duration * 60;
-    timerTaskIdRef.current = task.id;
-    timerTotalRef.current = totalSeconds;
-    timerEndRef.current = Date.now() + totalSeconds * 1000;
-    setTimerTaskId(task.id);
-    setTimerTotal(totalSeconds);
-    setTimerRemaining(totalSeconds);
-    setTimerRunning(true);
   };
 
-  const toggleTimerPause = () => {
+  // Leaving a task-linked Focus session — early abandon (task stays
+  // incomplete, nothing logged) or dismissing the "session complete" screen
+  // after a natural finish (which already ran handleTaskSessionFinish).
+  const handleTaskSessionExit = () => {
     buttonPress();
-    if (timerRunning) {
-      stopTimerInterval();
-      setTimerRunning(false);
-    } else {
-      timerEndRef.current = Date.now() + timerRemaining * 1000;
-      setTimerRunning(true);
-    }
-  };
-
-  const cancelTimer = () => {
-    buttonPress();
-    stopTimerInterval();
-    timerEndRef.current = 0;
-    timerTaskIdRef.current = null;
     setTimerTaskId(null);
-    setTimerRunning(false);
-    setTimerRemaining(0);
-    setTimerTotal(0);
   };
 
   const handleTaskPress = useCallback((id: string) => {
@@ -450,10 +299,10 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
       void applyCompletion(id, false);
       return;
     }
-    if (timerTaskId && timerTaskId !== id) return; // one timer at a time
-    if (timerTaskId === id) { toggleTimerPause(); return; }
-    startTaskTimer(task);
-  }, [tasks, timerTaskId, timerRunning, timerRemaining, applyCompletion]);
+    if (timerTaskId && timerTaskId !== id) return; // one focus session at a time
+    buttonPress();
+    setTimerTaskId(id);
+  }, [tasks, timerTaskId, applyCompletion]);
 
   const triggerTrophy = async () => {
     await allComplete();
@@ -535,7 +384,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
             <Text style={styles.tagline}>THERE IS</Text>
             <Text style={styles.tagline}>NO TOMORROW</Text>
           </View>
-          <FlameBadge streak={appState.streak} size={46} onPress={onNavigateFocus} />
+          <FlameBadge streak={appState.streak} size={46} onPress={onNavigateProfile} />
         </View>
 
         {viewingPast && (
@@ -567,24 +416,24 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
               <PixelFlame size={150} state="flicker" />
             </TouchableOpacity>
 
-            {/* Exam countdown, right under the hero */}
+            {/* Exam countdown, right under the hero — leads to Analytics */}
             {examTypes.length > 0 && (
-              <View style={styles.countdownStack}>
+              <TouchableOpacity style={styles.countdownStack} onPress={onNavigateAnalytics} activeOpacity={0.85}>
                 <UCEEDCountdown examTypes={examTypes} />
                 <NIDCountdown examTypes={examTypes} />
                 <NIFTCountdown examTypes={examTypes} />
-              </View>
+              </TouchableOpacity>
             )}
 
-            {/* Focus / progress stats row */}
+            {/* Focus / progress stats row — Focus pill leads to Analytics */}
             <View style={styles.pillRow}>
-              <View style={styles.pillCol}>
+              <TouchableOpacity style={styles.pillCol} onPress={onNavigateAnalytics} activeOpacity={0.75}>
                 <View style={[styles.pill, { borderColor: Colors.primary }]}>
                   <Ionicons name="flash" size={14} color={Colors.primary} />
                   <Text style={[styles.pillVal, { color: Colors.primary }]}>{focusToday}</Text>
                 </View>
                 <Text style={styles.pillLabel}>Focus</Text>
-              </View>
+              </TouchableOpacity>
               <View style={styles.pillCol}>
                 <View style={[styles.pill, { borderColor: Colors.success }]}>
                   <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
@@ -640,16 +489,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
           <>
             <View style={[styles.blob, styles.blobTodo]}>
               <Text style={[styles.blobLabel, styles.blobLabelTodo]}>To do</Text>
-              {timerTaskId && tasks.find(t => t.id === timerTaskId) && (
-                <ActiveTimerRow
-                  task={tasks.find(t => t.id === timerTaskId)!}
-                  remaining={timerRemaining}
-                  total={timerTotal}
-                  running={timerRunning}
-                  onTogglePause={toggleTimerPause}
-                  onCancel={cancelTimer}
-                />
-              )}
               {todoGroup.length === 0 && !timerTaskId ? (
                 <Text style={styles.blobEmpty}>All caught up.</Text>
               ) : (
@@ -693,6 +532,22 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
 
         <View style={{ height: 110 }} />
       </ScrollView>
+
+      {/* ── Task-linked Focus session — full-screen overlay, same UI as the
+           Focus tab, just pre-loaded with a task and auto-started ────────── */}
+      {timerTaskId && tasks.find(t => t.id === timerTaskId) && (
+        <View style={StyleSheet.absoluteFillObject}>
+          <FocusScreen
+            userId={userId}
+            externalTask={{
+              title: tasks.find(t => t.id === timerTaskId)!.title,
+              durationMins: tasks.find(t => t.id === timerTaskId)!.duration,
+            }}
+            onExternalFinish={handleTaskSessionFinish}
+            onExternalExit={handleTaskSessionExit}
+          />
+        </View>
+      )}
 
       {/* ── Confetti (per task) ─────────────────────────────────────────────── */}
       <Confetti visible={confettiVisible} onComplete={() => setConfettiVisible(false)} />

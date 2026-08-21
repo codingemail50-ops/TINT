@@ -22,8 +22,14 @@ create table if not exists public.user_data (
   today_tasks jsonb,
   today_tasks_date text,
   focus_log jsonb default '[]'::jsonb,
+  daily_focus_goal_mins int not null default 60,
   created_at timestamptz default now()
 );
+
+-- Re-running this file after the column already existed in an older version
+-- of this schema won't error — ALTER ... ADD COLUMN IF NOT EXISTS is a no-op
+-- when the column is already there.
+alter table public.user_data add column if not exists daily_focus_goal_mins int not null default 60;
 
 alter table public.user_data enable row level security;
 
