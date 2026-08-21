@@ -54,6 +54,12 @@ const TAB_CONFIG = [
   { id: 'leaderboard' as Screen, label: 'Rank', icon: 'trophy' as const },
 ];
 
+// showTabs stays true for the rest of the session once a profile exists, but
+// the bottom tab bar must not paint over onboarding screens reached via the
+// Home wordmark's replay shortcut — it used to swallow taps meant for those
+// screens' own buttons.
+const ONBOARDING_SCREENS = new Set<Screen>(['avatarExam', 'focusGoal', 'createAccount']);
+
 interface OnboardingDraft {
   avatar: string;
   examTypes: ExamType[];
@@ -75,10 +81,12 @@ export const AppNavigator: React.FC = () => {
   // to createAccount in login mode, without collecting avatar/exam/goal —
   // this flag is what tells createAccount which mode to open in.
   const [loginShortcut, setLoginShortcut] = useState(false);
-  // Tapping the wordmark on Home opens the login page directly (temporary
-  // dev shortcut, to be removed later) — this remembers to send them back
-  // to Today rather than reusing the onboarding shortcut's no-back-button flow.
-  const [loginFromHome, setLoginFromHome] = useState(false);
+  // Tapping the wordmark on Home replays the full onboarding flow from step
+  // 1, exactly as a first-time user would see it (temporary dev shortcut,
+  // to be removed later) — this flag is what gives step 1 a working back
+  // button (real first launches have nowhere to go back to, so it's absent
+  // there) that returns to Today instead of leaving them stranded.
+  const [previewFromHome, setPreviewFromHome] = useState(false);
   const tabFadeAnim = useRef(new Animated.Value(0)).current;
   const userIdRef = useRef<string | null>(null);
   const draftRef = useRef<OnboardingDraft>({ avatar: 'star', examTypes: [], dailyFocusGoalMins: 60 });
@@ -133,10 +141,9 @@ export const AppNavigator: React.FC = () => {
     setScreen('createAccount');
   };
 
-  const handleOpenLoginFromHome = () => {
-    setLoginShortcut(true);
-    setLoginFromHome(true);
-    setScreen('createAccount');
+  const handleOpenOnboardingPreview = () => {
+    setPreviewFromHome(true);
+    setScreen('avatarExam');
   };
 
   const handleFocusGoalComplete = (mins: number) => {
@@ -235,21 +242,21 @@ export const AppNavigator: React.FC = () => {
       <GestureDetector gesture={swipeGesture}>
         <View style={styles.swipeArea}>
           {screen === 'avatarExam' && (
-            <AvatarExamScreen onComplete={handleAvatarExamComplete} onLogin={handleLoginShortcut} />
+            <AvatarExamScreen
+              onComplete={handleAvatarExamComplete}
+              onLogin={handleLoginShortcut}
+              onBack={previewFromHome ? () => { setPreviewFromHome(false); setScreen('todo'); } : undefined}
+            />
           )}
           {screen === 'focusGoal' && (
-            <FocusGoalScreen onComplete={handleFocusGoalComplete} />
+            <FocusGoalScreen onComplete={handleFocusGoalComplete} onBack={() => setScreen('avatarExam')} />
           )}
           {screen === 'createAccount' && (
             <CreateAccountScreen
               onSignedUp={handleSignedUp}
               onGuest={handleGuestNamed}
               onLoggedIn={handleLoggedIn}
-              onBack={
-                loginFromHome
-                  ? () => { setLoginFromHome(false); setLoginShortcut(false); setScreen('todo'); }
-                  : loginShortcut ? undefined : () => setScreen('focusGoal')
-              }
+              onBack={loginShortcut ? undefined : () => setScreen('focusGoal')}
               initialMode={loginShortcut ? 'login' : 'signup'}
             />
           )}
@@ -261,7 +268,7 @@ export const AppNavigator: React.FC = () => {
               onNavigateFocus={() => navigateTo('focus')}
               onNavigateProfile={() => navigateTo('profile')}
               onNavigateAnalytics={() => navigateTo('productivity')}
-              onNavigateLogin={handleOpenLoginFromHome}
+              onPreviewOnboarding={handleOpenOnboardingPreview}
             />
           )}
           {screen === 'focus' && <FocusScreen userId={userIdRef.current ?? undefined} />}
@@ -278,7 +285,7 @@ export const AppNavigator: React.FC = () => {
         </View>
       </GestureDetector>
 
-      {showTabs && (
+      {showTabs && !ONBOARDING_SCREENS.has(screen) && (
         <Animated.View style={[styles.tabBar, { opacity: tabFadeAnim }]}>
           {TAB_CONFIG.map(tab => {
             const isActive = screen === tab.id;

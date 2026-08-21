@@ -13,13 +13,16 @@ const AVATAR_CELL = 72;
 interface Props {
   onComplete: (data: { avatar: string; examTypes: ExamType[] }) => void;
   onLogin: () => void;
+  /** Only set when this step was opened as a replay (e.g. the Home wordmark
+   *  shortcut) — a real first launch has nowhere to go back to. */
+  onBack?: () => void;
 }
 
 // Screen 1 of onboarding — pick a pixel-art-style avatar (same procedural
 // design language as the flame; these are Ionicons placeholders until the
 // real pixel-sprite set is designed) and which exam(s) to prep for, in one
 // screen instead of two separate steps.
-export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin }) => {
+export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack }) => {
   const [avatar, setAvatar] = useState(AVATARS[0]);
   const [selectedExams, setSelectedExams] = useState<Set<ExamType>>(new Set());
 
@@ -70,6 +73,11 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin }) => {
     <View style={styles.container}>
       <StatusBar style="light" />
       <View style={styles.bgOrb} />
+      {onBack && (
+        <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.7}>
+          <Text style={styles.backText}>← Back</Text>
+        </TouchableOpacity>
+      )}
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={styles.stepNum}>01</Text>
         <Text style={styles.title}>Who are you, and what are you here for?</Text>
@@ -199,7 +207,9 @@ const examS = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   bgOrb: { position: 'absolute', width: 350, height: 350, borderRadius: 175, top: -100, right: -100, backgroundColor: Colors.primary, opacity: 0.07 },
-  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 64, paddingBottom: Spacing.xl },
+  backBtn: { position: 'absolute', top: 58, left: Spacing.xl, zIndex: 1 },
+  backText: { fontSize: 15, color: Colors.textSecondary, fontFamily: Fonts.medium },
+  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 100, paddingBottom: Spacing.xl },
   stepNum: { fontSize: 56, fontFamily: Fonts.bold, color: Colors.primary + '18', letterSpacing: -3, marginBottom: -Spacing.lg, lineHeight: 64 },
   title: { fontSize: 26, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.5, marginBottom: 6 },
   sub: { fontSize: 14, color: Colors.textSecondary, lineHeight: 21, marginBottom: Spacing.sm, fontFamily: Fonts.regular },
