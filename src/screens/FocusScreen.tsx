@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
   dialSection: { alignItems: 'center', marginBottom: Spacing.lg },
 
   startBtn: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.pop,
     borderRadius: BorderRadius.md,
     paddingVertical: Spacing.md,
     alignItems: 'center',

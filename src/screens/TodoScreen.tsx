@@ -420,7 +420,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
           <>
             {/* Fire — the hero, like Opal's crystal */}
             <TouchableOpacity style={styles.heroFlame} onPress={onNavigateFocus} activeOpacity={0.85}>
-              <PixelFlame size={150} state="flicker" />
+              <PixelFlame size={150} state="flicker" intensity="pop" />
             </TouchableOpacity>
 
             {/* Exam countdown, right under the hero — leads to Analytics */}
@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   tagline: {
-    fontFamily: Fonts.pixel, fontSize: 26, color: Colors.gray[300],
+    fontFamily: Fonts.pixel, fontSize: 26, color: Colors.pop,
     letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 26,
   },
 

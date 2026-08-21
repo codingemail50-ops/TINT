@@ -136,6 +136,10 @@ export const FLAME_PALETTES: Record<string, FlamePalette> = {
   // warm/hot/blazing/gold/ice color-fire palettes are kept for reference
   // only — nothing in the app selects them anymore.
   cold:    { outline: '#0D0D0D', shades: ['#434343', '#767676', '#D6D6D6', '#F5F5F5'] },
+  // Brand orange accent — built from theme.ts's `orange` tokens (deep/DEFAULT/
+  // light), not the old hardcoded fire hexes below, so it matches the rest
+  // of the app's one deliberate pop of color.
+  pop:     { outline: '#2B0E00', shades: ['#C84E00', '#FF6A00', '#FFA352', '#FFD9B3'] },
   warm:    { outline: '#3D0F02', shades: ['#8A230D', '#D85A17', '#F5941F', '#FFD84D'] },
   hot:     { outline: '#3D0602', shades: ['#9A1505', '#E8420F', '#FF8A1F', '#FFE066'] },
   blazing: { outline: '#33020A', shades: ['#7A0B1E', '#D81B3F', '#FF5C3D', '#FFF0A8'] },
