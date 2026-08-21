@@ -130,9 +130,12 @@ export interface FlamePalette {
 }
 
 export const FLAME_PALETTES: Record<string, FlamePalette> = {
-  // Intensity progression — usable later for "color builds with today's
-  // focus minutes" (cold -> warm -> hot -> blazing as the day fills in).
-  cold:    { outline: '#0B0F14', shades: ['#3A4650', '#5C6E7A', '#8FA3AD', '#C9D6DB'] },
+  // 'cold' is the only palette actually used now — the app is fully
+  // monochrome, so it's built from the exact same neutral grey scale as
+  // everything else (theme.ts's `gray`) instead of a tinted grey. The
+  // warm/hot/blazing/gold/ice color-fire palettes are kept for reference
+  // only — nothing in the app selects them anymore.
+  cold:    { outline: '#0D0D0D', shades: ['#434343', '#767676', '#D6D6D6', '#F5F5F5'] },
   warm:    { outline: '#3D0F02', shades: ['#8A230D', '#D85A17', '#F5941F', '#FFD84D'] },
   hot:     { outline: '#3D0602', shades: ['#9A1505', '#E8420F', '#FF8A1F', '#FFE066'] },
   blazing: { outline: '#33020A', shades: ['#7A0B1E', '#D81B3F', '#FF5C3D', '#FFF0A8'] },

@@ -394,11 +394,11 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
             <View style={styles.hero}>
               <View style={styles.blobWrap}>
                 <Svg width={BLOB_WRAP} height={BLOB_WRAP} viewBox={`0 0 ${BLOB_SIZE} ${BLOB_SIZE}`}>
-                  <Path d={BLOB_PATH} fill={Colors.blue[100]} />
+                  <Path d={BLOB_PATH} fill={Colors.gray[100]} />
                   <Path
                     d={TRACE_PATH}
                     fill="none"
-                    stroke={Colors.blue[500]}
+                    stroke={Colors.gray[500]}
                     strokeWidth={2.5}
                     strokeLinecap="round"
                     strokeDasharray={TRACE_LENGTH}
@@ -409,7 +409,7 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
                   <Text style={styles.blobTask}>Focus Session</Text>
                   <Text style={styles.blobTime}>{formatMMSS(timeLeft)}</Text>
                   <TouchableOpacity style={styles.pauseCircle} onPress={togglePause} activeOpacity={0.75}>
-                    <Ionicons name={paused ? 'play' : 'pause'} size={20} color={Colors.blue[100]} />
+                    <Ionicons name={paused ? 'play' : 'pause'} size={20} color={Colors.gray[100]} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -511,7 +511,7 @@ export const FocusScreen: React.FC<Props> = ({ userId }) => {
             })}
             <TouchableOpacity style={styles.addAppRow} onPress={addCustomApp} activeOpacity={0.7}>
               <View style={styles.addAppIcon}>
-                <Ionicons name="add" size={14} color={Colors.blue[400]} />
+                <Ionicons name="add" size={14} color={Colors.primary} />
               </View>
               <Text style={styles.addAppText}>Add app to block</Text>
             </TouchableOpacity>
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   activeScreen: { flex: 1, paddingTop: 56, paddingHorizontal: Spacing.lg },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   wordmark: {
-    fontFamily: Fonts.display, fontSize: 14, color: Colors.blue[400],
+    fontFamily: Fonts.display, fontSize: 14, color: Colors.gray[400],
     letterSpacing: 0.5, textTransform: 'uppercase',
   },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -585,7 +585,7 @@ const styles = StyleSheet.create({
   blobWrap: { width: BLOB_WRAP, height: BLOB_WRAP, alignItems: 'center', justifyContent: 'center' },
   blobContent: { position: 'absolute', alignItems: 'center', justifyContent: 'center', gap: 4 },
   blobTask: {
-    fontSize: 12, fontFamily: Fonts.bold, color: Colors.blue[700],
+    fontSize: 12, fontFamily: Fonts.bold, color: Colors.gray[700],
     textTransform: 'uppercase', letterSpacing: 0.5,
   },
   blobTime: { fontFamily: Fonts.retro, fontSize: 40, color: Colors.ink, letterSpacing: -1, marginBottom: 10 },
@@ -651,21 +651,21 @@ const styles = StyleSheet.create({
   },
   permTextWrap: { flex: 1 },
   permDescription: { fontSize: 11.5, color: Colors.textSecondary, marginTop: 2, fontFamily: Fonts.regular },
-  permGrantText: { color: Colors.blue[400], fontSize: 13.5, fontFamily: Fonts.semibold, marginRight: 2 },
+  permGrantText: { color: Colors.primary, fontSize: 13.5, fontFamily: Fonts.semibold, marginRight: 2 },
   appRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   appName: { flex: 1, fontSize: 14.5, color: Colors.textPrimary, fontFamily: Fonts.regular },
   appToggle: { width: 40, height: 24, borderRadius: 12, backgroundColor: Colors.border, justifyContent: 'center' },
-  appToggleOn: { backgroundColor: Colors.blue[400] },
+  appToggleOn: { backgroundColor: Colors.gray[500] },
   appToggleDot: { width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.textPrimary, marginLeft: 3 },
   appToggleDotOn: { marginLeft: 19 },
   addAppRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 },
   addAppIcon: {
     width: 24, height: 24, borderRadius: 12,
-    borderWidth: 1.5, borderColor: Colors.blue[400], borderStyle: 'dashed',
+    borderWidth: 1.5, borderColor: Colors.primary, borderStyle: 'dashed',
     alignItems: 'center', justifyContent: 'center',
   },
-  addAppText: { color: Colors.blue[400], fontSize: 14.5, fontFamily: Fonts.medium },
+  addAppText: { color: Colors.primary, fontSize: 14.5, fontFamily: Fonts.medium },
 });

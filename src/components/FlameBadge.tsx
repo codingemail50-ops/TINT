@@ -30,11 +30,11 @@ export const FlameBadge: React.FC<Props> = ({ streak, size = 38, style, onPress 
 const styles = StyleSheet.create({
   badge: {
     borderWidth: 1.5,
-    borderColor: Colors.blue[400],
-    backgroundColor: Colors.blue[950],
+    borderColor: Colors.gray[400],
+    backgroundColor: Colors.gray[800],
     alignItems: 'center',
     justifyContent: 'center',
     gap: 1,
   },
-  n: { fontFamily: Fonts.retro, color: Colors.blue[400] },
+  n: { fontFamily: Fonts.retro, color: Colors.gray[400] },
 });

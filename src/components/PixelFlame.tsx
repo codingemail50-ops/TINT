@@ -20,7 +20,7 @@ interface PixelFlameProps {
 }
 
 export const PixelFlame: React.FC<PixelFlameProps> = ({
-  size = 52, state = 'static', intensity = 'warm', style,
+  size = 52, state = 'static', intensity = 'cold', style,
 }) => {
   const [frameIndex, setFrameIndex] = useState(0);
   const scale = useRef(new Animated.Value(state === 'resting' ? 0.95 : 1)).current;

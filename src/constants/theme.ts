@@ -1,23 +1,13 @@
-// Minimal OLED-dark theme: black→blue tonal scale, with a separate green
-// scale reserved ONLY for "done"/completed states. One typeface throughout
-// (Inter — the closest license-safe equivalent to SF Pro; Apple's actual
-// SF Pro font may only ship in software for Apple platforms, and this app
-// targets Google Play) at a few consistent weights, and a tight 12-18px
-// corner-radius scale used everywhere instead of one-off values per screen.
-const blue = {
-  50: '#F4F7FB',
-  100: '#E9EEF5',
-  200: '#CEDAE9',
-  300: '#A2BAD7',
-  400: '#7096C0',
-  500: '#4E79A9',
-  600: '#3C608D',
-  700: '#314D73',
-  800: '#2B415E',
-  900: '#293A51',
-  950: '#1B2536',
-};
-
+// Minimal OLED-dark, fully monochrome theme: black→white/grey tonal scale
+// for everything, including what used to be the blue accent — "primary"
+// and "accent" below are grey/white now, not blue. A separate green scale
+// stays reserved ONLY for "done"/completed states, and danger stays red,
+// since those are functional status signals, not decorative theme color.
+// One typeface throughout (Inter — the closest license-safe equivalent to
+// SF Pro; Apple's actual SF Pro font may only ship in software for Apple
+// platforms, and this app targets Google Play) at a few consistent
+// weights, and a tight 12-18px corner-radius scale used everywhere
+// instead of one-off values per screen.
 // Reserved for completed/done states only — never used for structure or accents.
 const green = {
   light: '#4BBC87',
@@ -25,8 +15,8 @@ const green = {
   glow: 'rgba(75, 188, 135, 0.14)',
 };
 
-// Black/grey/white tonal scale — the dominant palette on every screen
-// besides Today; blue is an accent on top of this, not the base.
+// Black/grey/white tonal scale — the only palette in the app now. Blue
+// used to be layered on top as an accent; it isn't anymore.
 const gray = {
   50: '#FAFAFA',
   100: '#F5F5F5',
@@ -43,17 +33,17 @@ const gray = {
 
 export const Colors = {
   background: '#060608',
-  surface: '#0F1720',
-  surfaceElevated: '#16212C',
-  border: '#223142',
+  surface: gray[900],
+  surfaceElevated: gray[800],
+  border: gray[700],
 
-  primary: blue[400],
-  primaryLight: blue[300],
-  primaryGlow: blue[950],
+  primary: gray[100],
+  primaryLight: gray[300],
+  primaryGlow: gray[700],
 
-  accent: blue[400],
-  accentLight: blue[300],
-  accentGlow: blue[950],
+  accent: gray[100],
+  accentLight: gray[300],
+  accentGlow: gray[700],
 
   success: green.light,
   successGlow: green.glow,
@@ -63,26 +53,25 @@ export const Colors = {
   textPrimary: '#FFFFFF',
   textSecondary: gray[400],
   textMuted: gray[600],
-  ink: '#0C1A26',
+  ink: gray[900],
 
-  water: blue[400],
-  waterSurface: 'rgba(115, 181, 221, 0.55)',
+  water: gray[400],
+  waterSurface: 'rgba(165, 165, 165, 0.55)',
 
-  gradientPurple: [blue[950], '#060608'] as string[],
-  gradientFire: ['#F97316', '#EF4444'] as string[],
-  gradientDark: [blue[950], '#060608'] as string[],
+  gradientPurple: [gray[800], '#060608'] as string[],
+  gradientFire: [gray[300], gray[600]] as string[],
+  gradientDark: [gray[800], '#060608'] as string[],
   gradientSuccess: [green.light, green.deep] as string[],
-  gradientBlue: [blue[300], blue[600]] as string[],
+  gradientBlue: [gray[300], gray[600]] as string[],
   gradientScreenTime: ['#FFFFFF', '#9B9B9B'] as string[],
 
   streakColors: {
-    cold: '#5C5C5C',
-    warm: '#F97316',
-    hot: '#FB923C',
-    blazing: '#EF4444',
+    cold: gray[600],
+    warm: gray[400],
+    hot: gray[300],
+    blazing: gray[100],
   },
 
-  blue,
   green,
   gray,
 };

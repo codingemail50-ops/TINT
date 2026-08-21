@@ -579,9 +579,9 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
             {/* Focus / progress stats row */}
             <View style={styles.pillRow}>
               <View style={styles.pillCol}>
-                <View style={[styles.pill, { borderColor: Colors.blue[400] }]}>
-                  <Ionicons name="flash" size={14} color={Colors.blue[400]} />
-                  <Text style={[styles.pillVal, { color: Colors.blue[400] }]}>{focusToday}</Text>
+                <View style={[styles.pill, { borderColor: Colors.primary }]}>
+                  <Ionicons name="flash" size={14} color={Colors.primary} />
+                  <Text style={[styles.pillVal, { color: Colors.primary }]}>{focusToday}</Text>
                 </View>
                 <Text style={styles.pillLabel}>Focus</Text>
               </View>
@@ -854,7 +854,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   tagline: {
-    fontFamily: Fonts.display, fontSize: 20, color: Colors.blue[400],
+    fontFamily: Fonts.display, fontSize: 20, color: Colors.gray[300],
     letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 24,
   },
 
@@ -890,10 +890,10 @@ const styles = StyleSheet.create({
   listTitle: { ...Typography.headlineSmall, color: Colors.textPrimary, flex: 1, marginRight: Spacing.sm },
   countdownStack: { gap: Spacing.sm, marginBottom: Spacing.sm },
   blob: { borderRadius: BorderRadius.xl, padding: Spacing.lg, marginBottom: Spacing.lg },
-  blobTodo: { backgroundColor: Colors.blue[950], borderWidth: 1, borderColor: Colors.blue[700] },
+  blobTodo: { backgroundColor: Colors.gray[800], borderWidth: 1, borderColor: Colors.gray[700] },
   blobDone: { backgroundColor: Colors.surfaceElevated, borderWidth: 1, borderColor: Colors.green.deep },
   blobLabel: { fontSize: 12, fontFamily: Fonts.bold, textTransform: 'uppercase', letterSpacing: 1, marginBottom: Spacing.md, paddingLeft: 2 },
-  blobLabelTodo: { color: Colors.blue[300] },
+  blobLabelTodo: { color: Colors.gray[300] },
   blobLabelDone: { color: Colors.green.light },
   blobEmpty: { ...Typography.bodySmall, color: Colors.textMuted, paddingVertical: Spacing.sm },
 

@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background, paddingHorizontal: Spacing.xl, justifyContent: 'center', gap: Spacing.xl },
   header: { gap: Spacing.xs, marginBottom: Spacing.md },
   wordmark: {
-    fontFamily: Fonts.display, fontSize: 13, color: Colors.blue[400],
+    fontFamily: Fonts.display, fontSize: 13, color: Colors.gray[400],
     letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: Spacing.sm,
   },
   title: { fontSize: 26, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.5 },
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
 
   switchRow: { alignItems: 'center' },
   switchText: { fontSize: 14, color: Colors.textSecondary, fontFamily: Fonts.regular },
-  switchLink: { color: Colors.blue[400], fontFamily: Fonts.semibold },
+  switchLink: { color: Colors.primary, fontFamily: Fonts.semibold },
 
   guestRow: { alignItems: 'center', paddingTop: Spacing.md },
   guestText: { fontSize: 13, color: Colors.textMuted, textDecorationLine: 'underline', fontFamily: Fonts.regular },
