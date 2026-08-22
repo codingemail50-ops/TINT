@@ -17,7 +17,6 @@ import { StorageService } from '../utils/storage';
 import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '../utils/focusLog';
 import { PixelFlame } from '../components/PixelFlame';
 import { FlameBadge } from '../components/FlameBadge';
-import { MeditatingFlame } from '../components/MeditatingFlame';
 import { KnurledDial } from '../components/KnurledDial';
 import { scallopPath } from '../utils/scallopPath';
 import { openPermissionSettings, getSelfReportedGrants, setSelfReportedGrant, BlockingPermission } from '../utils/appBlocking';
@@ -432,7 +431,6 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
             </View>
 
             <View style={styles.hero}>
-              <MeditatingFlame size={84} style={styles.meditatingFlame} />
               <Animated.View style={[
                 styles.blobWrap,
                 { opacity: blobEnterAnim, transform: [{ scale: blobEnterAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] },
@@ -615,7 +613,6 @@ const styles = StyleSheet.create({
   },
 
   hero: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  meditatingFlame: { marginBottom: Spacing.xl },
   blobWrap: { width: BLOB_WRAP, height: BLOB_WRAP, alignItems: 'center', justifyContent: 'center' },
   blobContent: { position: 'absolute', alignItems: 'center', justifyContent: 'center', gap: 4 },
   blobTask: {
