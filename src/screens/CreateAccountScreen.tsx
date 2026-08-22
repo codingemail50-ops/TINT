@@ -102,10 +102,13 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.container}>
         <StatusBar style="light" />
-        {!!avatar && <AvatarWall icons={[avatar]} alternateDirection rows={9} cellSize={52} angleDeg={-8} />}
+        {/* Tiled the whole screen height on purpose (not just a header band) —
+            the wall stays faintly visible above AND below the form instead
+            of fading to solid black by the bottom. */}
+        {!!avatar && <AvatarWall icons={[avatar]} alternateDirection rows={28} cellSize={52} angleDeg={-8} />}
         <LinearGradient
-          colors={['rgba(6,6,8,0.55)', 'rgba(6,6,8,0.8)', Colors.background]}
-          locations={[0, 0.4, 0.75]}
+          colors={['rgba(6,6,8,0.45)', 'rgba(6,6,8,0.75)', 'rgba(6,6,8,0.75)', 'rgba(6,6,8,0.45)']}
+          locations={[0, 0.35, 0.75, 1]}
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
         />

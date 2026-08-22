@@ -9,7 +9,7 @@ import { AvatarWall } from '../components/AvatarWall';
 import { useHaptics } from '../hooks/useHaptics';
 
 const { width: W } = Dimensions.get('window');
-const WALL_HEIGHT = 320;
+const WALL_HEIGHT = 260;
 
 interface Props {
   onComplete: (data: { avatar: string; examTypes: ExamType[] }) => void;
@@ -74,23 +74,25 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
         </TouchableOpacity>
       )}
 
+      {/* Solid header, entirely above the wall — kept separate on purpose so
+          the heading never sits on top of the moving icons. */}
+      <View style={styles.header}>
+        <Text style={styles.pixelTitle}>Choose Your Avatar</Text>
+        <Text style={styles.sub}>Tap an avatar in the wall to pick it.</Text>
+      </View>
+
       <View style={styles.wallSection}>
         <AvatarWall icons={AVATARS} selected={avatar} onPick={onPickAvatar} rows={6} cellSize={56} angleDeg={-7} />
         <LinearGradient
-          colors={['rgba(6,6,8,0.8)', 'rgba(6,6,8,0.35)', 'rgba(6,6,8,0.15)', 'rgba(6,6,8,0.9)']}
-          locations={[0, 0.28, 0.55, 1]}
+          colors={['rgba(6,6,8,0.9)', 'rgba(6,6,8,0)', 'rgba(6,6,8,0.9)']}
+          locations={[0, 0.5, 1]}
           style={StyleSheet.absoluteFillObject}
           pointerEvents="none"
         />
-        <View style={styles.wallHeader} pointerEvents="none">
-          <Text style={styles.stepNum}>01</Text>
-          <Text style={styles.title}>Who are you, and what are you here for?</Text>
-          <Text style={styles.sub}>Tap an avatar in the wall to pick it.</Text>
-        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={examS.sectionLabel}>Which exams are you targeting?</Text>
+        <Text style={examS.sectionLabel}>What's Your Exam?</Text>
         <TouchableOpacity style={examS.otherBtn} onPress={handleOther} activeOpacity={0.75}>
           <Text style={examS.otherText}>Other</Text>
         </TouchableOpacity>
@@ -143,7 +145,7 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
 };
 
 const examS = StyleSheet.create({
-  sectionLabel: { fontSize: 18, fontFamily: Fonts.bold, color: Colors.textPrimary, marginBottom: Spacing.sm },
+  sectionLabel: { fontFamily: Fonts.pixel, fontSize: 26, color: Colors.textPrimary, letterSpacing: 0.5, marginBottom: Spacing.sm },
   otherBtn: {
     backgroundColor: Colors.surfaceElevated,
     borderRadius: BorderRadius.full,
@@ -180,10 +182,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   backBtn: { position: 'absolute', top: 58, left: Spacing.xl, zIndex: 2 },
   backText: { fontSize: 15, color: Colors.textPrimary, fontFamily: Fonts.medium },
+  header: { paddingTop: 100, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.md, backgroundColor: Colors.background },
+  pixelTitle: { fontFamily: Fonts.pixel, fontSize: 34, color: Colors.textPrimary, letterSpacing: 0.5, marginBottom: 4 },
   wallSection: { height: WALL_HEIGHT, overflow: 'hidden', backgroundColor: Colors.background },
-  wallHeader: { position: 'absolute', top: 58, left: Spacing.xl, right: Spacing.xl },
-  stepNum: { fontSize: 56, fontFamily: Fonts.bold, color: 'rgba(255,255,255,0.1)', letterSpacing: -3, marginBottom: -Spacing.lg, lineHeight: 64 },
-  title: { fontSize: 24, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.5, marginBottom: 6 },
   sub: { fontSize: 13, color: Colors.textSecondary, lineHeight: 20, fontFamily: Fonts.regular },
   scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg, paddingBottom: Spacing.xl },
   footer: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl, paddingTop: Spacing.sm, gap: Spacing.sm },

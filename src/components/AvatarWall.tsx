@@ -9,6 +9,12 @@ interface Props {
    *  decorative single-icon wallpaper, or the full avatar list for a
    *  tap-to-pick wall. */
   icons: string[];
+  /** Rows must be enough to actually fill the wrapper's rendered box
+   *  (rows * (cellSize + gap) >= wrapper height * ~1.6, since the wall is
+   *  pre-sized to that height before the scale/rotate transform) — the row
+   *  stack does not stretch to fill leftover space, it just stops, leaving
+   *  a plain black gap at the bottom if under-sized. For a wall meant to
+   *  cover a full screen, size generously (e.g. 25-30 rows). */
   rows?: number;
   cellSize?: number;
   gap?: number;
