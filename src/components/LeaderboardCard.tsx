@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Fonts } from '../constants/theme';
+import { PixelIcon } from './PixelIcon';
 import { LeaderboardEntry } from '../data/leaderboard';
 
 interface Props {
@@ -66,7 +67,7 @@ export const LeaderboardCard: React.FC<Props> = ({ entry, rank, index }) => {
       </View>
 
       <View style={styles.avatar}>
-        <Ionicons name={(entry.avatar || 'star') as any} size={20} color={Colors.textPrimary} />
+        <PixelIcon name={entry.avatar || 'star'} size={26} />
       </View>
     </Animated.View>
   );

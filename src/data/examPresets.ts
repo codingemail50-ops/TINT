@@ -119,10 +119,11 @@ export const REALITY_CHECK_MESSAGES = [
   { threshold: 95, message: "95% consistency. You're already winning. Stay the course." },
 ];
 
-// Icon names (Ionicons) used as user avatars — not emoji.
+// PixelIconName keys (see src/components/pixelIcons.ts) used as user avatars
+// — full-color pixel-art icons, the one deliberate break from the app's
+// greyscale/orange theme.
 export const AVATARS = [
-  'rocket', 'flash', 'trophy', 'flame', 'star',
-  'planet', 'telescope', 'compass', 'shield', 'ribbon',
-  'medal', 'football', 'basketball', 'game-controller', 'musical-notes',
-  'color-palette', 'brush', 'book', 'bulb', 'paw',
+  'star', 'heart', 'bomb', 'coin', 'cherry',
+  'watermelon', 'strawberry', 'mushroom', 'cat', 'fox',
+  'panda', 'pizza', 'donut',
 ];

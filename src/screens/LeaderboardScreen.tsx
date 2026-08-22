@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
 import { LeaderboardEntry } from '../data/leaderboard';
 import { LeaderboardCard } from '../components/LeaderboardCard';
+import { PixelIcon } from '../components/PixelIcon';
 import { AppState } from '../utils/storage';
 import { ExamType } from '../data/examPresets';
 import { loadLeaderboard, CloudLeaderboardRow } from '../utils/supabaseStorage';
@@ -101,7 +102,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
             <View style={styles.userRankGradient}>
               <View style={styles.userRankLeft}>
                 <View style={styles.userRankAvatar}>
-                  <Ionicons name={(user?.avatar ?? 'star') as any} size={22} color={Colors.textPrimary} />
+                  <PixelIcon name={user?.avatar ?? 'star'} size={26} />
                 </View>
                 <View>
                   <Text style={styles.userRankName}>{user?.name ?? 'You'}</Text>

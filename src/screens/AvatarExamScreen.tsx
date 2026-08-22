@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { EXAM_TYPES, ExamType, AVATARS } from '../data/examPresets';
+import { PixelIcon } from '../components/PixelIcon';
 import { useHaptics } from '../hooks/useHaptics';
 
 const { width: W } = Dimensions.get('window');
@@ -18,9 +19,9 @@ interface Props {
   onBack?: () => void;
 }
 
-// Screen 1 of onboarding — pick a pixel-art-style avatar (same procedural
-// design language as the flame; these are Ionicons placeholders until the
-// real pixel-sprite set is designed) and which exam(s) to prep for, in one
+// Screen 1 of onboarding — pick a pixel-art avatar (procedurally drawn, same
+// technique as the flame, full color — the one deliberate break from the
+// app's greyscale/orange theme) and which exam(s) to prep for, in one
 // screen instead of two separate steps.
 export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack }) => {
   const [avatar, setAvatar] = useState(AVATARS[0]);
@@ -91,7 +92,7 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
           <Animated.View style={[avatarS.previewCircle, {
             transform: [{ scale: Animated.multiply(avatarBounce, avatarPulse) }],
           }]}>
-            <Ionicons name={avatar as any} size={44} color={Colors.textPrimary} />
+            <PixelIcon name={avatar} size={52} />
           </Animated.View>
         </View>
         <FlatList
@@ -114,7 +115,7 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
                     style={[StyleSheet.absoluteFill, { borderRadius: BorderRadius.md }]}
                   />
                 )}
-                <Ionicons name={item as any} size={26} color={Colors.textPrimary} />
+                <PixelIcon name={item} size={34} />
               </TouchableOpacity>
             );
           }}

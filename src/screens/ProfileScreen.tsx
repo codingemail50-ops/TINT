@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Activi
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts, Typography } from '../constants/theme';
+import { PixelIcon } from '../components/PixelIcon';
 import { AppState } from '../utils/storage';
 import {
   CloudLeaderboardRow, FriendRequestRow,
@@ -94,7 +95,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
 
         <View style={styles.avatarWrap}>
           <View style={styles.avatarCircle}>
-            <Ionicons name={(user?.avatar ?? 'star') as any} size={56} color={Colors.textPrimary} />
+            <PixelIcon name={user?.avatar ?? 'star'} size={64} />
           </View>
           <Text style={styles.name}>{user?.name || 'Anonymous'}</Text>
           {!!user?.email && <Text style={styles.email}>{user.email}</Text>}
@@ -140,7 +141,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
         {results.map(r => (
           <View key={r.id} style={styles.friendRow}>
             <View style={styles.friendAvatar}>
-              <Ionicons name={r.avatar as any} size={18} color={Colors.textPrimary} />
+              <PixelIcon name={r.avatar} size={22} />
             </View>
             <Text style={styles.friendName}>{r.name}</Text>
             <TouchableOpacity
@@ -177,7 +178,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
           friends.map(f => (
             <View key={f.id} style={styles.friendRow}>
               <View style={styles.friendAvatar}>
-                <Ionicons name={f.avatar as any} size={18} color={Colors.textPrimary} />
+                <PixelIcon name={f.avatar} size={22} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.friendName}>{f.name}</Text>
