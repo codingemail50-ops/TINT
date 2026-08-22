@@ -28,7 +28,7 @@ interface Props {
 // duplicated once more so animating from 0 to -(one copy's width) loops
 // with no visible seam.
 export const AvatarWall: React.FC<Props> = ({
-  icons, rows = 6, cellSize = 64, gap = 14, angleDeg = -7,
+  icons, rows = 8, cellSize = 60, gap = 4, angleDeg = -7,
   alternateDirection = false, durationMs = 14000, selected, onPick,
 }) => {
   const cell = cellSize + gap;
@@ -105,17 +105,14 @@ const styles = StyleSheet.create({
     width: '170%',
     height: '160%',
   },
-  row: { flexDirection: 'row', marginBottom: 14 },
+  row: { flexDirection: 'row', marginBottom: 4 },
   cell: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    marginRight: 4,
   },
   cellSelected: {
-    backgroundColor: 'rgba(255,106,0,0.18)',
-    borderWidth: 2,
-    borderColor: '#FF6A00',
+    backgroundColor: 'rgba(255,106,0,0.22)',
+    borderRadius: 14,
   },
 });

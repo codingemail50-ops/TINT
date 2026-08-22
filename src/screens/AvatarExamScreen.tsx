@@ -70,7 +70,7 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
       )}
 
       <View style={styles.wallSection}>
-        <AvatarWall icons={AVATARS} selected={avatar} onPick={onPickAvatar} rows={4} cellSize={58} angleDeg={-7} />
+        <AvatarWall icons={AVATARS} selected={avatar} onPick={onPickAvatar} rows={6} cellSize={56} angleDeg={-7} />
         <LinearGradient
           colors={['rgba(6,6,8,0.8)', 'rgba(6,6,8,0.35)', 'rgba(6,6,8,0.15)', 'rgba(6,6,8,0.9)']}
           locations={[0, 0.28, 0.55, 1]}

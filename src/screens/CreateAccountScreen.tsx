@@ -102,7 +102,7 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.container}>
         <StatusBar style="light" />
-        {!!avatar && <AvatarWall icons={[avatar]} alternateDirection rows={7} cellSize={54} angleDeg={-8} />}
+        {!!avatar && <AvatarWall icons={[avatar]} alternateDirection rows={9} cellSize={52} angleDeg={-8} />}
         <LinearGradient
           colors={['rgba(6,6,8,0.55)', 'rgba(6,6,8,0.8)', Colors.background]}
           locations={[0, 0.4, 0.75]}
