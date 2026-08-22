@@ -4,10 +4,12 @@ import {
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { supabase } from '../lib/supabase';
 import { useHaptics } from '../hooks/useHaptics';
+import { AvatarWall } from '../components/AvatarWall';
 
 type Mode = 'signup' | 'login';
 
@@ -21,6 +23,10 @@ interface Props {
   onLoggedIn: (hasProfile: boolean) => void;
   onBack?: () => void;
   initialMode?: Mode;
+  /** The avatar picked on step 1 — tiled as a scrolling brick-pattern
+   *  background, rows alternating direction. Omitted for the direct-login
+   *  shortcut, which skips step 1. */
+  avatar?: string;
 }
 
 function friendlyError(message: string): string {
@@ -38,7 +44,7 @@ function friendlyError(message: string): string {
 
 // Screen 3 of onboarding — username + email/password (or stay anonymous),
 // plus a placeholder for Google sign-in until that's wired up for real.
-export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLoggedIn, onBack, initialMode = 'signup' }) => {
+export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLoggedIn, onBack, initialMode = 'signup', avatar }) => {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -96,6 +102,13 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.container}>
         <StatusBar style="light" />
+        {!!avatar && <AvatarWall icons={[avatar]} alternateDirection rows={7} cellSize={54} angleDeg={-8} />}
+        <LinearGradient
+          colors={['rgba(6,6,8,0.55)', 'rgba(6,6,8,0.8)', Colors.background]}
+          locations={[0, 0.4, 0.75]}
+          style={StyleSheet.absoluteFillObject}
+          pointerEvents="none"
+        />
         {onBack && (
           <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.7}>
             <Text style={styles.backText}>← Back</Text>

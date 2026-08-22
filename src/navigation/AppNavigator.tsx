@@ -64,6 +64,8 @@ interface OnboardingDraft {
   avatar: string;
   examTypes: ExamType[];
   dailyFocusGoalMins: number;
+  name: string;
+  email: string;
 }
 
 export const AppNavigator: React.FC = () => {
@@ -89,7 +91,7 @@ export const AppNavigator: React.FC = () => {
   const [previewFromHome, setPreviewFromHome] = useState(false);
   const tabFadeAnim = useRef(new Animated.Value(0)).current;
   const userIdRef = useRef<string | null>(null);
-  const draftRef = useRef<OnboardingDraft>({ avatar: 'star', examTypes: [], dailyFocusGoalMins: 60 });
+  const draftRef = useRef<OnboardingDraft>({ avatar: 'star', examTypes: [], dailyFocusGoalMins: 60, name: '', email: '' });
 
   // No splash animation — resolve session/local state directly on mount.
   useEffect(() => {
@@ -129,11 +131,11 @@ export const AppNavigator: React.FC = () => {
 
   const navigateTo = (s: Screen) => setScreen(s);
 
-  // ── Onboarding flow: avatarExam -> focusGoal -> createAccount ────────────
+  // ── Onboarding flow: avatarExam -> createAccount -> focusGoal ────────────
   const handleAvatarExamComplete = (data: { avatar: string; examTypes: ExamType[] }) => {
     draftRef.current.avatar = data.avatar;
     draftRef.current.examTypes = data.examTypes;
-    setScreen('focusGoal');
+    setScreen('createAccount');
   };
 
   const handleLoginShortcut = () => {
@@ -146,14 +148,15 @@ export const AppNavigator: React.FC = () => {
     setScreen('avatarExam');
   };
 
+  // Tail of onboarding — persists the full profile (avatar/exams from step 1
+  // + name/email from step 2 + the goal just set here), then boots into the
+  // app the same way a returning user does.
   const handleFocusGoalComplete = (mins: number) => {
     draftRef.current.dailyFocusGoalMins = mins;
-    setScreen('createAccount');
+    const { avatar, examTypes, name, email } = draftRef.current;
+    finishOnboarding({ name, email, examTypes, avatar, createdAt: new Date().toISOString(), dailyFocusGoalMins: mins });
   };
 
-  // Shared tail for both "signed up" and "stayed guest" — persists the full
-  // profile (avatar/exams/goal collected earlier + name/email from this
-  // step), then boots into the app the same way a returning user does.
   const finishOnboarding = (user: UserProfile) => {
     StorageService.saveUser(user)
       .then(() => StorageService.getAppState())
@@ -176,13 +179,15 @@ export const AppNavigator: React.FC = () => {
   };
 
   const handleSignedUp = ({ name, email }: { name: string; email: string }) => {
-    const { avatar, examTypes, dailyFocusGoalMins } = draftRef.current;
-    finishOnboarding({ name, email, examTypes, avatar, createdAt: new Date().toISOString(), dailyFocusGoalMins });
+    draftRef.current.name = name;
+    draftRef.current.email = email;
+    setScreen('focusGoal');
   };
 
   const handleGuestNamed = ({ name }: { name: string }) => {
-    const { avatar, examTypes, dailyFocusGoalMins } = draftRef.current;
-    finishOnboarding({ name, email: '', examTypes, avatar, createdAt: new Date().toISOString(), dailyFocusGoalMins });
+    draftRef.current.name = name;
+    draftRef.current.email = '';
+    setScreen('focusGoal');
   };
 
   const handleLoggedIn = async (hasProfile: boolean) => {
@@ -248,17 +253,18 @@ export const AppNavigator: React.FC = () => {
               onBack={previewFromHome ? () => { setPreviewFromHome(false); setScreen('todo'); } : undefined}
             />
           )}
-          {screen === 'focusGoal' && (
-            <FocusGoalScreen onComplete={handleFocusGoalComplete} onBack={() => setScreen('avatarExam')} />
-          )}
           {screen === 'createAccount' && (
             <CreateAccountScreen
               onSignedUp={handleSignedUp}
               onGuest={handleGuestNamed}
               onLoggedIn={handleLoggedIn}
-              onBack={loginShortcut ? undefined : () => setScreen('focusGoal')}
+              onBack={loginShortcut ? undefined : () => setScreen('avatarExam')}
               initialMode={loginShortcut ? 'login' : 'signup'}
+              avatar={draftRef.current.avatar}
             />
+          )}
+          {screen === 'focusGoal' && (
+            <FocusGoalScreen onComplete={handleFocusGoalComplete} onBack={() => setScreen('createAccount')} />
           )}
           {screen === 'todo' && (
             <TodoScreen

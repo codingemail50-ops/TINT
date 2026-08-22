@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
-import { KnurledDial } from '../components/KnurledDial';
+import { BlobDial } from '../components/BlobDial';
 import { useHaptics } from '../hooks/useHaptics';
 
 const MIN_MINS = 15;
@@ -44,13 +44,13 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
         </TouchableOpacity>
       )}
       <View style={styles.header}>
-        <Text style={styles.stepNum}>02</Text>
+        <Text style={styles.stepNum}>03</Text>
         <Text style={styles.title}>Set your daily focus goal</Text>
         <Text style={styles.sub}>Turn the dial — you can always change this later.</Text>
       </View>
 
       <View style={styles.dialWrap}>
-        <KnurledDial
+        <BlobDial
           size={260}
           minValue={MIN_MINS}
           maxValue={MAX_MINS}
