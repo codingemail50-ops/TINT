@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -54,6 +54,11 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
 
   const canProceed = selectedExams.size > 0;
 
+  const handleOther = () => {
+    buttonPress();
+    Alert.alert('Coming soon', "Support for exams outside JEE/UCEED/NID/NIFT isn't wired up yet.");
+  };
+
   const handleContinue = () => {
     if (!canProceed) return;
     buttonPress();
@@ -86,6 +91,9 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={examS.sectionLabel}>Which exams are you targeting?</Text>
+        <TouchableOpacity style={examS.otherBtn} onPress={handleOther} activeOpacity={0.75}>
+          <Text style={examS.otherText}>Other</Text>
+        </TouchableOpacity>
         <View style={examS.grid}>
           {EXAM_TYPES.map((exam, index) => {
             const checked = selectedExams.has(exam.id);
@@ -136,6 +144,16 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
 
 const examS = StyleSheet.create({
   sectionLabel: { fontSize: 18, fontFamily: Fonts.bold, color: Colors.textPrimary, marginBottom: Spacing.sm },
+  otherBtn: {
+    backgroundColor: Colors.surfaceElevated,
+    borderRadius: BorderRadius.full,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  otherText: { fontSize: 15, fontFamily: Fonts.bold, color: Colors.textSecondary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   card: {
     backgroundColor: Colors.surfaceElevated,
