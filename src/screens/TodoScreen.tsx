@@ -12,6 +12,7 @@ import { StorageService, AppState } from '../utils/storage';
 import { TaskItem } from '../components/TaskItem';
 import { FlameBadge } from '../components/FlameBadge';
 import { PixelFlame } from '../components/PixelFlame';
+import { Bonfire } from '../components/Bonfire';
 import { Confetti } from '../components/Confetti';
 import { FocusScreen } from './FocusScreen';
 import { UCEEDCountdown, NIDCountdown, NIFTCountdown } from '../components/ExamCountdowns';
@@ -418,9 +419,14 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
       >
         {!viewingPast && (
           <>
-            {/* Fire — the hero, like Opal's crystal */}
+            {/* Fire — the hero, like Opal's crystal. Grows/brightens with
+                today's focus progress; color tier escalates with streak. */}
             <TouchableOpacity style={styles.heroFlame} onPress={onNavigateFocus} activeOpacity={0.85}>
-              <PixelFlame size={150} state="flicker" intensity="pop" />
+              <Bonfire
+                progress={focusToday / (appState.user?.dailyFocusGoalMins || 60)}
+                streak={appState.streak}
+                maxSize={150}
+              />
             </TouchableOpacity>
 
             {/* Exam countdown, right under the hero — leads to Analytics */}
