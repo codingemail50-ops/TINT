@@ -45,7 +45,13 @@ export const Bonfire: React.FC<Props> = ({ progress, streak, maxSize = 150 }) =>
   const lit = stage >= 3;
 
   const def = useMemo(() => buildBonfireStage(stage, intensity), [stage, intensity]);
-  const height = (maxSize / def.cols) * def.rows;
+  // Every stage shares one grid sized for the tallest (stage 6), so a small
+  // early-stage sprite (ash pile, kindling) sits low in a mostly-empty
+  // canvas — cropping to the stage's actual content keeps it snug against
+  // whatever's above it instead of floating with dead space on top.
+  const minY = useMemo(() => Math.min(...def.cells.map(c => c.y)), [def]);
+  const cropRows = def.rows - minY;
+  const height = (maxSize / def.cols) * cropRows;
 
   const breathe = useRef(new Animated.Value(1)).current;
 
@@ -64,7 +70,7 @@ export const Bonfire: React.FC<Props> = ({ progress, streak, maxSize = 150 }) =>
   return (
     <View style={styles.wrap}>
       <Animated.View style={{ transform: [{ scale: lit ? breathe : 1 }] }}>
-        <Svg width={maxSize} height={height} viewBox={`0 0 ${def.cols} ${def.rows}`}>
+        <Svg width={maxSize} height={height} viewBox={`0 ${minY} ${def.cols} ${cropRows}`}>
           {def.cells.map((c, i) => (
             <Rect key={i} x={c.x} y={c.y} width={1} height={1} fill={c.color} />
           ))}

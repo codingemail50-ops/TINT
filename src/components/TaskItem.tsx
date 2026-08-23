@@ -57,8 +57,8 @@ export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPres
         <Animated.View style={[
           styles.checkbox,
           {
-            borderColor:     task.completed ? Colors.success : Colors.border,
-            backgroundColor: task.completed ? Colors.success : 'transparent',
+            borderColor:     task.completed ? Colors.primary : Colors.border,
+            backgroundColor: task.completed ? Colors.primary : 'transparent',
             transform: [{ scale: checkAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.2, 1] }) }],
           },
         ]}>
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   innerCompleted: {
     opacity: 0.7,
     backgroundColor: Colors.surface,
-    borderColor: Colors.green.deep,
+    borderColor: Colors.border,
   },
   checkbox: {
     width: 30, height: 30,
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
   },
-  checkmark: { color: '#fff', fontSize: 16, fontFamily: Fonts.bold },
+  checkmark: { color: Colors.background, fontSize: 16, fontFamily: Fonts.bold },
   content: { flex: 1, gap: 8 },
   title: { ...Typography.bodyLarge, color: Colors.textPrimary, fontFamily: Fonts.medium, fontSize: 17 },
   titleCompleted: { color: Colors.textMuted, textDecorationLine: 'line-through' },

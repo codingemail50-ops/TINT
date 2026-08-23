@@ -781,10 +781,10 @@ const styles = StyleSheet.create({
   countdownStack: { gap: Spacing.sm, marginBottom: Spacing.sm },
   blob: { borderRadius: BorderRadius.xl, padding: Spacing.lg, marginBottom: Spacing.lg },
   blobTodo: { backgroundColor: Colors.gray[800], borderWidth: 1, borderColor: Colors.gray[700] },
-  blobDone: { backgroundColor: Colors.surfaceElevated, borderWidth: 1, borderColor: Colors.green.deep },
+  blobDone: { backgroundColor: Colors.surfaceElevated, borderWidth: 1, borderColor: Colors.gray[600] },
   blobLabel: { fontSize: 12, fontFamily: Fonts.bold, textTransform: 'uppercase', letterSpacing: 1, marginBottom: Spacing.md, paddingLeft: 2 },
   blobLabelTodo: { color: Colors.gray[300] },
-  blobLabelDone: { color: Colors.green.light },
+  blobLabelDone: { color: Colors.textSecondary },
   blobEmpty: { ...Typography.bodySmall, color: Colors.textMuted, paddingVertical: Spacing.sm },
 
   addBtn: { borderRadius: BorderRadius.sm, overflow: 'hidden' },
