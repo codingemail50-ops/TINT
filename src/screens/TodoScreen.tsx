@@ -455,23 +455,20 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                 which needs a native build we don't have. */}
             <View style={styles.pillRow}>
               <TouchableOpacity style={styles.pillCol} onPress={onNavigateAnalytics} activeOpacity={0.75}>
-                <View style={[styles.pill, { borderColor: Colors.primary }]}>
-                  <Ionicons name="flash" size={14} color={Colors.primary} />
-                  <Text style={[styles.pillVal, { color: Colors.primary }]}>{formatHrsMins(focusToday)}</Text>
+                <View style={styles.pill}>
+                  <Text style={styles.pillVal}>{formatHrsMins(focusToday)}</Text>
                 </View>
                 <Text style={styles.pillLabel}>Focused</Text>
               </TouchableOpacity>
               <View style={styles.pillCol}>
-                <View style={[styles.pill, { borderColor: Colors.textMuted }]}>
-                  <Ionicons name="eye-off-outline" size={14} color={Colors.textMuted} />
-                  <Text style={[styles.pillVal, { color: Colors.textMuted }]}>{formatHrsMins(distractedToday)}</Text>
+                <View style={styles.pill}>
+                  <Text style={styles.pillVal}>{formatHrsMins(distractedToday)}</Text>
                 </View>
                 <Text style={styles.pillLabel}>Distracted</Text>
               </View>
               <View style={styles.pillCol}>
-                <View style={[styles.pill, { borderColor: Colors.success }]}>
-                  <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
-                  <Text style={[styles.pillVal, { color: Colors.success }]}>{completedCount}/{totalCount}</Text>
+                <View style={styles.pill}>
+                  <Text style={styles.pillVal}>{completedCount}/{totalCount}</Text>
                 </View>
                 <Text style={styles.pillLabel}>Progress</Text>
               </View>
@@ -756,15 +753,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 26,
   },
 
-  pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.sm, marginBottom: Spacing.xl },
-  pillCol: { alignItems: 'center', gap: 6 },
+  pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.md, marginBottom: Spacing.xl },
+  pillCol: { alignItems: 'center', gap: 8 },
   pill: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    borderWidth: 1.5, borderRadius: BorderRadius.full,
-    paddingHorizontal: 11, paddingVertical: 7,
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: 18, paddingVertical: 10,
+    minWidth: 76, alignItems: 'center',
   },
-  pillVal: { fontFamily: Fonts.retro, fontSize: 14 },
-  pillLabel: { fontSize: 11, color: Colors.textSecondary, fontFamily: Fonts.regular },
+  pillVal: { fontFamily: Fonts.retro, fontSize: 16, color: Colors.background },
+  pillLabel: { fontSize: 12, color: Colors.textSecondary, fontFamily: Fonts.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
   progressSection: { gap: 6 },
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   progressLabel: { ...Typography.labelSmall, color: Colors.textSecondary },
