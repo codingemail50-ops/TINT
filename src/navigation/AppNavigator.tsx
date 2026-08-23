@@ -13,7 +13,7 @@ import { ProductivityScreen } from '../screens/ProductivityScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { StorageService, AppState, UserProfile } from '../utils/storage';
-import { ExamType } from '../data/examPresets';
+import { ExamType, CustomExam } from '../data/examPresets';
 import { supabase } from '../lib/supabase';
 import {
   loadUserFromSupabase,
@@ -63,6 +63,7 @@ const ONBOARDING_SCREENS = new Set<Screen>(['avatarExam', 'focusGoal', 'createAc
 interface OnboardingDraft {
   avatar: string;
   examTypes: ExamType[];
+  customExam?: CustomExam;
   dailyFocusGoalMins: number;
   name: string;
   email: string;
@@ -132,9 +133,10 @@ export const AppNavigator: React.FC = () => {
   const navigateTo = (s: Screen) => setScreen(s);
 
   // ── Onboarding flow: avatarExam -> createAccount -> focusGoal ────────────
-  const handleAvatarExamComplete = (data: { avatar: string; examTypes: ExamType[] }) => {
+  const handleAvatarExamComplete = (data: { avatar: string; examTypes: ExamType[]; customExam?: CustomExam }) => {
     draftRef.current.avatar = data.avatar;
     draftRef.current.examTypes = data.examTypes;
+    draftRef.current.customExam = data.customExam;
     setScreen('createAccount');
   };
 
@@ -153,8 +155,8 @@ export const AppNavigator: React.FC = () => {
   // app the same way a returning user does.
   const handleFocusGoalComplete = (mins: number) => {
     draftRef.current.dailyFocusGoalMins = mins;
-    const { avatar, examTypes, name, email } = draftRef.current;
-    finishOnboarding({ name, email, examTypes, avatar, createdAt: new Date().toISOString(), dailyFocusGoalMins: mins });
+    const { avatar, examTypes, customExam, name, email } = draftRef.current;
+    finishOnboarding({ name, email, examTypes, customExam, avatar, createdAt: new Date().toISOString(), dailyFocusGoalMins: mins });
   };
 
   const finishOnboarding = (user: UserProfile) => {

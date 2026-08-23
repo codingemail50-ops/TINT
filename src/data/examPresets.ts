@@ -11,6 +11,16 @@ export interface Task {
   repeat?: boolean;
 }
 
+// A user-authored exam+task set, for anyone whose exam isn't one of the four
+// built-in presets — picked via "Other" on the avatar/exam screen. Runs
+// through the exact same daily-task and focus-timer machinery as a preset,
+// just seeded from what they typed instead of BASE_TASKS.
+export interface CustomExam {
+  name: string;
+  date: string; // YYYY-MM-DD
+  tasks: { title: string; duration: number }[];
+}
+
 export const EXAM_TYPES: { id: ExamType; label: string; icon: string; description: string; color: string }[] = [
   { id: 'JEE',   label: 'JEE',   icon: 'flash',          description: 'Joint Entrance Exam — Mains & Advanced', color: '#3B82F6' },
   { id: 'UCEED', label: 'UCEED', icon: 'pencil',         description: 'Undergraduate Common Entrance Exam for Design', color: '#8B5CF6' },

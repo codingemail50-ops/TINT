@@ -1,18 +1,19 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
-import { EXAM_TYPES, ExamType, AVATARS } from '../data/examPresets';
+import { EXAM_TYPES, ExamType, AVATARS, CustomExam } from '../data/examPresets';
 import { AvatarWall } from '../components/AvatarWall';
+import { CustomExamModal } from '../components/CustomExamModal';
 import { useHaptics } from '../hooks/useHaptics';
 
 const { width: W } = Dimensions.get('window');
 const WALL_HEIGHT = 260;
 
 interface Props {
-  onComplete: (data: { avatar: string; examTypes: ExamType[] }) => void;
+  onComplete: (data: { avatar: string; examTypes: ExamType[]; customExam?: CustomExam }) => void;
   onLogin: () => void;
   /** Only set when this step was opened as a replay (e.g. the Home wordmark
    *  shortcut) — a real first launch has nowhere to go back to. */
@@ -26,6 +27,8 @@ interface Props {
 export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack }) => {
   const [avatar, setAvatar] = useState(AVATARS[0]);
   const [selectedExams, setSelectedExams] = useState<Set<ExamType>>(new Set());
+  const [customExam, setCustomExam] = useState<CustomExam | null>(null);
+  const [customExamModalOpen, setCustomExamModalOpen] = useState(false);
   const examPunch = useRef(EXAM_TYPES.map(() => new Animated.Value(1))).current;
 
   const { buttonPress, dialTick } = useHaptics();
@@ -52,17 +55,22 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
     ]).start();
   };
 
-  const canProceed = selectedExams.size > 0;
+  const canProceed = selectedExams.size > 0 || !!customExam;
 
   const handleOther = () => {
     buttonPress();
-    Alert.alert('Coming soon', "Support for exams outside JEE/UCEED/NID/NIFT isn't wired up yet.");
+    setCustomExamModalOpen(true);
+  };
+
+  const handleSaveCustomExam = (exam: CustomExam) => {
+    setCustomExam(exam);
+    setCustomExamModalOpen(false);
   };
 
   const handleContinue = () => {
     if (!canProceed) return;
     buttonPress();
-    onComplete({ avatar, examTypes: Array.from(selectedExams) });
+    onComplete({ avatar, examTypes: Array.from(selectedExams), customExam: customExam ?? undefined });
   };
 
   return (
@@ -93,8 +101,14 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={examS.sectionLabel}>What's Your Exam?</Text>
-        <TouchableOpacity style={examS.otherBtn} onPress={handleOther} activeOpacity={0.75}>
-          <Text style={examS.otherText}>Other</Text>
+        <TouchableOpacity
+          style={[examS.otherBtn, !!customExam && examS.otherBtnActive]}
+          onPress={handleOther}
+          activeOpacity={0.75}
+        >
+          <Text style={[examS.otherText, !!customExam && examS.otherTextActive]} numberOfLines={1}>
+            {customExam ? `✓ ${customExam.name}` : 'Other'}
+          </Text>
         </TouchableOpacity>
         <View style={examS.grid}>
           {EXAM_TYPES.map((exam, index) => {
@@ -140,6 +154,13 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
           <Text style={styles.loginLink}>Already have an account? <Text style={styles.loginLinkStrong}>Log in</Text></Text>
         </TouchableOpacity>
       </View>
+
+      <CustomExamModal
+        visible={customExamModalOpen}
+        initial={customExam}
+        onClose={() => setCustomExamModalOpen(false)}
+        onSave={handleSaveCustomExam}
+      />
     </View>
   );
 };
@@ -156,6 +177,8 @@ const examS = StyleSheet.create({
     marginBottom: 10,
   },
   otherText: { fontSize: 15, fontFamily: Fonts.bold, color: Colors.textSecondary },
+  otherBtnActive: { backgroundColor: Colors.pop, borderColor: Colors.pop },
+  otherTextActive: { color: '#000' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   card: {
     backgroundColor: Colors.surfaceElevated,

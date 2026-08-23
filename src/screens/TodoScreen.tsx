@@ -211,14 +211,20 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   const user        = appState.user;
   const examTypes   = (user?.examTypes ?? []) as ExamType[];
 
-  // Load today's tasks
+  // Load today's tasks — a custom exam (from "Other") seeds the day the same
+  // way a preset does, just from user-typed tasks instead of BASE_TASKS.
   useEffect(() => {
     (async () => {
       const saved = await StorageService.getTodayTasks();
       if (saved) {
         setTasks(saved);
       } else {
-        const fresh = getCombinedPreset(examTypes).map(t => ({ ...t, completed: false }));
+        const fresh = user?.customExam
+          ? user.customExam.tasks.map((t, i) => ({
+              id: `custom-${i}`, title: t.title, duration: t.duration,
+              category: user.customExam!.name, completed: false,
+            }))
+          : getCombinedPreset(examTypes).map(t => ({ ...t, completed: false }));
         setTasks(fresh);
         await StorageService.saveTodayTasks(fresh);
       }

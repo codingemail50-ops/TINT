@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Task } from '../data/examPresets';
+import { Task, CustomExam } from '../data/examPresets';
 
 export interface UserProfile {
   name: string;
@@ -8,6 +8,8 @@ export interface UserProfile {
   avatar: string;
   createdAt: string;
   dailyFocusGoalMins: number;
+  /** Set instead of (or alongside) examTypes when picked via "Other". */
+  customExam?: CustomExam;
 }
 
 export interface DayRecord {
