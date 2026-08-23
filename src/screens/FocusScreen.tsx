@@ -20,6 +20,7 @@ import { FlameBadge } from '../components/FlameBadge';
 import { KnurledDial } from '../components/KnurledDial';
 import { scallopPath } from '../utils/scallopPath';
 import { openPermissionSettings, getSelfReportedGrants, setSelfReportedGrant, BlockingPermission } from '../utils/appBlocking';
+import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY } from '../data/blockableApps';
 
 const DEFAULT_DURATION = 25;
 const HOLD_MS = 2000;
@@ -32,15 +33,7 @@ function formatDuration(mins: number): string {
   return `${h}h${m}m`;
 }
 
-const FOCUS_APPS: { id: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: 'instagram', label: 'Instagram', icon: 'logo-instagram' },
-  { id: 'youtube', label: 'YouTube', icon: 'logo-youtube' },
-  { id: 'tiktok', label: 'TikTok', icon: 'logo-tiktok' },
-  { id: 'twitter', label: 'Twitter / X', icon: 'logo-twitter' },
-  { id: 'reddit', label: 'Reddit', icon: 'logo-reddit' },
-  { id: 'snapchat', label: 'Snapchat', icon: 'logo-snapchat' },
-];
-const DEFAULT_BLOCKED_APPS = ['instagram', 'youtube', 'tiktok'];
+const FOCUS_APPS = BLOCKABLE_APPS;
 
 const PERMISSIONS: { id: BlockingPermission; label: string; description: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: 'usageAccess', label: 'Usage Access', description: 'Lets TINT see which app is open right now.', icon: 'bar-chart-outline' },
@@ -49,7 +42,7 @@ const PERMISSIONS: { id: BlockingPermission; label: string; description: string;
 ];
 
 const KEYS = {
-  BLOCKED_APPS: 'tint_blocked_apps',
+  BLOCKED_APPS: BLOCKED_APPS_STORAGE_KEY,
 };
 
 const BLOB_SIZE = 240;
