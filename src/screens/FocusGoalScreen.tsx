@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { BlobDial } from '../components/BlobDial';
 import { PixelFlame } from '../components/PixelFlame';
+import { MeditatingFlame } from '../components/MeditatingFlame';
 import { useHaptics } from '../hooks/useHaptics';
 
 const MIN_MINS = 15;
@@ -53,6 +54,7 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
       </View>
 
       <View style={styles.dialWrap}>
+        <MeditatingFlame size={100} style={styles.mascot} />
         <BlobDial
           size={260}
           minValue={MIN_MINS}
@@ -99,6 +101,7 @@ const styles = StyleSheet.create({
   goalPillText: { fontSize: 15, fontFamily: Fonts.bold, color: '#000', letterSpacing: 0.5, textTransform: 'uppercase' },
   sub: { fontSize: 13, color: Colors.textSecondary, fontFamily: Fonts.regular },
   dialWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md },
+  mascot: { marginBottom: Spacing.sm },
   labelsRow: { flexDirection: 'row', gap: Spacing.lg },
   dailyRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   pixelLabel: { fontFamily: Fonts.pixel, fontSize: 26, letterSpacing: 1, textTransform: 'uppercase' },
