@@ -439,20 +439,20 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
           <>
             {/* Fire — the hero, like Opal's crystal. Grows through discrete
                 stages with today's focus progress; color tier escalates
-                with streak. Compact now — a header widget, not a centerpiece. */}
+                with streak. */}
             <TouchableOpacity style={styles.heroFlame} onPress={onNavigateFocus} activeOpacity={0.85}>
               <Bonfire
                 progress={focusToday / (appState.user?.dailyFocusGoalMins || 60)}
                 streak={appState.streak}
-                maxSize={92}
+                maxSize={148}
               />
             </TouchableOpacity>
 
-            {/* Focused / Distracted / Progress stats row — Focused pill
-                leads to Analytics. Distracted is honest, not simulated:
-                time the app was backgrounded during an active focus
-                session (see distractionLog.ts) — not real per-app usage,
-                which needs a native build we don't have. */}
+            {/* Focused / Distracted stats row — Focused pill leads to
+                Analytics. Distracted is honest, not simulated: time the
+                app was backgrounded during an active focus session (see
+                distractionLog.ts) — not real per-app usage, which needs a
+                native build we don't have. */}
             <View style={styles.pillRow}>
               <TouchableOpacity style={styles.pillCol} onPress={onNavigateAnalytics} activeOpacity={0.75}>
                 <View style={styles.pill}>
@@ -465,12 +465,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                   <Text style={styles.pillVal}>{formatHrsMins(distractedToday)}</Text>
                 </View>
                 <Text style={styles.pillLabel}>Distracted</Text>
-              </View>
-              <View style={styles.pillCol}>
-                <View style={styles.pill}>
-                  <Text style={styles.pillVal}>{completedCount}/{totalCount}</Text>
-                </View>
-                <Text style={styles.pillLabel}>Progress</Text>
               </View>
             </View>
 
@@ -776,7 +770,7 @@ const styles = StyleSheet.create({
   // Scroll / list
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg },
-  heroFlame: { alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.xl },
+  heroFlame: { alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.md },
   listHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',

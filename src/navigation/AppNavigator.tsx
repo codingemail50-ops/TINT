@@ -308,7 +308,7 @@ export const AppNavigator: React.FC = () => {
                   <Ionicons
                     name={isActive ? tab.icon : (`${tab.icon}-outline` as any)}
                     size={20}
-                    color={isActive ? Colors.primary : Colors.textMuted}
+                    color={isActive ? Colors.primary : Colors.textSecondary}
                   />
                 </View>
                 <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
