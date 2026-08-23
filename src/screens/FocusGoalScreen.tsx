@@ -99,14 +99,14 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
           <Text style={styles.titleRegular}>What's your</Text>
           <Text style={styles.titlePixel}>Focus Goal?</Text>
         </View>
-        <MeditatingFlame size={78} />
+        <MeditatingFlame size={92} />
       </View>
 
       <View style={styles.dialWrap}>
         <Animated.View style={[styles.glow, { opacity: glowOpacity, transform: [{ scale: dialScale }] }]} />
         <Animated.View style={{ transform: [{ scale: dialScale }] }}>
           <BlobDial
-            size={250}
+            size={230}
             minValue={MIN_MINS}
             maxValue={MAX_MINS}
             step={STEP_MINS}
@@ -117,6 +117,8 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
           />
         </Animated.View>
       </View>
+
+      <View style={styles.divider} />
 
       <View style={styles.blockSection}>
         <TouchableOpacity style={styles.blockAppsBtn} onPress={handleBlockApps} activeOpacity={0.8}>
@@ -135,6 +137,8 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
           })}
         </View>
       </View>
+
+      <View style={{ flex: 1 }} />
 
       <View style={styles.footer}>
         <TouchableOpacity style={styles.lockBtn} onPress={handleLockIn} activeOpacity={0.85} disabled={locking}>
@@ -158,11 +162,12 @@ const styles = StyleSheet.create({
   titleBlock: { flex: 1, paddingRight: Spacing.md },
   titleRegular: { fontSize: 22, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.3 },
   titlePixel: { fontFamily: Fonts.pixel, fontSize: 40, color: Colors.pop, letterSpacing: 0.5, marginTop: -4 },
-  dialWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  dialWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.lg },
   glow: {
-    position: 'absolute', width: 250 * 1.25, height: 250 * 1.25, borderRadius: 250,
+    position: 'absolute', width: 230 * 1.25, height: 230 * 1.25, borderRadius: 230,
     backgroundColor: Colors.pop, shadowColor: Colors.pop, shadowOpacity: 0.9, shadowRadius: 40, elevation: 20,
   },
+  divider: { height: 1, backgroundColor: Colors.border, marginHorizontal: Spacing.xl, marginBottom: Spacing.lg },
   blockSection: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.md, gap: Spacing.sm },
   blockAppsBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
