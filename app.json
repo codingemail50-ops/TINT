@@ -25,7 +25,11 @@
         "backgroundColor": "#080810"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.tint.app"
+      "package": "com.tint.app",
+      "permissions": [
+        "SYSTEM_ALERT_WINDOW",
+        "PACKAGE_USAGE_STATS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
