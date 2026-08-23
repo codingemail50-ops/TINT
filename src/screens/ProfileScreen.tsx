@@ -1,15 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts, Typography } from '../constants/theme';
 import { PixelIcon } from '../components/PixelIcon';
-import { AppState } from '../utils/storage';
+import { AppState, DayRecord, computeStreak } from '../utils/storage';
 import {
   CloudLeaderboardRow, FriendRequestRow,
   loadFriendsLeaderboard, loadIncomingRequests, loadOutgoingRequests,
   findUsersByName, sendFriendRequest, respondToFriendRequest, removeFriend,
 } from '../utils/supabaseStorage';
+import { loadFocusLog, saveFocusLog } from '../utils/focusLog';
 import { FocusGoalScreen } from './FocusGoalScreen';
 import { useHaptics } from '../hooks/useHaptics';
 
@@ -77,6 +78,40 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
     setGoalModalOpen(false);
     if (!appState.user) return;
     onStateChange({ ...appState, user: { ...appState.user, dailyFocusGoalMins: mins } });
+  };
+
+  // Dev-only shortcuts for testing streak/progress logic without waiting on
+  // real time — gated by __DEV__ so this is simply absent from a production
+  // build, no manual removal needed before shipping.
+  const handleAddFocusMinutes = async () => {
+    await buttonPress();
+    const log = await loadFocusLog();
+    log.push({ date: new Date().toDateString(), mins: 30 });
+    await saveFocusLog(log);
+    Alert.alert('Dev', '+30 min added to today’s focus log. Reopen Today to see it.');
+  };
+
+  const handleAddStreakDay = () => {
+    buttonPress();
+    const nextOffset = appState.streak + 1;
+    const d = new Date();
+    d.setDate(d.getDate() - nextOffset);
+    const record: DayRecord = { date: d.toDateString(), tasks: [], completedCount: 1, totalCount: 1, consistency: 100 };
+    const history = [...appState.history.filter(h => h.date !== record.date), record].slice(-60);
+    const streak = computeStreak(history);
+    onStateChange({
+      ...appState,
+      history,
+      streak,
+      longestStreak: Math.max(appState.longestStreak, streak),
+    });
+  };
+
+  const handleResetTestData = async () => {
+    buttonPress();
+    await saveFocusLog([]);
+    onStateChange({ ...appState, history: [], streak: 0, longestStreak: 0, totalTasksCompleted: 0 });
+    Alert.alert('Dev', 'Streak, history, and focus log reset.');
   };
 
   const user = appState.user;
@@ -191,6 +226,23 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
           ))
         )}
 
+        {__DEV__ && (
+          <>
+            <Text style={styles.sectionLabel}>Developer Tools</Text>
+            <View style={styles.devRow}>
+              <TouchableOpacity style={styles.devBtn} onPress={handleAddFocusMinutes}>
+                <Text style={styles.devBtnText}>+30 min today</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.devBtn} onPress={handleAddStreakDay}>
+                <Text style={styles.devBtnText}>+1 day streak</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.devBtn, styles.devBtnDanger]} onPress={handleResetTestData}>
+                <Text style={[styles.devBtnText, styles.devBtnDangerText]}>Reset test data</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
         <View style={{ height: 60 }} />
       </ScrollView>
 
@@ -242,6 +294,15 @@ const styles = StyleSheet.create({
 
   sectionLabel: { ...Typography.labelSmall, color: Colors.textSecondary, marginBottom: Spacing.sm, marginTop: Spacing.md },
   emptyText: { ...Typography.bodySmall, color: Colors.textMuted },
+
+  devRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  devBtn: {
+    backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md,
+    borderWidth: 1, borderColor: Colors.border, paddingVertical: 10, paddingHorizontal: 14,
+  },
+  devBtnText: { fontSize: 13, fontFamily: Fonts.semibold, color: Colors.textSecondary },
+  devBtnDanger: { borderColor: Colors.danger + '55' },
+  devBtnDangerText: { color: Colors.danger },
 
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
