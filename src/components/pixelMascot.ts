@@ -5,7 +5,7 @@
 // distance from a core point, outlined from the silhouette) instead of a
 // hand-traced bitmap, so it stays crisp at any size.
 import {
-  Mask, emptyMask, circleMask, union, IconBuilder, PixelIconDef,
+  Mask, circleMask, tongueMask, union, IconBuilder, PixelIconDef,
 } from '../utils/pixelMask';
 import { FLAME_PALETTES } from './flameShapes';
 
@@ -17,28 +17,13 @@ const FACE_DARK = '#1A0800';
 const WISP_GREY = '#7A7A7A';
 const WISP_GREY_FAINT = '#4E4E4E';
 
-// A cone that curves as it rises (cx drifts by `lean` toward the tip)
-// instead of a straight-sided wedge — reads as a flame lick, not a
-// triangle. `pow` > 1 keeps it narrow near the tip longer before flaring.
-function tongueMask(y0: number, y1: number, cxBase: number, maxHalf: number, lean: number, pow: number): Mask {
-  const grid = emptyMask(COLS, ROWS);
-  const span = y1 - y0;
-  for (let y = y0; y <= y1; y++) {
-    const t = (y - y0) / span; // 0 at tip, 1 at base
-    const halfWidth = maxHalf * Math.pow(t, pow);
-    const cx = cxBase + lean * (1 - t);
-    for (let x = 0; x < COLS; x++) if (Math.abs(x - cx) <= halfWidth) grid[y][x] = true;
-  }
-  return grid;
-}
-
 function buildBody(): Mask {
   const belly = circleMask(COLS, ROWS, CX, 19.5, 10, 8.5);
   // One main tongue that hooks left toward its tip, plus a shorter,
   // lower secondary flick to its right — reads as a single flame with a
   // subordinate lick, not a symmetric double-peaked crown.
-  const mainTongue = tongueMask(3, 15, CX, 9, -2.4, 0.85);
-  const sideTongue = tongueMask(9, 14, CX + 5.5, 3.6, 0.8, 0.85);
+  const mainTongue = tongueMask(COLS, ROWS, 3, 15, CX, 9, -2.4, 0.85);
+  const sideTongue = tongueMask(COLS, ROWS, 9, 14, CX + 5.5, 3.6, 0.8, 0.85);
   return union(mainTongue, sideTongue, belly);
 }
 

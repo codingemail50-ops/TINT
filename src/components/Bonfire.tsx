@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Animated, StyleSheet } from 'react-native';
-import { PixelFlame } from './PixelFlame';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated, Easing, View, StyleSheet } from 'react-native';
+import Svg, { Rect } from 'react-native-svg';
+import { buildBonfireStage, BONFIRE_STAGE_COUNT } from './pixelBonfireStages';
 import { FLAME_PALETTES } from './flameShapes';
 
 interface Props {
@@ -20,43 +21,59 @@ function intensityForStreak(streak: number): keyof typeof FLAME_PALETTES {
   return 'warm';
 }
 
-// The home flame as a bonfire: starts small and dim over a pile of logs at
-// the start of the day, and grows bigger/brighter as today's focus time
-// climbs toward the daily goal — separate from the streak-driven color tier,
-// so "how lit is it right now" and "how hot has the streak made it" read as
-// two different signals. Size changes only between sessions (not something
-// the user watches happen live), so it just re-renders at the new size;
-// opacity is animated since that dimming/brightening is worth the polish.
-export const Bonfire: React.FC<Props> = ({ progress, streak, maxSize = 150 }) => {
-  const clamped = Math.max(0, Math.min(1, progress));
-  const minSize = maxSize * 0.42;
-  const size = minSize + (maxSize - minSize) * clamped;
-  const targetOpacity = 0.5 + 0.5 * clamped;
-  const intensity = intensityForStreak(streak);
+// Which of the 6 growth stages (ash -> kindling -> small flame -> ... ->
+// biggest blazing flame) today's progress toward the daily goal has reached.
+function stageForProgress(progress: number): number {
+  if (progress <= 0) return 1;
+  if (progress < 0.15) return 2;
+  if (progress < 0.35) return 3;
+  if (progress < 0.6) return 4;
+  if (progress < 1) return 5;
+  return BONFIRE_STAGE_COUNT;
+}
 
-  const opacityAnim = useRef(new Animated.Value(targetOpacity)).current;
+// The home flame as a bonfire that visibly grows through distinct stages
+// over the course of the day — unlit ash, kindling with smoke, then a
+// flame that gets bigger and gains logs/licks as focus time climbs toward
+// the goal. Color tier is a separate axis driven by the streak, so "how
+// far into today" and "how hot has the streak made it" read as two
+// different signals layered on the same sprite.
+export const Bonfire: React.FC<Props> = ({ progress, streak, maxSize = 150 }) => {
+  const clamped = Math.max(0, progress);
+  const stage = stageForProgress(clamped);
+  const intensity = intensityForStreak(streak);
+  const lit = stage >= 3;
+
+  const def = useMemo(() => buildBonfireStage(stage, intensity), [stage, intensity]);
+  const height = (maxSize / def.cols) * def.rows;
+
+  const breathe = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    Animated.timing(opacityAnim, { toValue: targetOpacity, duration: 500, useNativeDriver: true }).start();
-  }, [targetOpacity]);
-
-  const logsWidth = maxSize * 0.6;
+    if (!lit) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breathe, { toValue: 1.03, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(breathe, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [lit, breathe]);
 
   return (
     <View style={styles.wrap}>
-      <Animated.View style={{ opacity: opacityAnim, marginBottom: -6 }}>
-        <PixelFlame size={size} state="flicker" intensity={intensity} />
+      <Animated.View style={{ transform: [{ scale: lit ? breathe : 1 }] }}>
+        <Svg width={maxSize} height={height} viewBox={`0 0 ${def.cols} ${def.rows}`}>
+          {def.cells.map((c, i) => (
+            <Rect key={i} x={c.x} y={c.y} width={1} height={1} fill={c.color} />
+          ))}
+        </Svg>
       </Animated.View>
-      <View style={[styles.logs, { width: logsWidth }]}>
-        <View style={[styles.log, { width: logsWidth, transform: [{ rotate: '-3deg' }] }]} />
-        <View style={[styles.log, { width: logsWidth * 0.85, marginTop: -6, transform: [{ rotate: '4deg' }] }]} />
-      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center' },
-  logs: { alignItems: 'center' },
-  log: { height: 10, borderRadius: 5, backgroundColor: '#6B4226', borderWidth: 1, borderColor: '#3A2415' },
 });

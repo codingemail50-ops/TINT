@@ -93,6 +93,34 @@ export function intersect(a: Mask, b: Mask): Mask {
   return grid;
 }
 
+// A cone that curves as it rises — cx drifts by `lean` toward the tip
+// instead of a straight-sided wedge — so it reads as a flame lick, not a
+// triangle. `pow` > 1 keeps it narrow near the tip longer before flaring.
+export function tongueMask(cols: number, rows: number, y0: number, y1: number, cxBase: number, maxHalf: number, lean: number, pow: number): Mask {
+  const grid = emptyMask(cols, rows);
+  const span = y1 - y0;
+  for (let y = y0; y <= y1; y++) {
+    const t = (y - y0) / span; // 0 at tip, 1 at base
+    const halfWidth = maxHalf * Math.pow(t, pow);
+    const cx = cxBase + lean * (1 - t);
+    for (let x = 0; x < cols; x++) if (Math.abs(x - cx) <= halfWidth) grid[y][x] = true;
+  }
+  return grid;
+}
+
+// A straight bar of constant width running from (cxAt0, y0) to (cxAt1, y1)
+// — a cheap way to draw an angled log/stick without needing real rotation.
+export function barMask(cols: number, rows: number, y0: number, y1: number, cxAt0: number, cxAt1: number, halfWidth: number): Mask {
+  const grid = emptyMask(cols, rows);
+  const span = y1 - y0 || 1;
+  for (let y = y0; y <= y1; y++) {
+    const t = (y - y0) / span;
+    const cx = cxAt0 + (cxAt1 - cxAt0) * t;
+    for (let x = 0; x < cols; x++) if (Math.abs(x - cx) <= halfWidth) grid[y][x] = true;
+  }
+  return grid;
+}
+
 export function belowRow(cols: number, rows: number, y: number, keepBelow: boolean): Mask {
   const grid = emptyMask(cols, rows);
   for (let yy = 0; yy < rows; yy++) {
