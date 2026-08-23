@@ -11,6 +11,7 @@ import {
   findUsersByName, sendFriendRequest, respondToFriendRequest, removeFriend,
 } from '../utils/supabaseStorage';
 import { loadFocusLog, saveFocusLog } from '../utils/focusLog';
+import { saveDistractionLog } from '../utils/distractionLog';
 import { FocusGoalScreen } from './FocusGoalScreen';
 import { useHaptics } from '../hooks/useHaptics';
 
@@ -110,8 +111,9 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
   const handleResetTestData = async () => {
     buttonPress();
     await saveFocusLog([]);
+    await saveDistractionLog([]);
     onStateChange({ ...appState, history: [], streak: 0, longestStreak: 0, totalTasksCompleted: 0 });
-    Alert.alert('Dev', 'Streak, history, and focus log reset.');
+    Alert.alert('Dev', 'Streak, history, focus log, and distraction log reset.');
   };
 
   const user = appState.user;

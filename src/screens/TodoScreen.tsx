@@ -19,11 +19,20 @@ import { UCEEDCountdown, NIDCountdown, NIFTCountdown } from '../components/ExamC
 import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog } from '../utils/supabaseStorage';
 import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '../utils/focusLog';
+import { DistractionLogEntry, loadDistractionLog, computeDistractedToday } from '../utils/distractionLog';
 
 const CATEGORIES = [
   'Study', 'Practice', 'Revision', 'Reading', 'Writing',
   'Drawing', 'Design', 'Mathematics', 'Physics', 'Chemistry', 'Other',
 ];
+
+function formatHrsMins(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h${m}m`;
+}
 
 // ── Duration Slider ──────────────────────────────────────────────────────────
 const PRESETS = [30, 60, 90, 120];
@@ -183,6 +192,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   const [tasks, setTasks]           = useState<Task[]>([]);
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
+  const [distractionLog, setDistractionLog] = useState<DistractionLogEntry[]>([]);
 
   // Tapping an incomplete task pops up the Focus screen (same squiggly-circle
   // UI as the Focus tab) pre-loaded with that task and running — this just
@@ -230,6 +240,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
       }
     })();
     loadFocusLog().then(setFocusLog);
+    loadDistractionLog().then(setDistractionLog);
   }, []);
 
   const viewingPast = selectedDate !== todayStr;
@@ -240,6 +251,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   const todoGroup = displayTasks.filter(t => !t.completed && t.id !== timerTaskId);
   const doneGroup = displayTasks.filter(t => t.completed);
   const focusToday = computeFocusStats(focusLog).today;
+  const distractedToday = computeDistractedToday(distractionLog);
 
   const completedCount = displayTasks.filter(t => t.completed).length;
   const totalCount     = displayTasks.length;
@@ -425,34 +437,37 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
       >
         {!viewingPast && (
           <>
-            {/* Fire — the hero, like Opal's crystal. Grows/brightens with
-                today's focus progress; color tier escalates with streak. */}
+            {/* Fire — the hero, like Opal's crystal. Grows through discrete
+                stages with today's focus progress; color tier escalates
+                with streak. Compact now — a header widget, not a centerpiece. */}
             <TouchableOpacity style={styles.heroFlame} onPress={onNavigateFocus} activeOpacity={0.85}>
               <Bonfire
                 progress={focusToday / (appState.user?.dailyFocusGoalMins || 60)}
                 streak={appState.streak}
-                maxSize={150}
+                maxSize={92}
               />
             </TouchableOpacity>
 
-            {/* Exam countdown, right under the hero — leads to Analytics */}
-            {examTypes.length > 0 && (
-              <TouchableOpacity style={styles.countdownStack} onPress={onNavigateAnalytics} activeOpacity={0.85}>
-                <UCEEDCountdown examTypes={examTypes} />
-                <NIDCountdown examTypes={examTypes} />
-                <NIFTCountdown examTypes={examTypes} />
-              </TouchableOpacity>
-            )}
-
-            {/* Focus / progress stats row — Focus pill leads to Analytics */}
+            {/* Focused / Distracted / Progress stats row — Focused pill
+                leads to Analytics. Distracted is honest, not simulated:
+                time the app was backgrounded during an active focus
+                session (see distractionLog.ts) — not real per-app usage,
+                which needs a native build we don't have. */}
             <View style={styles.pillRow}>
               <TouchableOpacity style={styles.pillCol} onPress={onNavigateAnalytics} activeOpacity={0.75}>
                 <View style={[styles.pill, { borderColor: Colors.primary }]}>
                   <Ionicons name="flash" size={14} color={Colors.primary} />
-                  <Text style={[styles.pillVal, { color: Colors.primary }]}>{focusToday}</Text>
+                  <Text style={[styles.pillVal, { color: Colors.primary }]}>{formatHrsMins(focusToday)}</Text>
                 </View>
-                <Text style={styles.pillLabel}>Focus</Text>
+                <Text style={styles.pillLabel}>Focused</Text>
               </TouchableOpacity>
+              <View style={styles.pillCol}>
+                <View style={[styles.pill, { borderColor: Colors.textMuted }]}>
+                  <Ionicons name="eye-off-outline" size={14} color={Colors.textMuted} />
+                  <Text style={[styles.pillVal, { color: Colors.textMuted }]}>{formatHrsMins(distractedToday)}</Text>
+                </View>
+                <Text style={styles.pillLabel}>Distracted</Text>
+              </View>
               <View style={styles.pillCol}>
                 <View style={[styles.pill, { borderColor: Colors.success }]}>
                   <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
@@ -461,6 +476,15 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                 <Text style={styles.pillLabel}>Progress</Text>
               </View>
             </View>
+
+            {/* Exam countdown — leads to Analytics */}
+            {examTypes.length > 0 && (
+              <TouchableOpacity style={styles.countdownStack} onPress={onNavigateAnalytics} activeOpacity={0.85}>
+                <UCEEDCountdown examTypes={examTypes} />
+                <NIDCountdown examTypes={examTypes} />
+                <NIFTCountdown examTypes={examTypes} />
+              </TouchableOpacity>
+            )}
           </>
         )}
 
@@ -732,14 +756,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 26,
   },
 
-  pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginBottom: Spacing.xl },
+  pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.sm, marginBottom: Spacing.xl },
   pillCol: { alignItems: 'center', gap: 6 },
   pill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 5,
     borderWidth: 1.5, borderRadius: BorderRadius.full,
-    paddingHorizontal: 14, paddingVertical: 7,
+    paddingHorizontal: 11, paddingVertical: 7,
   },
-  pillVal: { fontFamily: Fonts.retro, fontSize: 16 },
+  pillVal: { fontFamily: Fonts.retro, fontSize: 14 },
   pillLabel: { fontSize: 11, color: Colors.textSecondary, fontFamily: Fonts.regular },
   progressSection: { gap: 6 },
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

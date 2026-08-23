@@ -15,6 +15,7 @@ import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog } from '../utils/supabaseStorage';
 import { StorageService } from '../utils/storage';
 import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '../utils/focusLog';
+import { loadDistractionLog, saveDistractionLog } from '../utils/distractionLog';
 import { PixelFlame } from '../components/PixelFlame';
 import { FlameBadge } from '../components/FlameBadge';
 import { KnurledDial } from '../components/KnurledDial';
@@ -109,6 +110,15 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
   const endTimeRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wasPausedBeforeConfirm = useRef(false);
+  // Time the app spent backgrounded while a session was actively running —
+  // the one "distracted" signal we can measure honestly without a native
+  // module (see distractionLog.ts).
+  const distractedSecondsRef = useRef(0);
+  const backgroundedAtRef = useRef<number | null>(null);
+  const phaseRef = useRef<Phase>(phase);
+  const pausedRef = useRef(paused);
+  phaseRef.current = phase;
+  pausedRef.current = paused;
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const dialFadeAnim = useRef(new Animated.Value(1)).current;
@@ -164,6 +174,14 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
     await saveFocusLog(updatedLog);
     setFocusLog(updatedLog);
 
+    const distractedMins = Math.round(distractedSecondsRef.current / 60);
+    distractedSecondsRef.current = 0;
+    backgroundedAtRef.current = null;
+    if (distractedMins > 0) {
+      const distractionLog = await loadDistractionLog();
+      await saveDistractionLog([...distractionLog, { date: new Date().toDateString(), mins: distractedMins }]);
+    }
+
     await taskComplete();
 
     if (userId) {
@@ -186,8 +204,14 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
 
   useEffect(() => {
     const onChange = (state: AppStateStatus) => {
-      if (state === 'active' && endTimeRef.current > 0 && !paused) {
-        tick();
+      if (state === 'active') {
+        if (backgroundedAtRef.current !== null) {
+          distractedSecondsRef.current += (Date.now() - backgroundedAtRef.current) / 1000;
+          backgroundedAtRef.current = null;
+        }
+        if (endTimeRef.current > 0 && !paused) tick();
+      } else if (phaseRef.current === 'active' && !pausedRef.current && backgroundedAtRef.current === null) {
+        backgroundedAtRef.current = Date.now();
       }
     };
     const sub = RNAppState.addEventListener('change', onChange);
@@ -206,6 +230,8 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
   const resetToSetup = useCallback(() => {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
     endTimeRef.current = 0;
+    distractedSecondsRef.current = 0;
+    backgroundedAtRef.current = null;
     setPaused(false);
     setConfirmOpen(false);
     setSheetOpen(false);
@@ -233,6 +259,8 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
       Animated.timing(dialFadeAnim, { toValue: 0, duration: 160, useNativeDriver: true }),
     ]).start(() => {
       endTimeRef.current = Date.now() + duration * 60 * 1000;
+      distractedSecondsRef.current = 0;
+      backgroundedAtRef.current = null;
       setTimeLeft(duration * 60);
       setPaused(false);
       setPhase('active');
