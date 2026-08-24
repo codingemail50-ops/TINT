@@ -57,9 +57,24 @@ export function getLast7DaysFocus(log: FocusLogEntry[]): { day: string; mins: nu
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MS_PER_DAY = 86400000;
 
+// Any day with a real focus session logged (not "no data") — the honest
+// signal for "did the user actually focus," separate from task-completion
+// consistency %. Used for the binary orange/grey heatmap.
+export function getFocusHeatmap(log: FocusLogEntry[], days = 70): { date: string; focused: boolean }[] {
+  const byDate = new Set(log.filter(e => e.mins > 0).map(e => e.date));
+  const result: { date: string; focused: boolean }[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toDateString();
+    result.push({ date: dateStr, focused: byDate.has(dateStr) });
+  }
+  return result;
+}
+
 export type FocusTimeframe = 'week' | 'month' | 'year' | 'allTime';
 
-export interface FocusBucket { label: string; mins: number }
+export interface FocusBucket { label: string; mins: number; distractedMins: number; dateLabel: string }
 
 export interface FocusSummary {
   buckets: FocusBucket[];
@@ -70,11 +85,27 @@ export interface FocusSummary {
   avgSessionsPerDay: number;
 }
 
+function sumMins(log: { date: string; mins: number }[], dateStr: string): number {
+  let sum = 0;
+  for (const e of log) if (e.date === dateStr) sum += e.mins;
+  return sum;
+}
+
+function shortDate(d: Date): string {
+  return `${MONTH_LABELS[d.getMonth()]} ${d.getDate()}`;
+}
+
 // Buckets + rollup totals for a timeframe, so the Insights screen can show
 // one consistent "Duration / Sessions / Avg per day" summary no matter
 // which tab is selected — averages are per calendar day elapsed in the
 // period, not per active day, matching how the reference design reads.
-export function getFocusSummary(log: FocusLogEntry[], timeframe: FocusTimeframe): FocusSummary {
+// distractionLog is optional so callers that don't care about the
+// focus-vs-distracted chart (or don't have the data loaded yet) can omit it.
+export function getFocusSummary(
+  log: FocusLogEntry[],
+  timeframe: FocusTimeframe,
+  distractionLog: { date: string; mins: number }[] = []
+): FocusSummary {
   const now = new Date();
 
   if (timeframe === 'week') {
@@ -83,10 +114,11 @@ export function getFocusSummary(log: FocusLogEntry[], timeframe: FocusTimeframe)
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const entries = log.filter(e => e.date === d.toDateString());
+      const dateStr = d.toDateString();
+      const entries = log.filter(e => e.date === dateStr);
       const mins = entries.reduce((s, e) => s + e.mins, 0);
       totalMins += mins; sessionCount += entries.length;
-      buckets.push({ label: DAY_LABELS[d.getDay()], mins });
+      buckets.push({ label: DAY_LABELS[d.getDay()], mins, distractedMins: sumMins(distractionLog, dateStr), dateLabel: shortDate(d) });
     }
     return { buckets, periodLabel: 'This Week', totalMins, sessionCount, avgMinsPerDay: totalMins / 7, avgSessionsPerDay: sessionCount / 7 };
   }
@@ -97,11 +129,12 @@ export function getFocusSummary(log: FocusLogEntry[], timeframe: FocusTimeframe)
     const buckets: FocusBucket[] = [];
     let totalMins = 0, sessionCount = 0;
     for (let day = 1; day <= daysElapsed; day++) {
-      const dateStr = new Date(year, month, day).toDateString();
+      const d = new Date(year, month, day);
+      const dateStr = d.toDateString();
       const entries = log.filter(e => e.date === dateStr);
       const mins = entries.reduce((s, e) => s + e.mins, 0);
       totalMins += mins; sessionCount += entries.length;
-      buckets.push({ label: day === 1 || day % 5 === 1 ? String(day) : '', mins });
+      buckets.push({ label: day === 1 || day % 5 === 1 ? String(day) : '', mins, distractedMins: sumMins(distractionLog, dateStr), dateLabel: shortDate(d) });
     }
     return { buckets, periodLabel: `${MONTH_LABELS[month]} ${year}`, totalMins, sessionCount, avgMinsPerDay: totalMins / daysElapsed, avgSessionsPerDay: sessionCount / daysElapsed };
   }
@@ -117,9 +150,13 @@ export function getFocusSummary(log: FocusLogEntry[], timeframe: FocusTimeframe)
         const d = new Date(e.date);
         return !isNaN(d.getTime()) && d.getFullYear() === year && d.getMonth() === m;
       });
+      const distracted = distractionLog.filter(e => {
+        const d = new Date(e.date);
+        return !isNaN(d.getTime()) && d.getFullYear() === year && d.getMonth() === m;
+      }).reduce((s, e) => s + e.mins, 0);
       const mins = entries.reduce((s, e) => s + e.mins, 0);
       totalMins += mins; sessionCount += entries.length;
-      buckets.push({ label: MONTH_LABELS[m], mins });
+      buckets.push({ label: MONTH_LABELS[m], mins, distractedMins: distracted, dateLabel: `${MONTH_LABELS[m]} ${year}` });
     }
     return { buckets, periodLabel: String(year), totalMins, sessionCount, avgMinsPerDay: totalMins / daysElapsed, avgSessionsPerDay: sessionCount / daysElapsed };
   }
@@ -130,12 +167,14 @@ export function getFocusSummary(log: FocusLogEntry[], timeframe: FocusTimeframe)
   const daysElapsed = Math.max(1, Math.round((now.getTime() - earliest.getTime()) / MS_PER_DAY) + 1);
 
   const byMonth = new Map<string, number>();
+  const byMonthDistracted = new Map<string, number>();
   const orderedKeys: string[] = [];
   const cursor = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth(), 1);
   while (cursor <= end) {
     const key = `${cursor.getFullYear()}-${cursor.getMonth()}`;
     byMonth.set(key, 0);
+    byMonthDistracted.set(key, 0);
     orderedKeys.push(key);
     cursor.setMonth(cursor.getMonth() + 1);
   }
@@ -147,9 +186,15 @@ export function getFocusSummary(log: FocusLogEntry[], timeframe: FocusTimeframe)
     if (byMonth.has(key)) byMonth.set(key, (byMonth.get(key) ?? 0) + e.mins);
     totalMins += e.mins; sessionCount += 1;
   }
+  for (const e of distractionLog) {
+    const d = new Date(e.date);
+    if (isNaN(d.getTime())) continue;
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if (byMonthDistracted.has(key)) byMonthDistracted.set(key, (byMonthDistracted.get(key) ?? 0) + e.mins);
+  }
   const buckets = orderedKeys.map(key => {
-    const m = Number(key.split('-')[1]);
-    return { label: MONTH_LABELS[m], mins: byMonth.get(key) ?? 0 };
+    const [y, m] = key.split('-').map(Number);
+    return { label: MONTH_LABELS[m], mins: byMonth.get(key) ?? 0, distractedMins: byMonthDistracted.get(key) ?? 0, dateLabel: `${MONTH_LABELS[m]} ${y}` };
   });
   return { buckets, periodLabel: 'All Time', totalMins, sessionCount, avgMinsPerDay: totalMins / daysElapsed, avgSessionsPerDay: sessionCount / daysElapsed };
 }

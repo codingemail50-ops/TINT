@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, PanResponder } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
-import { AppState, getHeatmapData } from '../utils/storage';
-import { FocusLogEntry, loadFocusLog, FocusTimeframe, FocusBucket, getFocusSummary } from '../utils/focusLog';
+import { AppState } from '../utils/storage';
+import { FocusLogEntry, loadFocusLog, FocusTimeframe, FocusBucket, getFocusSummary, getFocusHeatmap } from '../utils/focusLog';
+import { DistractionLogEntry, loadDistractionLog } from '../utils/distractionLog';
 import { REALITY_CHECK_MESSAGES } from '../data/examPresets';
 
 interface Props { appState: AppState }
@@ -15,34 +16,99 @@ function formatHours(mins: number): string {
   return h >= 10 || Number.isInteger(h) ? `${Math.round(h)}h` : `${h.toFixed(1)}h`;
 }
 
-// ── Time-spent bar chart, monochrome ─────────────────────────────────────────
-const CHART_H = 150;
-const CHART_W = Dimensions.get('window').width - (Spacing.xl + Spacing.md) * 2;
+function formatMinsShort(mins: number): string {
+  if (mins < 60) return `${Math.round(mins)}m`;
+  const h = Math.floor(mins / 60), m = Math.round(mins % 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
 
-const TimeBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
-  const maxVal = Math.max(...buckets.map(b => b.mins), 1);
-  const barW = Math.max(3, Math.min(20, CHART_W / buckets.length - 4));
+// ── Focus-vs-distracted bar chart, orange over white ─────────────────────────
+const CHART_H = 150;
+const YAXIS_W = 26;
+const TOOLTIP_W = 132;
+const CHART_W = Dimensions.get('window').width - (Spacing.xl + Spacing.md) * 2;
+const PLOT_W = CHART_W - YAXIS_W;
+
+const DualBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
+  const [touchIdx, setTouchIdx] = useState<number | null>(null);
+
+  const maxMins = Math.max(...buckets.map(b => Math.max(b.mins, b.distractedMins)), 60);
+  const maxHours = Math.max(1, Math.ceil(maxMins / 60));
+  const step = maxHours <= 4 ? 1 : Math.ceil(maxHours / 4);
+  const topHours = Math.ceil(maxHours / step) * step;
+  const scaleMins = topHours * 60;
+  const hourMarks: number[] = [];
+  for (let h = step; h <= topHours; h += step) hourMarks.push(h);
+
+  const colW = PLOT_W / buckets.length;
+  const barW = Math.max(3, Math.min(20, colW - 4));
+  const frontW = Math.max(2, barW * 0.55);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: e => {
+      const idx = Math.max(0, Math.min(buckets.length - 1, Math.floor(e.nativeEvent.locationX / colW)));
+      setTouchIdx(idx);
+    },
+    onPanResponderMove: e => {
+      const idx = Math.max(0, Math.min(buckets.length - 1, Math.floor(e.nativeEvent.locationX / colW)));
+      setTouchIdx(idx);
+    },
+    onPanResponderRelease: () => setTouchIdx(null),
+    onPanResponderTerminate: () => setTouchIdx(null),
+  }), [buckets.length, colW]);
+
+  const touched = touchIdx !== null ? buckets[touchIdx] : null;
+  const tooltipLeft = touchIdx !== null
+    ? Math.max(0, Math.min(PLOT_W - TOOLTIP_W, touchIdx * colW + colW / 2 - TOOLTIP_W / 2))
+    : 0;
 
   return (
     <View>
-      <View style={[chartSt.chartArea, { height: CHART_H, width: CHART_W }]}>
-        {[0.25, 0.5, 0.75, 1].map(f => (
-          <View key={f} style={[chartSt.gridline, { bottom: CHART_H * f }]} />
-        ))}
-        <View style={chartSt.barRow}>
-          {buckets.map((b, i) => (
-            <View key={i} style={chartSt.barCol}>
-              <View
-                style={[
-                  chartSt.bar,
-                  { height: Math.max(2, (b.mins / maxVal) * (CHART_H - 8)), width: barW },
-                ]}
-              />
-            </View>
+      <View style={chartSt.row}>
+        <View style={[chartSt.yAxis, { height: CHART_H }]}>
+          {hourMarks.map(h => (
+            <Text key={h} style={[chartSt.yLabel, { bottom: (h * 60 / scaleMins) * CHART_H - 6 }]}>{h}h</Text>
           ))}
+        </View>
+        <View style={[chartSt.chartArea, { height: CHART_H, width: PLOT_W }]} {...panResponder.panHandlers}>
+          {hourMarks.map(h => (
+            <View key={h} style={[chartSt.gridline, { bottom: (h * 60 / scaleMins) * CHART_H }]} />
+          ))}
+          <View style={chartSt.barRow}>
+            {buckets.map((b, i) => {
+              const focusH = Math.max(b.mins > 0 ? 2 : 0, (b.mins / scaleMins) * CHART_H);
+              const distH = Math.max(b.distractedMins > 0 ? 2 : 0, (b.distractedMins / scaleMins) * CHART_H);
+              const focusFront = b.mins <= b.distractedMins;
+              const [bottomBar, topBar] = focusFront
+                ? [{ height: distH, width: barW, backgroundColor: Colors.primary }, { height: focusH, width: frontW, backgroundColor: Colors.pop }]
+                : [{ height: focusH, width: barW, backgroundColor: Colors.pop }, { height: distH, width: frontW, backgroundColor: Colors.primary }];
+              return (
+                <View key={i} style={chartSt.barCol}>
+                  <View style={[chartSt.bar, chartSt.barBack, bottomBar]} />
+                  <View style={[chartSt.bar, chartSt.barFront, topBar]} />
+                </View>
+              );
+            })}
+          </View>
+          {touched && (
+            <View style={[chartSt.tooltip, { left: tooltipLeft, width: TOOLTIP_W }]}>
+              <Text style={chartSt.tooltipDate}>{touched.dateLabel}</Text>
+              <View style={chartSt.tooltipRow}>
+                <View style={[chartSt.tooltipDot, { backgroundColor: Colors.pop }]} />
+                <Text style={chartSt.tooltipText}>Focus {formatMinsShort(touched.mins)}</Text>
+              </View>
+              <View style={chartSt.tooltipRow}>
+                <View style={[chartSt.tooltipDot, { backgroundColor: Colors.primary }]} />
+                <Text style={chartSt.tooltipText}>Distracted {formatMinsShort(touched.distractedMins)}</Text>
+              </View>
+            </View>
+          )}
         </View>
       </View>
       <View style={chartSt.dayRow}>
+        <View style={{ width: YAXIS_W }} />
         {buckets.map((b, i) => (
           <Text key={i} style={chartSt.dayLabel}>{b.label}</Text>
         ))}
@@ -52,41 +118,38 @@ const TimeBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
 };
 
 const chartSt = StyleSheet.create({
-  chartArea: { justifyContent: 'flex-end' },
+  row: { flexDirection: 'row' },
+  yAxis: { width: YAXIS_W, justifyContent: 'flex-end' },
+  yLabel: { position: 'absolute', right: 6, fontSize: 9, color: Colors.textMuted, fontFamily: Fonts.regular },
+  chartArea: { justifyContent: 'flex-end', position: 'relative' },
   gridline: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: Colors.border },
   // Each bucket gets an equal-width flex column (matching dayRow's flex:1
   // labels below) so the bar always sits centered under its own label,
   // regardless of how many buckets the timeframe produces.
   barRow: { flexDirection: 'row', alignItems: 'flex-end', height: '100%' },
-  barCol: { flex: 1, alignItems: 'center' },
-  bar: { backgroundColor: Colors.gray[200], borderRadius: 3 },
+  barCol: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'flex-end' },
+  bar: { position: 'absolute', bottom: 0, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
+  barBack: { zIndex: 1 },
+  barFront: { zIndex: 2 },
   dayRow: { flexDirection: 'row', marginTop: Spacing.sm },
   dayLabel: { flex: 1, textAlign: 'center', fontSize: 11, color: Colors.textMuted, fontFamily: Fonts.regular },
+  tooltip: {
+    position: 'absolute', top: -8, backgroundColor: Colors.gray[900], borderRadius: BorderRadius.md,
+    padding: Spacing.sm, borderWidth: 1, borderColor: Colors.border, zIndex: 10, gap: 3,
+  },
+  tooltipDate: { fontSize: 10, color: Colors.textMuted, fontFamily: Fonts.semibold, marginBottom: 2, textTransform: 'uppercase' },
+  tooltipRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tooltipDot: { width: 7, height: 7, borderRadius: 4 },
+  tooltipText: { fontSize: 11, color: Colors.textPrimary, fontFamily: Fonts.medium },
 });
 
-// ── Current-streak-only heatmap, monochrome ──────────────────────────────────
-function grayShade(v: number): string {
-  if (v < 0) return Colors.surface;
-  if (v === 0) return Colors.gray[900];
-  const stops = [Colors.gray[900], Colors.gray[700], Colors.gray[500], Colors.gray[300], Colors.gray[100]];
-  const t = Math.min(v / 100, 1);
-  const idx = Math.min(Math.floor(t * (stops.length - 1)), stops.length - 2);
-  return stops[idx + 1];
-}
-
+// ── Focus heatmap, binary orange (focused) / grey (no show) ──────────────────
 const HEAT_CELL = 14;
 const HEAT_GAP = 3;
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-const StreakHeatmap: React.FC<{ history: AppState['history'] }> = ({ history }) => {
-  const heatVals = useMemo(() => getHeatmapData(history), [history]);
-
-  let currentStreakLen = 0;
-  for (let i = heatVals.length - 1; i >= 0; i--) {
-    if (heatVals[i].value === 100) currentStreakLen++;
-    else break;
-  }
-  const streakStart = heatVals.length - currentStreakLen;
+const StreakHeatmap: React.FC<{ focusLog: FocusLogEntry[] }> = ({ focusLog }) => {
+  const heatVals = useMemo(() => getFocusHeatmap(focusLog), [focusLog]);
 
   const d0 = new Date();
   d0.setDate(d0.getDate() - (heatVals.length - 1));
@@ -119,17 +182,9 @@ const StreakHeatmap: React.FC<{ history: AppState['history'] }> = ({ history }) 
             <View key={ci} style={[heatSt.col, { gap: HEAT_GAP }]}>
               {col.map((di, row) => {
                 if (di === null) return <View key={row} style={{ width: HEAT_CELL, height: HEAT_CELL }} />;
-                const isToday = di === heatVals.length - 1;
-                const inStreak = currentStreakLen >= 2 && di >= streakStart;
-                const bg = inStreak
-                  ? (isToday ? Colors.textPrimary : Colors.gray[300])
-                  : grayShade(heatVals[di].value);
+                const bg = heatVals[di].focused ? Colors.pop : Colors.gray[600];
                 return (
-                  <View key={row} style={[heatSt.cell, { width: HEAT_CELL, height: HEAT_CELL, backgroundColor: bg }]}>
-                    {inStreak && isToday && (
-                      <Ionicons name="checkmark" size={10} color={Colors.background} />
-                    )}
-                  </View>
+                  <View key={row} style={[heatSt.cell, { width: HEAT_CELL, height: HEAT_CELL, backgroundColor: bg }]} />
                 );
               })}
             </View>
@@ -241,13 +296,15 @@ function formatCount(n: number): string {
 // ── Main screen ───────────────────────────────────────────────────────────────
 export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
   const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
+  const [distractionLog, setDistractionLog] = useState<DistractionLogEntry[]>([]);
   const [timeframe, setTimeframe] = useState<FocusTimeframe>('month');
 
   useEffect(() => {
     loadFocusLog().then(setFocusLog);
+    loadDistractionLog().then(setDistractionLog);
   }, []);
 
-  const summary = useMemo(() => getFocusSummary(focusLog, timeframe), [focusLog, timeframe]);
+  const summary = useMemo(() => getFocusSummary(focusLog, timeframe, distractionLog), [focusLog, distractionLog, timeframe]);
 
   const consistencyLast7 = useMemo(() => {
     let sum = 0, count = 0;
@@ -323,12 +380,12 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
 
         <Text style={styles.sectionLabel}>Time Spent</Text>
         <View style={styles.sectionCard}>
-          <TimeBarChart buckets={summary.buckets} />
+          <DualBarChart buckets={summary.buckets} />
         </View>
 
         <Text style={styles.sectionLabel}>Current Streak</Text>
         <View style={styles.sectionCard}>
-          <StreakHeatmap history={appState.history} />
+          <StreakHeatmap focusLog={focusLog} />
         </View>
 
         <Text style={styles.sectionLabel}>Today by Category</Text>
@@ -360,7 +417,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 56 },
 
-  title: { ...Typography.displayMedium, color: Colors.textPrimary },
+  title: { ...Typography.displayMedium, color: Colors.pop },
   subtitle: { ...Typography.bodyMedium, color: Colors.textSecondary, marginTop: 4, marginBottom: Spacing.lg },
 
   tabRow: {
