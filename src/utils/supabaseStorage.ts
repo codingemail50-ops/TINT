@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { AppState, UserProfile, computeLifetimeConsistency } from './storage';
+import { computeFocusStats } from './focusLog';
 
 // ── Types for the user_data row ──────────────────────────────────────────────
 interface UserDataRow {
@@ -17,6 +18,9 @@ interface UserDataRow {
   today_tasks: unknown;
   today_tasks_date: string | null;
   daily_focus_goal_mins: number | null;
+  focus_today_mins?: number;
+  focus_week_mins?: number;
+  focus_alltime_mins?: number;
 }
 
 // ── Save a brand-new user to Supabase (upsert) ───────────────────────────────
@@ -146,9 +150,18 @@ export async function syncFocusLog(
   focusLog: { date: string; mins: number }[]
 ): Promise<void> {
   try {
+    // Rollups for the public leaderboard (see focus_today/week/alltime_mins
+    // in schema.sql) — recomputed here rather than trusted from elsewhere
+    // since this is the one place the full log is already at hand.
+    const stats = computeFocusStats(focusLog);
     const { error } = await supabase
       .from('user_data')
-      .update({ focus_log: focusLog })
+      .update({
+        focus_log: focusLog,
+        focus_today_mins: stats.today,
+        focus_week_mins: stats.week,
+        focus_alltime_mins: stats.allTime,
+      })
       .eq('id', userId);
 
     if (error) {
@@ -191,6 +204,9 @@ export interface CloudLeaderboardRow {
   streak: number;
   consistency: number;
   tasksCompleted: number;
+  focusTodayMins: number;
+  focusWeekMins: number;
+  focusAllTimeMins: number;
 }
 
 function toLeaderboardRow(row: UserDataRow): CloudLeaderboardRow {
@@ -202,6 +218,9 @@ function toLeaderboardRow(row: UserDataRow): CloudLeaderboardRow {
     streak: row.streak ?? 0,
     consistency: computeLifetimeConsistency(Array.isArray(row.history) ? row.history : []),
     tasksCompleted: row.total_tasks_completed ?? 0,
+    focusTodayMins: row.focus_today_mins ?? 0,
+    focusWeekMins: row.focus_week_mins ?? 0,
+    focusAllTimeMins: row.focus_alltime_mins ?? 0,
   };
 }
 
@@ -212,7 +231,7 @@ export async function loadLeaderboard(): Promise<CloudLeaderboardRow[]> {
     // that table to the owning user's own row.
     const { data, error } = await supabase
       .from('leaderboard_view')
-      .select('id, name, avatar, exams, streak, history, total_tasks_completed')
+      .select('id, name, avatar, exams, streak, history, total_tasks_completed, focus_today_mins, focus_week_mins, focus_alltime_mins')
       .order('streak', { ascending: false })
       .limit(100);
 

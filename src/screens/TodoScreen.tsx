@@ -794,16 +794,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 22,
   },
 
-  pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginTop: 46, marginBottom: 45 },
-  pillCol: { alignItems: 'center', gap: 8 },
+  pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginTop: 25, marginBottom: 40 },
+  pillCol: { alignItems: 'center', gap: 4 },
   pill: {
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.full,
-    paddingHorizontal: 30, paddingVertical: 14,
-    minWidth: 110, alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 6,
+    minWidth: 90, alignItems: 'center',
   },
-  pillVal: { fontFamily: Fonts.retro, fontSize: 20, color: Colors.background },
-  pillLabel: { fontSize: 12, color: Colors.textSecondary, fontFamily: Fonts.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
+  pillVal: { fontFamily: Fonts.retro, fontSize: 14, color: Colors.background },
+  pillLabel: { fontSize: 10, color: Colors.textSecondary, fontFamily: Fonts.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
   progressSection: { gap: 6 },
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   progressLabel: { ...Typography.labelSmall, color: Colors.textSecondary },
@@ -817,7 +817,7 @@ const styles = StyleSheet.create({
   // Scroll / list
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md },
-  heroFlame: { alignItems: 'center', justifyContent: 'center', paddingTop: 22, paddingBottom: 0 },
+  heroFlame: { alignItems: 'center', justifyContent: 'center', paddingTop: 54, paddingBottom: 0 },
   listHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',

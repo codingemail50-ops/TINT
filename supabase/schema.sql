@@ -23,6 +23,14 @@ create table if not exists public.user_data (
   today_tasks_date text,
   focus_log jsonb default '[]'::jsonb,
   daily_focus_goal_mins int not null default 60,
+  -- Pre-aggregated focus-time rollups, recomputed client-side from
+  -- focus_log and pushed alongside it (see supabaseStorage.ts's
+  -- syncFocusLog). Kept separate from focus_log itself because these three
+  -- numbers are safe to expose on the public leaderboard — the raw log
+  -- (individual session timestamps) isn't.
+  focus_today_mins int not null default 0,
+  focus_week_mins int not null default 0,
+  focus_alltime_mins int not null default 0,
   created_at timestamptz default now()
 );
 
@@ -30,6 +38,9 @@ create table if not exists public.user_data (
 -- of this schema won't error — ALTER ... ADD COLUMN IF NOT EXISTS is a no-op
 -- when the column is already there.
 alter table public.user_data add column if not exists daily_focus_goal_mins int not null default 60;
+alter table public.user_data add column if not exists focus_today_mins int not null default 0;
+alter table public.user_data add column if not exists focus_week_mins int not null default 0;
+alter table public.user_data add column if not exists focus_alltime_mins int not null default 0;
 
 alter table public.user_data enable row level security;
 
@@ -68,7 +79,8 @@ create policy "user can update own row"
 -- base table to owner-only access. The view's column list is the entire
 -- privacy boundary here — never add email/today_tasks/focus_log to it.
 create or replace view public.leaderboard_view as
-select id, name, avatar, exams, streak, history, total_tasks_completed
+select id, name, avatar, exams, streak, history, total_tasks_completed,
+       focus_today_mins, focus_week_mins, focus_alltime_mins
 from public.user_data;
 
 grant select on public.leaderboard_view to authenticated;
@@ -141,12 +153,16 @@ grant select on public.friendships to authenticated;
 -- arbitrary user_id into a view -- this view is a function of auth.uid()
 -- alone, called with `select * from friends_leaderboard_view()`.
 create or replace function public.friends_leaderboard()
-returns table (id uuid, name text, avatar text, exams text[], streak int, history jsonb, total_tasks_completed int)
+returns table (
+  id uuid, name text, avatar text, exams text[], streak int, history jsonb, total_tasks_completed int,
+  focus_today_mins int, focus_week_mins int, focus_alltime_mins int
+)
 language sql
 security definer
 set search_path = public
 as $$
-  select u.id, u.name, u.avatar, u.exams, u.streak, u.history, u.total_tasks_completed
+  select u.id, u.name, u.avatar, u.exams, u.streak, u.history, u.total_tasks_completed,
+         u.focus_today_mins, u.focus_week_mins, u.focus_alltime_mins
   from public.user_data u
   join public.friendships f on f.friend_id = u.id
   where f.user_id = auth.uid();
