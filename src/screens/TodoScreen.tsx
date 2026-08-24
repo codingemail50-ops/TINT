@@ -471,6 +471,15 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                 <Text style={styles.pillLabel}>Distracted</Text>
               </View>
             </View>
+
+            {/* Exam countdown, right under the pills — leads to Analytics */}
+            {examTypes.length > 0 && (
+              <TouchableOpacity style={styles.countdownStack} onPress={onNavigateAnalytics} activeOpacity={0.85}>
+                <UCEEDCountdown examTypes={examTypes} />
+                <NIDCountdown examTypes={examTypes} />
+                <NIFTCountdown examTypes={examTypes} />
+              </TouchableOpacity>
+            )}
           </>
         )}
 
@@ -566,15 +575,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
               </View>
             )}
           </>
-        )}
-
-        {/* Exam countdown — pushed below the task list, leads to Analytics */}
-        {!viewingPast && examTypes.length > 0 && (
-          <TouchableOpacity style={styles.countdownStack} onPress={onNavigateAnalytics} activeOpacity={0.85}>
-            <UCEEDCountdown examTypes={examTypes} />
-            <NIDCountdown examTypes={examTypes} />
-            <NIFTCountdown examTypes={examTypes} />
-          </TouchableOpacity>
         )}
 
         {!viewingPast && completedCount > 0 && completedCount < totalCount && (
