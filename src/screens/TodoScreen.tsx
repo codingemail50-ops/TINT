@@ -414,7 +414,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
             <Text style={styles.tagline}>THERE IS</Text>
             <Text style={styles.tagline}>NO TOMORROW</Text>
           </TouchableOpacity>
-          <FlameBadge streak={appState.streak} size={46} onPress={onNavigateProfile} />
+          <FlameBadge streak={appState.streak} size={46} onPress={onNavigateProfile} avatar={appState.user?.avatar} />
         </View>
 
         {viewingPast && (
@@ -448,7 +448,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
               <Bonfire
                 progress={focusToday / (appState.user?.dailyFocusGoalMins || 60)}
                 streak={appState.streak}
-                maxSize={148}
+                maxSize={210}
               />
             </TouchableOpacity>
 
@@ -471,15 +471,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                 <Text style={styles.pillLabel}>Distracted</Text>
               </View>
             </View>
-
-            {/* Exam countdown — leads to Analytics */}
-            {examTypes.length > 0 && (
-              <TouchableOpacity style={styles.countdownStack} onPress={onNavigateAnalytics} activeOpacity={0.85}>
-                <UCEEDCountdown examTypes={examTypes} />
-                <NIDCountdown examTypes={examTypes} />
-                <NIFTCountdown examTypes={examTypes} />
-              </TouchableOpacity>
-            )}
           </>
         )}
 
@@ -575,6 +566,15 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
               </View>
             )}
           </>
+        )}
+
+        {/* Exam countdown — pushed below the task list, leads to Analytics */}
+        {!viewingPast && examTypes.length > 0 && (
+          <TouchableOpacity style={styles.countdownStack} onPress={onNavigateAnalytics} activeOpacity={0.85}>
+            <UCEEDCountdown examTypes={examTypes} />
+            <NIDCountdown examTypes={examTypes} />
+            <NIFTCountdown examTypes={examTypes} />
+          </TouchableOpacity>
         )}
 
         {!viewingPast && completedCount > 0 && completedCount < totalCount && (
@@ -784,15 +784,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 26,
   },
 
-  pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.md, marginBottom: Spacing.xl },
+  pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginBottom: Spacing.xl },
   pillCol: { alignItems: 'center', gap: 8 },
   pill: {
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.full,
-    paddingHorizontal: 18, paddingVertical: 10,
-    minWidth: 76, alignItems: 'center',
+    paddingHorizontal: 30, paddingVertical: 14,
+    minWidth: 110, alignItems: 'center',
   },
-  pillVal: { fontFamily: Fonts.retro, fontSize: 16, color: Colors.background },
+  pillVal: { fontFamily: Fonts.retro, fontSize: 20, color: Colors.background },
   pillLabel: { fontSize: 12, color: Colors.textSecondary, fontFamily: Fonts.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
   progressSection: { gap: 6 },
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -807,7 +807,7 @@ const styles = StyleSheet.create({
   // Scroll / list
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md },
-  heroFlame: { alignItems: 'center', justifyContent: 'center', paddingTop: Spacing.xs, paddingBottom: Spacing.md },
+  heroFlame: { alignItems: 'center', justifyContent: 'center', paddingTop: Spacing.md, paddingBottom: Spacing.lg },
   listHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -827,8 +827,8 @@ const styles = StyleSheet.create({
   blobEmpty: { ...Typography.bodySmall, color: Colors.textMuted, paddingVertical: Spacing.sm },
 
   addBtn: { borderRadius: BorderRadius.sm, overflow: 'hidden' },
-  addBtnGradient: { paddingHorizontal: Spacing.md, paddingVertical: 8, backgroundColor: Colors.textPrimary },
-  addBtnText: { fontFamily: Fonts.retro, fontSize: 16, color: Colors.background, letterSpacing: 0.5 },
+  addBtnGradient: { paddingHorizontal: Spacing.sm, paddingVertical: 5, backgroundColor: Colors.textPrimary },
+  addBtnText: { fontFamily: Fonts.retro, fontSize: 13, color: Colors.background, letterSpacing: 0.5 },
   backTodayBtn: {
     paddingHorizontal: Spacing.md,
     paddingVertical: 8,
