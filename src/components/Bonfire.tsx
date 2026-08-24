@@ -9,7 +9,12 @@ interface Props {
   progress: number;
   /** Current streak length in days — shifts the flame's color tier. */
   streak: number;
-  maxSize?: number;
+  /** Total vertical budget. The biggest stage (6, blazing) fills it
+   *  exactly; every other stage renders proportionally shorter at the
+   *  same px-per-grid-unit scale, so the flame's base always sits at the
+   *  bottom of this box while its tip varies — a fixed ground line, not a
+   *  fixed bounding box. */
+  maxHeight?: number;
 }
 
 // Streak-based color tiers, escalating with weekly-ish milestones — same
@@ -32,26 +37,35 @@ function stageForProgress(progress: number): number {
   return BONFIRE_STAGE_COUNT;
 }
 
+function cropRowsOf(def: ReturnType<typeof buildBonfireStage>): number {
+  const minY = Math.min(...def.cells.map(c => c.y));
+  return def.rows - minY;
+}
+
+// The tallest stage's content height, in grid units — the reference the
+// px-per-unit scale is derived from. Shape doesn't depend on intensity, so
+// this is computed once at module load, not per render.
+const TALLEST_CROP_ROWS = cropRowsOf(buildBonfireStage(BONFIRE_STAGE_COUNT));
+
 // The home flame as a bonfire that visibly grows through distinct stages
 // over the course of the day — unlit ash, kindling with smoke, then a
 // flame that gets bigger and gains logs/licks as focus time climbs toward
 // the goal. Color tier is a separate axis driven by the streak, so "how
 // far into today" and "how hot has the streak made it" read as two
 // different signals layered on the same sprite.
-export const Bonfire: React.FC<Props> = ({ progress, streak, maxSize = 150 }) => {
+export const Bonfire: React.FC<Props> = ({ progress, streak, maxHeight = 190 }) => {
   const clamped = Math.max(0, progress);
   const stage = stageForProgress(clamped);
   const intensity = intensityForStreak(streak);
   const lit = stage >= 3;
 
   const def = useMemo(() => buildBonfireStage(stage, intensity), [stage, intensity]);
-  // Every stage shares one grid sized for the tallest (stage 6), so a small
-  // early-stage sprite (ash pile, kindling) sits low in a mostly-empty
-  // canvas — cropping to the stage's actual content keeps it snug against
-  // whatever's above it instead of floating with dead space on top.
   const minY = useMemo(() => Math.min(...def.cells.map(c => c.y)), [def]);
   const cropRows = def.rows - minY;
-  const height = (maxSize / def.cols) * cropRows;
+
+  const scale = maxHeight / TALLEST_CROP_ROWS;
+  const renderedHeight = scale * cropRows;
+  const renderedWidth = scale * def.cols;
 
   const breathe = useRef(new Animated.Value(1)).current;
 
@@ -68,9 +82,9 @@ export const Bonfire: React.FC<Props> = ({ progress, streak, maxSize = 150 }) =>
   }, [lit, breathe]);
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { height: maxHeight }]}>
       <Animated.View style={{ transform: [{ scale: lit ? breathe : 1 }] }}>
-        <Svg width={maxSize} height={height} viewBox={`0 ${minY} ${def.cols} ${cropRows}`}>
+        <Svg width={renderedWidth} height={renderedHeight} viewBox={`0 ${minY} ${def.cols} ${cropRows}`}>
           {def.cells.map((c, i) => (
             <Rect key={i} x={c.x} y={c.y} width={1} height={1} fill={c.color} />
           ))}
@@ -81,5 +95,5 @@ export const Bonfire: React.FC<Props> = ({ progress, streak, maxSize = 150 }) =>
 };
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: 'center' },
+  wrap: { alignItems: 'center', justifyContent: 'flex-end' },
 });

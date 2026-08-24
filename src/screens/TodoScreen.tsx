@@ -456,7 +456,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
               <Bonfire
                 progress={focusToday / (appState.user?.dailyFocusGoalMins || 60)}
                 streak={appState.streak}
-                maxSize={210}
+                maxHeight={175}
               />
             </TouchableOpacity>
 
@@ -777,7 +777,7 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    paddingTop: 56,
+    paddingTop: 48,
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.sm,
     borderBottomWidth: 1,
@@ -790,11 +790,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   tagline: {
-    fontFamily: Fonts.pixel, fontSize: 34, color: Colors.pop,
-    letterSpacing: 1, textTransform: 'uppercase', lineHeight: 34,
+    fontFamily: Fonts.pixel, fontSize: 22, color: Colors.pop,
+    letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 22,
   },
 
-  pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginBottom: Spacing.xl },
+  pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginTop: 46, marginBottom: 45 },
   pillCol: { alignItems: 'center', gap: 8 },
   pill: {
     backgroundColor: Colors.primary,
@@ -817,7 +817,7 @@ const styles = StyleSheet.create({
   // Scroll / list
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md },
-  heroFlame: { alignItems: 'center', justifyContent: 'center', paddingTop: Spacing.md, paddingBottom: Spacing.lg },
+  heroFlame: { alignItems: 'center', justifyContent: 'center', paddingTop: 22, paddingBottom: 0 },
   listHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -825,7 +825,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   listTitle: { ...Typography.headlineSmall, color: Colors.textPrimary, flex: 1, marginRight: Spacing.sm },
-  countdownStack: { gap: Spacing.sm, marginBottom: Spacing.sm },
+  countdownStack: { gap: Spacing.sm, marginBottom: 35 },
   blob: { borderRadius: BorderRadius.xl, padding: Spacing.lg, marginBottom: Spacing.lg },
   blobPriority: { backgroundColor: Colors.pop },
   blobTodo: { backgroundColor: Colors.gray[800], borderWidth: 1, borderColor: Colors.gray[700] },
