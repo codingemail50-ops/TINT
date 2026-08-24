@@ -205,6 +205,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   const [newTaskDuration, setNewTaskDuration] = useState(60);
   const [newTaskCategory, setNewTaskCategory] = useState('Study');
   const [newTaskRepeat, setNewTaskRepeat]   = useState(false);
+  const [newTaskPriority, setNewTaskPriority] = useState(false);
 
   // Edit duration modal (long press)
   const [editingTask, setEditingTask]     = useState<Task | null>(null);
@@ -248,7 +249,8 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     ? appState.history.find(h => h.date === selectedDate)
     : null;
   const displayTasks = viewingPast ? (pastRecord?.tasks ?? []) : tasks;
-  const todoGroup = displayTasks.filter(t => !t.completed && t.id !== timerTaskId);
+  const priorityGroup = displayTasks.filter(t => !t.completed && t.id !== timerTaskId && t.priority === 'high');
+  const todoGroup = displayTasks.filter(t => !t.completed && t.id !== timerTaskId && t.priority !== 'high');
   const doneGroup = displayTasks.filter(t => t.completed);
   const focusToday = computeFocusStats(focusLog).today;
   const distractedToday = computeDistractedToday(distractionLog);
@@ -354,6 +356,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
       isCustom: true,
       completed: false,
       repeat: newTaskRepeat,
+      priority: newTaskPriority ? 'high' : undefined,
     };
     const updated = [...tasks, newTask];
     setTasks(updated);
@@ -362,6 +365,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     setNewTaskDuration(60);
     setNewTaskCategory('Study');
     setNewTaskRepeat(false);
+    setNewTaskPriority(false);
     setShowAddModal(false);
     buttonPress();
   };
@@ -521,6 +525,23 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
           </View>
         ) : (
           <>
+            {priorityGroup.length > 0 && (
+              <View style={[styles.blob, styles.blobPriority]}>
+                <Text style={[styles.blobLabel, styles.blobLabelPriority]}>High priority</Text>
+                {priorityGroup.map((task, index) => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    onToggle={handleTaskPress}
+                    onDelete={task.isCustom ? handleDelete : undefined}
+                    onLongPress={handleLongPress}
+                    index={index}
+                    variant="priority"
+                  />
+                ))}
+              </View>
+            )}
+
             <View style={[styles.blob, styles.blobTodo]}>
               <Text style={[styles.blobLabel, styles.blobLabelTodo]}>To do</Text>
               {todoGroup.length === 0 && !timerTaskId ? (
@@ -548,6 +569,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                     task={task}
                     onToggle={handleTaskPress}
                     index={index}
+                    variant="done"
                   />
                 ))}
               </View>
@@ -671,6 +693,21 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
               </View>
             </TouchableOpacity>
 
+            {/* High priority toggle */}
+            <TouchableOpacity
+              style={styles.repeatRow}
+              onPress={() => { setNewTaskPriority(p => !p); buttonPress(); }}
+              activeOpacity={0.7}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.repeatLabel}>High priority</Text>
+                <Text style={styles.repeatSub}>Pin it above the rest of today's list</Text>
+              </View>
+              <View style={[styles.toggle, newTaskPriority && styles.togglePriorityOn]}>
+                <View style={[styles.toggleThumb, newTaskPriority && styles.toggleThumbOn]} />
+              </View>
+            </TouchableOpacity>
+
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => { setShowAddModal(false); Keyboard.dismiss(); }}>
                 <Text style={styles.cancelText}>Cancel</Text>
@@ -769,8 +806,8 @@ const styles = StyleSheet.create({
 
   // Scroll / list
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg },
-  heroFlame: { alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.md },
+  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md },
+  heroFlame: { alignItems: 'center', justifyContent: 'center', paddingTop: Spacing.xs, paddingBottom: Spacing.xs },
   listHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -780,11 +817,13 @@ const styles = StyleSheet.create({
   listTitle: { ...Typography.headlineSmall, color: Colors.textPrimary, flex: 1, marginRight: Spacing.sm },
   countdownStack: { gap: Spacing.sm, marginBottom: Spacing.sm },
   blob: { borderRadius: BorderRadius.xl, padding: Spacing.lg, marginBottom: Spacing.lg },
+  blobPriority: { backgroundColor: Colors.pop },
   blobTodo: { backgroundColor: Colors.gray[800], borderWidth: 1, borderColor: Colors.gray[700] },
-  blobDone: { backgroundColor: Colors.surfaceElevated, borderWidth: 1, borderColor: Colors.gray[600] },
+  blobDone: { backgroundColor: Colors.primary },
   blobLabel: { fontSize: 12, fontFamily: Fonts.bold, textTransform: 'uppercase', letterSpacing: 1, marginBottom: Spacing.md, paddingLeft: 2 },
+  blobLabelPriority: { color: Colors.background },
   blobLabelTodo: { color: Colors.gray[300] },
-  blobLabelDone: { color: Colors.textSecondary },
+  blobLabelDone: { color: Colors.background },
   blobEmpty: { ...Typography.bodySmall, color: Colors.textMuted, paddingVertical: Spacing.sm },
 
   addBtn: { borderRadius: BorderRadius.sm, overflow: 'hidden' },
@@ -913,6 +952,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   toggleOn: { backgroundColor: Colors.primary },
+  togglePriorityOn: { backgroundColor: Colors.pop },
   toggleThumb: {
     width: 20, height: 20,
     borderRadius: 10,

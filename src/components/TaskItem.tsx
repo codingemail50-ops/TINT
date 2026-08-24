@@ -10,9 +10,12 @@ interface Props {
   onLongPress?: (id: string) => void;
   readOnly?: boolean;
   index: number;
+  /** 'priority' sits on the orange High Priority panel — inner card goes
+   *  near-black for contrast. 'done' sits on the white Done panel. */
+  variant?: 'priority' | 'done';
 }
 
-export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPress, readOnly, index }) => {
+export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPress, readOnly, index, variant }) => {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
@@ -48,7 +51,7 @@ export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPres
       readOnly && styles.containerReadOnly,
     ]}>
       <TouchableOpacity
-        style={[styles.inner, task.completed && styles.innerCompleted]}
+        style={[styles.inner, variant === 'priority' && styles.innerPriority, task.completed && styles.innerCompleted]}
         onPress={() => !readOnly && onToggle?.(task.id)}
         onLongPress={() => !readOnly && onLongPress?.(task.id)}
         delayLongPress={400}
@@ -105,10 +108,14 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     gap: Spacing.md,
   },
+  innerPriority: {
+    backgroundColor: Colors.ink,
+    borderColor: Colors.ink,
+  },
   innerCompleted: {
     opacity: 0.7,
-    backgroundColor: Colors.surface,
-    borderColor: Colors.border,
+    backgroundColor: Colors.ink,
+    borderColor: Colors.ink,
   },
   checkbox: {
     width: 30, height: 30,
@@ -119,7 +126,7 @@ const styles = StyleSheet.create({
   checkmark: { color: Colors.background, fontSize: 16, fontFamily: Fonts.bold },
   content: { flex: 1, gap: 8 },
   title: { ...Typography.bodyLarge, color: Colors.textPrimary, fontFamily: Fonts.medium, fontSize: 17 },
-  titleCompleted: { color: Colors.textMuted, textDecorationLine: 'line-through' },
+  titleCompleted: { color: Colors.textPrimary, textDecorationLine: 'line-through' },
   repeatBadge: { color: Colors.accent, fontSize: 13, fontFamily: Fonts.regular },
   meta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   categoryBadge: {

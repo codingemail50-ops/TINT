@@ -9,6 +9,9 @@ export interface Task {
   completed?: boolean;
   completedAt?: string;
   repeat?: boolean;
+  /** Set by the user when creating the task. Puts it in its own
+   *  orange-panel section above the regular To Do list. */
+  priority?: 'high';
 }
 
 // A user-authored exam+task set, for anyone whose exam isn't one of the four
