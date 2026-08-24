@@ -345,6 +345,14 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     buttonPress();
   }, [tasks]);
 
+  // ── Toggle High Priority (double-tap, or drag between To Do / High Priority) ──
+  const handleTogglePriority = useCallback(async (id: string) => {
+    const updated = tasks.map(t => (t.id === id ? { ...t, priority: t.priority === 'high' ? undefined : 'high' as const } : t));
+    setTasks(updated);
+    await StorageService.saveTodayTasks(updated);
+    buttonPress();
+  }, [tasks]);
+
   // ── Add task ─────────────────────────────────────────────────────────────────
   const handleAddTask = async () => {
     if (!newTaskTitle.trim()) return;
@@ -535,6 +543,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                     onToggle={handleTaskPress}
                     onDelete={task.isCustom ? handleDelete : undefined}
                     onLongPress={handleLongPress}
+                    onTogglePriority={handleTogglePriority}
                     index={index}
                     variant="priority"
                   />
@@ -554,6 +563,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                     onToggle={handleTaskPress}
                     onDelete={task.isCustom ? handleDelete : undefined}
                     onLongPress={handleLongPress}
+                    onTogglePriority={handleTogglePriority}
                     index={index}
                   />
                 ))
@@ -780,8 +790,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   tagline: {
-    fontFamily: Fonts.pixel, fontSize: 26, color: Colors.pop,
-    letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 26,
+    fontFamily: Fonts.pixel, fontSize: 34, color: Colors.pop,
+    letterSpacing: 1, textTransform: 'uppercase', lineHeight: 34,
   },
 
   pillRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginBottom: Spacing.xl },
