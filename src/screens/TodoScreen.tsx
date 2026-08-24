@@ -807,7 +807,7 @@ const styles = StyleSheet.create({
   // Scroll / list
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md },
-  heroFlame: { alignItems: 'center', justifyContent: 'center', paddingTop: Spacing.xs, paddingBottom: Spacing.xs },
+  heroFlame: { alignItems: 'center', justifyContent: 'center', paddingTop: Spacing.xs, paddingBottom: Spacing.md },
   listHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -820,7 +820,7 @@ const styles = StyleSheet.create({
   blobPriority: { backgroundColor: Colors.pop },
   blobTodo: { backgroundColor: Colors.gray[800], borderWidth: 1, borderColor: Colors.gray[700] },
   blobDone: { backgroundColor: Colors.primary },
-  blobLabel: { fontSize: 12, fontFamily: Fonts.bold, textTransform: 'uppercase', letterSpacing: 1, marginBottom: Spacing.md, paddingLeft: 2 },
+  blobLabel: { fontSize: 20, fontFamily: Fonts.pixel, textTransform: 'uppercase', letterSpacing: 1, marginBottom: Spacing.md, paddingLeft: 2 },
   blobLabelPriority: { color: Colors.background },
   blobLabelTodo: { color: Colors.gray[300] },
   blobLabelDone: { color: Colors.background },

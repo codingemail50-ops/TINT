@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   deleteBtn: {
     width: 28, height: 28,
     alignItems: 'center', justifyContent: 'center',
-    borderRadius: 14, backgroundColor: Colors.danger + '22',
+    borderRadius: 14,
   },
-  deleteText: { color: Colors.danger, fontSize: 18, fontFamily: Fonts.bold, lineHeight: 22 },
+  deleteText: { color: Colors.textMuted, fontSize: 18, fontFamily: Fonts.bold, lineHeight: 22 },
 });
