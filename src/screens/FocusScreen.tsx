@@ -16,6 +16,8 @@ import { syncFocusLog } from '../utils/supabaseStorage';
 import { StorageService } from '../utils/storage';
 import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '../utils/focusLog';
 import { loadDistractionLog, saveDistractionLog } from '../utils/distractionLog';
+import { saveActiveSession, loadActiveSession, clearActiveSession } from '../utils/activeFocusSession';
+import { useFocusSessionStatus } from '../context/FocusSessionContext';
 import { PixelFlame } from '../components/PixelFlame';
 import { FlameBadge } from '../components/FlameBadge';
 import { KnurledDial } from '../components/KnurledDial';
@@ -78,6 +80,9 @@ const HOLD_BORDER_RANGE = ['hsl(350, 40%, 45%)', 'hsl(350, 80%, 35%)'];
 interface ExternalTask {
   title: string;
   durationMins: number;
+  /** Task id, so an app-kill-and-relaunch mid-session can be routed back
+   *  to the right task's overlay on Today. */
+  id?: string;
 }
 
 interface Props {
@@ -88,13 +93,27 @@ interface Props {
   externalTask?: ExternalTask;
   /** Natural completion of an externalTask session — parent marks the task done. */
   onExternalFinish?: (actualSeconds: number) => void;
-  /** Leaving an externalTask session (early exit, or dismissing the done screen). */
-  onExternalExit?: () => void;
+  /** Leaving an externalTask session — early exit (actualSeconds > 0, not
+   *  yet logged by the caller, wasNaturalCompletion=false) or dismissing
+   *  the "session complete" screen after a natural finish (already logged,
+   *  wasNaturalCompletion=true). */
+  onExternalExit?: (actualSeconds: number, wasNaturalCompletion: boolean) => void;
+  /** Whether this instance is the on-screen UI right now. When false the
+   *  screen stays mounted — so its timer keeps running — but is hidden;
+   *  AppNavigator shows the mini-player instead. Defaults to true so
+   *  existing single-instance usage is unaffected. */
+  visible?: boolean;
+  /** Which shared-status slot this instance reports to, so the mini-player
+   *  can tell whether the full UI for the active session is already
+   *  showing elsewhere. */
+  sessionSource?: 'tab' | 'task';
 }
 
 type Phase = 'setup' | 'active' | 'done';
 
-export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalFinish, onExternalExit }) => {
+export const FocusScreen: React.FC<Props> = ({
+  userId, externalTask, onExternalFinish, onExternalExit, visible = true, sessionSource = 'tab',
+}) => {
   const [phase, setPhase] = useState<Phase>(externalTask ? 'active' : 'setup');
   const [duration, setDuration] = useState(externalTask?.durationMins ?? DEFAULT_DURATION);
   const [timeLeft, setTimeLeft] = useState((externalTask?.durationMins ?? DEFAULT_DURATION) * 60);
@@ -125,6 +144,8 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
   const blobEnterAnim = useRef(new Animated.Value(1)).current;
   const sheetY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const { taskComplete, buttonPress } = useHaptics();
+  const { setStatus } = useFocusSessionStatus();
+  const bootstrappedRef = useRef(false);
 
   const holdAnim = useRef(new Animated.Value(0)).current;
   const [holdLabel, setHoldLabel] = useState('Hold to end session');
@@ -132,12 +153,6 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
   const [grants, setGrants] = useState<Record<BlockingPermission, boolean>>({
     usageAccess: false, accessibility: false, overlay: false,
   });
-
-  useEffect(() => {
-    if (externalTask) {
-      endTimeRef.current = Date.now() + externalTask.durationMins * 60 * 1000;
-    }
-  }, []);
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
@@ -163,18 +178,25 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
     }).start();
   }, [sheetOpen, sheetY]);
 
-  const finishSession = useCallback(async () => {
+  // Takes the completed duration explicitly rather than reading `duration`
+  // from closure — needed because the boot-time resume path (below) may
+  // call this before a `setDuration` from the same tick has actually
+  // committed, and a stale closure there would silently log the wrong
+  // amount of time.
+  const finishSession = useCallback(async (completedDurationMins: number) => {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
     endTimeRef.current = 0;
     setTimeLeft(0);
+    setDuration(completedDurationMins);
     setPhase('done');
+    await clearActiveSession();
 
-    const entry: FocusLogEntry = { date: new Date().toDateString(), mins: duration };
+    const entry: FocusLogEntry = { date: new Date().toDateString(), mins: completedDurationMins };
     const updatedLog = [...(await loadFocusLog()), entry];
     await saveFocusLog(updatedLog);
     setFocusLog(updatedLog);
 
-    const distractedMins = Math.round(distractedSecondsRef.current / 60);
+    const distractedMins = distractedSecondsRef.current / 60;
     distractedSecondsRef.current = 0;
     backgroundedAtRef.current = null;
     if (distractedMins > 0) {
@@ -188,19 +210,68 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
       syncFocusLog(userId, updatedLog);
     }
 
-    if (externalTask) {
-      onExternalFinish?.(duration * 60);
-    }
-  }, [duration, userId, taskComplete, externalTask, onExternalFinish]);
+    onExternalFinish?.(completedDurationMins * 60);
+  }, [userId, taskComplete, onExternalFinish]);
 
   const tick = useCallback(() => {
     if (endTimeRef.current <= 0) return;
     const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
     setTimeLeft(remaining);
     if (remaining <= 0) {
-      finishSession();
+      finishSession(duration);
     }
-  }, [finishSession]);
+  }, [finishSession, duration]);
+
+  // Runs once on mount: resume a session that was still running when the
+  // app got killed (matching this instance's source — 'tab' for the Focus
+  // tab, 'task' for Today's task-linked overlay), fall back to starting a
+  // fresh externalTask session, or do nothing (plain setup screen).
+  useEffect(() => {
+    if (bootstrappedRef.current) return;
+    bootstrappedRef.current = true;
+    (async () => {
+      const saved = await loadActiveSession();
+      const matches = !!saved && saved.source === sessionSource
+        && (sessionSource === 'tab' || saved.taskId === externalTask?.id);
+
+      if (matches && saved) {
+        const plannedEnd = saved.startedAtMs + saved.durationMins * 60 * 1000;
+        const remaining = Math.max(0, Math.round((plannedEnd - Date.now()) / 1000));
+        if (remaining <= 0) {
+          endTimeRef.current = 0;
+          await finishSession(saved.durationMins);
+        } else {
+          endTimeRef.current = plannedEnd;
+          setDuration(saved.durationMins);
+          setTimeLeft(remaining);
+          setPaused(false);
+          setPhase('active');
+        }
+        return;
+      }
+
+      if (externalTask) {
+        endTimeRef.current = Date.now() + externalTask.durationMins * 60 * 1000;
+        setTimeLeft(externalTask.durationMins * 60);
+        setPhase('active');
+        void saveActiveSession({
+          source: sessionSource, startedAtMs: Date.now(), durationMins: externalTask.durationMins,
+          title: externalTask.title, taskId: externalTask.id,
+        });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    setStatus({
+      active: phase === 'active',
+      paused,
+      timeLeft,
+      title: externalTask?.title ?? 'Focus Session',
+      source: phase === 'active' ? sessionSource : null,
+    });
+  }, [phase, paused, timeLeft, externalTask?.title, sessionSource, setStatus]);
 
   useEffect(() => {
     const onChange = (state: AppStateStatus) => {
@@ -227,22 +298,45 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
     }
   }, [phase, paused, tick]);
 
-  const resetToSetup = useCallback(() => {
+  // mode 'early': hold-to-end mid-session — banks whatever time actually
+  // ran as a partial focus-log entry instead of discarding it.
+  // mode 'afterDone': just dismissing the "session complete" screen —
+  // finishSession() already logged everything, nothing more to save.
+  const exitSession = useCallback(async (mode: 'early' | 'afterDone') => {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+    const elapsedSeconds = mode === 'early' ? Math.max(0, duration * 60 - timeLeft) : 0;
+
     endTimeRef.current = 0;
-    distractedSecondsRef.current = 0;
-    backgroundedAtRef.current = null;
     setPaused(false);
     setConfirmOpen(false);
     setSheetOpen(false);
+    await clearActiveSession();
+
+    if (mode === 'early') {
+      const distractedMins = distractedSecondsRef.current / 60;
+      if (distractedMins > 0) {
+        const distractionLog = await loadDistractionLog();
+        await saveDistractionLog([...distractionLog, { date: new Date().toDateString(), mins: distractedMins }]);
+      }
+      if (elapsedSeconds > 0) {
+        const entry: FocusLogEntry = { date: new Date().toDateString(), mins: elapsedSeconds / 60 };
+        const updatedLog = [...(await loadFocusLog()), entry];
+        await saveFocusLog(updatedLog);
+        setFocusLog(updatedLog);
+        if (userId) syncFocusLog(userId, updatedLog);
+      }
+    }
+    distractedSecondsRef.current = 0;
+    backgroundedAtRef.current = null;
+
     if (externalTask) {
-      onExternalExit?.();
+      onExternalExit?.(elapsedSeconds, mode === 'afterDone');
       return;
     }
     setTimeLeft(duration * 60);
     setPhase('setup');
     dialFadeAnim.setValue(1);
-  }, [duration, externalTask, onExternalExit, dialFadeAnim]);
+  }, [duration, timeLeft, userId, externalTask, onExternalExit, dialFadeAnim]);
 
   // A quick pixel-flicker on the dial, then a cut to the timer, which
   // materializes in with a small scale/fade — reads as the dial
@@ -264,6 +358,7 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
       setTimeLeft(duration * 60);
       setPaused(false);
       setPhase('active');
+      void saveActiveSession({ source: sessionSource, startedAtMs: Date.now(), durationMins: duration, title: 'Focus Session' });
       blobEnterAnim.setValue(0);
       Animated.timing(blobEnterAnim, { toValue: 1, duration: 320, useNativeDriver: true }).start();
     });
@@ -281,10 +376,21 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
     if (paused) {
       endTimeRef.current = Date.now() + timeLeft * 1000;
       setPaused(false);
+      void saveActiveSession({
+        source: sessionSource,
+        startedAtMs: Date.now() - (duration * 60 - timeLeft) * 1000,
+        durationMins: duration,
+        title: externalTask?.title ?? 'Focus Session',
+        taskId: externalTask?.id,
+      });
     } else {
       const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
       setTimeLeft(remaining);
       setPaused(true);
+      // While paused there's no wall-clock end time to resume from — clear
+      // the descriptor so an app-kill mid-pause doesn't auto-complete or
+      // auto-resume a session that was deliberately paused.
+      void clearActiveSession();
     }
   };
 
@@ -315,7 +421,7 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
     }).start(({ finished }) => {
       if (finished) {
         setHoldLabel('Session ended');
-        resetToSetup();
+        void exitSession('early');
       }
     });
   };
@@ -357,14 +463,19 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
     await setSelfReportedGrant(permission, next);
   };
 
-  const swipeGesture = Gesture.Pan()
-    .activeOffsetY([-20, 20])
-    .failOffsetX([-25, 25])
-    .onEnd(event => {
-      'worklet';
-      if (event.translationY < -50) runOnJS(setSheetOpen)(true);
-      else if (event.translationY > 50) runOnJS(setSheetOpen)(false);
-    });
+  // Composed with Gesture.Native() so it doesn't contest the touch
+  // responder with the close/pause buttons it wraps.
+  const swipeGesture = Gesture.Simultaneous(
+    Gesture.Pan()
+      .activeOffsetY([-20, 20])
+      .failOffsetX([-25, 25])
+      .onEnd(event => {
+        'worklet';
+        if (event.translationY < -50) runOnJS(setSheetOpen)(true);
+        else if (event.translationY > 50) runOnJS(setSheetOpen)(false);
+      }),
+    Gesture.Native()
+  );
 
   const stats = computeFocusStats(focusLog);
 
@@ -373,7 +484,7 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
   const traceDashoffset = TRACE_LENGTH * (1 - pct);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, !visible && styles.hidden]} pointerEvents={visible ? 'auto' : 'none'}>
       <StatusBar style="light" />
 
       {phase !== 'active' && (
@@ -406,15 +517,15 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
 
               <View style={styles.statsRow}>
                 <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{stats.today}</Text>
+                  <Text style={styles.statValue}>{Math.round(stats.today)}</Text>
                   <Text style={styles.statLabel}>Today</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{stats.week}</Text>
+                  <Text style={styles.statValue}>{Math.round(stats.week)}</Text>
                   <Text style={styles.statLabel}>This Week</Text>
                 </View>
                 <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{stats.allTime}</Text>
+                  <Text style={styles.statValue}>{Math.round(stats.allTime)}</Text>
                   <Text style={styles.statLabel}>All-Time</Text>
                 </View>
               </View>
@@ -428,7 +539,7 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
               <Text style={styles.doneSub}>{duration} minutes of pure focus.</Text>
               <TouchableOpacity
                 style={styles.startBtn}
-                onPress={externalTask ? onExternalExit : handleStartAnother}
+                onPress={externalTask ? () => void exitSession('afterDone') : handleStartAnother}
                 activeOpacity={0.8}
               >
                 <Text style={styles.startBtnText}>{externalTask ? 'Back to Today' : 'Start Another'}</Text>
@@ -589,6 +700,7 @@ export const FocusScreen: React.FC<Props> = ({ userId, externalTask, onExternalF
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  hidden: { display: 'none' },
   scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 56, paddingBottom: Spacing.xxxl },
 
   title: { ...Typography.displayMedium, color: Colors.textPrimary },

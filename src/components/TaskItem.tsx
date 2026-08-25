@@ -9,7 +9,7 @@ import { Task } from '../data/examPresets';
 
 const SCREEN_W = Dimensions.get('window').width;
 const DELETE_THRESHOLD = SCREEN_W * 0.32;
-const PRIORITY_DRAG_THRESHOLD = 56;
+const PRIORITY_DRAG_THRESHOLD = 32;
 
 interface Props {
   task: Task;
@@ -70,6 +70,9 @@ export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPres
   const doubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .maxDuration(250)
+    // Keeps the single-tap's forced "is a second tap coming?" wait short —
+    // without this it defaults to ~500ms of felt lag on every plain tap.
+    .maxDelay(180)
     .enabled(!!onTogglePriority && !readOnly)
     .onEnd((_e, success) => { if (success) runOnJS(firePriorityToggle)(); });
 
@@ -82,7 +85,7 @@ export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPres
 
   const pan = Gesture.Pan()
     .enabled(!!canDrag)
-    .activateAfterLongPress(220)
+    .activateAfterLongPress(150)
     .onUpdate(e => {
       dragX.value = e.translationX;
       dragY.value = onTogglePriority ? e.translationY : 0;

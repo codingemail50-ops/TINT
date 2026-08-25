@@ -15,6 +15,8 @@ import { ProfileScreen } from '../screens/ProfileScreen';
 import { StorageService, AppState, UserProfile } from '../utils/storage';
 import { ExamType, CustomExam } from '../data/examPresets';
 import { supabase } from '../lib/supabase';
+import { FocusSessionProvider, useFocusSessionStatus } from '../context/FocusSessionContext';
+import { FocusMiniPlayer } from '../components/FocusMiniPlayer';
 import {
   loadUserFromSupabase,
   syncAppStateToSupabase,
@@ -69,7 +71,13 @@ interface OnboardingDraft {
   email: string;
 }
 
-export const AppNavigator: React.FC = () => {
+export const AppNavigator: React.FC = () => (
+  <FocusSessionProvider>
+    <AppNavigatorInner />
+  </FocusSessionProvider>
+);
+
+const AppNavigatorInner: React.FC = () => {
   const [screen, setScreen] = useState<Screen>('boot');
   const [appState, setAppState] = useState<AppState>({
     user: null,
@@ -92,6 +100,7 @@ export const AppNavigator: React.FC = () => {
   const [previewFromHome, setPreviewFromHome] = useState(false);
   const tabFadeAnim = useRef(new Animated.Value(0)).current;
   const userIdRef = useRef<string | null>(null);
+  const { status: focusStatus } = useFocusSessionStatus();
   const draftRef = useRef<OnboardingDraft>({ avatar: 'star', examTypes: [], dailyFocusGoalMins: 60, name: '', email: '' });
 
   // No splash animation — resolve session/local state directly on mount.
@@ -234,15 +243,33 @@ export const AppNavigator: React.FC = () => {
     }
   };
 
-  const swipeGesture = Gesture.Pan()
-    .enabled(showTabs)
-    .activeOffsetX([-25, 25])
-    .failOffsetY([-20, 20])
-    .onEnd(event => {
-      'worklet';
-      if (Math.abs(event.translationX) < 60) return;
-      runOnJS(goRelative)(event.translationX < 0 ? 1 : -1);
-    });
+  // Composed with Gesture.Native() so this doesn't compete for the touch
+  // responder with every button/touchable underneath it — without that,
+  // just starting to evaluate whether a touch *might* become a swipe was
+  // enough to occasionally swallow ordinary taps everywhere in the app.
+  const swipeGesture = Gesture.Simultaneous(
+    Gesture.Pan()
+      .enabled(showTabs)
+      .activeOffsetX([-35, 35])
+      .failOffsetY([-20, 20])
+      .onEnd(event => {
+        'worklet';
+        if (Math.abs(event.translationX) < 60) return;
+        runOnJS(goRelative)(event.translationX < 0 ? 1 : -1);
+      }),
+    Gesture.Native()
+  );
+
+  // Mini-player shows whenever a session is actively running and its own
+  // full-screen UI isn't the thing currently on screen (Focus tab for a
+  // standalone session, Today's task-linked overlay for a task session).
+  const focusUIOnScreen = (focusStatus.source === 'tab' && screen === 'focus')
+    || (focusStatus.source === 'task' && screen === 'todo');
+  const miniPlayerVisible = focusStatus.active && !focusUIOnScreen;
+
+  const handleMiniPlayerPress = () => {
+    navigateTo(focusStatus.source === 'task' ? 'todo' : 'focus');
+  };
 
   return (
     <View style={styles.root}>
@@ -268,20 +295,43 @@ export const AppNavigator: React.FC = () => {
           {screen === 'focusGoal' && (
             <FocusGoalScreen onComplete={handleFocusGoalComplete} onBack={() => setScreen('createAccount')} />
           )}
-          {screen === 'todo' && (
-            <TodoScreen
-              appState={appState}
-              onStateChange={handleStateChange}
-              userId={userIdRef.current ?? undefined}
-              onNavigateFocus={() => navigateTo('focus')}
-              onNavigateProfile={() => navigateTo('profile')}
-              onNavigateAnalytics={() => navigateTo('productivity')}
-              onPreviewOnboarding={handleOpenOnboardingPreview}
-            />
+          {/* The four tab screens stay mounted (visibility toggled via
+              display:none) instead of being swapped in and out of the tree —
+              otherwise navigating away destroys their state, which is
+              exactly what was happening to a running Focus session the
+              moment you switched tabs. */}
+          {showTabs && (
+            <View style={[styles.tabScreenSlot, screen !== 'todo' && styles.hidden]}>
+              <TodoScreen
+                appState={appState}
+                onStateChange={handleStateChange}
+                userId={userIdRef.current ?? undefined}
+                onNavigateFocus={() => navigateTo('focus')}
+                onNavigateProfile={() => navigateTo('profile')}
+                onNavigateAnalytics={() => navigateTo('productivity')}
+                onPreviewOnboarding={handleOpenOnboardingPreview}
+              />
+            </View>
           )}
-          {screen === 'focus' && <FocusScreen userId={userIdRef.current ?? undefined} />}
-          {screen === 'productivity' && <ProductivityScreen appState={appState} />}
-          {screen === 'leaderboard' && <LeaderboardScreen appState={appState} userId={userIdRef.current ?? undefined} />}
+          {showTabs && (
+            <View style={[styles.tabScreenSlot, screen !== 'focus' && styles.hidden]}>
+              <FocusScreen
+                userId={userIdRef.current ?? undefined}
+                visible={screen === 'focus'}
+                sessionSource="tab"
+              />
+            </View>
+          )}
+          {showTabs && (
+            <View style={[styles.tabScreenSlot, screen !== 'productivity' && styles.hidden]}>
+              <ProductivityScreen appState={appState} />
+            </View>
+          )}
+          {showTabs && (
+            <View style={[styles.tabScreenSlot, screen !== 'leaderboard' && styles.hidden]}>
+              <LeaderboardScreen appState={appState} userId={userIdRef.current ?? undefined} />
+            </View>
+          )}
           {screen === 'profile' && (
             <ProfileScreen
               appState={appState}
@@ -292,6 +342,16 @@ export const AppNavigator: React.FC = () => {
           )}
         </View>
       </GestureDetector>
+
+      {miniPlayerVisible && !ONBOARDING_SCREENS.has(screen) && screen !== 'profile' && (
+        <FocusMiniPlayer
+          title={focusStatus.title}
+          timeLeft={focusStatus.timeLeft}
+          paused={focusStatus.paused}
+          onPress={handleMiniPlayerPress}
+          bottomOffset={showTabs ? 100 : 24}
+        />
+      )}
 
       {showTabs && !ONBOARDING_SCREENS.has(screen) && (
         <Animated.View style={[styles.tabBar, { opacity: tabFadeAnim }]}>
@@ -331,6 +391,12 @@ const styles = StyleSheet.create({
   },
   swipeArea: {
     flex: 1,
+  },
+  tabScreenSlot: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  hidden: {
+    display: 'none',
   },
   tabBar: {
     position: 'absolute',

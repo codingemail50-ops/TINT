@@ -27,10 +27,13 @@ create table if not exists public.user_data (
   -- focus_log and pushed alongside it (see supabaseStorage.ts's
   -- syncFocusLog). Kept separate from focus_log itself because these three
   -- numbers are safe to expose on the public leaderboard — the raw log
-  -- (individual session timestamps) isn't.
-  focus_today_mins int not null default 0,
-  focus_week_mins int not null default 0,
-  focus_alltime_mins int not null default 0,
+  -- (individual session timestamps) isn't. double precision (not int) so a
+  -- session that ends early keeps its exact fractional-minute value instead
+  -- of being rounded away — that precision is what lets the leaderboard
+  -- rank ties down to the second instead of the whole minute.
+  focus_today_mins double precision not null default 0,
+  focus_week_mins double precision not null default 0,
+  focus_alltime_mins double precision not null default 0,
   created_at timestamptz default now()
 );
 
@@ -38,9 +41,14 @@ create table if not exists public.user_data (
 -- of this schema won't error — ALTER ... ADD COLUMN IF NOT EXISTS is a no-op
 -- when the column is already there.
 alter table public.user_data add column if not exists daily_focus_goal_mins int not null default 60;
-alter table public.user_data add column if not exists focus_today_mins int not null default 0;
-alter table public.user_data add column if not exists focus_week_mins int not null default 0;
-alter table public.user_data add column if not exists focus_alltime_mins int not null default 0;
+alter table public.user_data add column if not exists focus_today_mins double precision not null default 0;
+alter table public.user_data add column if not exists focus_week_mins double precision not null default 0;
+alter table public.user_data add column if not exists focus_alltime_mins double precision not null default 0;
+-- In case this file was previously run with the old `int` column type —
+-- widen in place so existing rows keep their data instead of needing a drop.
+alter table public.user_data alter column focus_today_mins type double precision;
+alter table public.user_data alter column focus_week_mins type double precision;
+alter table public.user_data alter column focus_alltime_mins type double precision;
 
 alter table public.user_data enable row level security;
 
@@ -155,7 +163,7 @@ grant select on public.friendships to authenticated;
 create or replace function public.friends_leaderboard()
 returns table (
   id uuid, name text, avatar text, exams text[], streak int, history jsonb, total_tasks_completed int,
-  focus_today_mins int, focus_week_mins int, focus_alltime_mins int
+  focus_today_mins double precision, focus_week_mins double precision, focus_alltime_mins double precision
 )
 language sql
 security definer

@@ -19,12 +19,16 @@ export function minsForPeriod(entry: LeaderboardEntry, period: LeaderboardPeriod
   return entry.focusAllTimeMins;
 }
 
-// "Hours minutes and seconds" per spec — seconds are always :00 since focus
-// time is only ever tracked to minute precision, not a fabricated number.
+// Real seconds now — totalMins can carry sub-minute precision (a session
+// that ended early logs its exact elapsed time, not a rounded minute), so
+// ranking and display both go down to the second instead of tying at the
+// whole minute.
 export function formatHMS(totalMins: number): string {
-  const h = Math.floor(totalMins / 60);
-  const m = totalMins % 60;
-  return `${h}:${String(m).padStart(2, '0')}:00`;
+  const totalSeconds = Math.round(totalMins * 60);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 // Placeholder rows so the leaderboard doesn't render empty before the

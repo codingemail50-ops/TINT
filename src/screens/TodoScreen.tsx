@@ -20,6 +20,7 @@ import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog } from '../utils/supabaseStorage';
 import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '../utils/focusLog';
 import { DistractionLogEntry, loadDistractionLog, computeDistractedToday } from '../utils/distractionLog';
+import { loadActiveSession } from '../utils/activeFocusSession';
 
 const CATEGORIES = [
   'Study', 'Practice', 'Revision', 'Reading', 'Writing',
@@ -226,18 +227,28 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   // way a preset does, just from user-typed tasks instead of BASE_TASKS.
   useEffect(() => {
     (async () => {
+      let loadedTasks: Task[];
       const saved = await StorageService.getTodayTasks();
       if (saved) {
-        setTasks(saved);
+        loadedTasks = saved;
       } else {
-        const fresh = user?.customExam
+        loadedTasks = user?.customExam
           ? user.customExam.tasks.map((t, i) => ({
               id: `custom-${i}`, title: t.title, duration: t.duration,
               category: user.customExam!.name, completed: false,
             }))
           : getCombinedPreset(examTypes).map(t => ({ ...t, completed: false }));
-        setTasks(fresh);
-        await StorageService.saveTodayTasks(fresh);
+        await StorageService.saveTodayTasks(loadedTasks);
+      }
+      setTasks(loadedTasks);
+
+      // A task-linked session was still running when the app process got
+      // killed — re-open its overlay so FocusScreen's own boot-resume logic
+      // (see activeFocusSession.ts) can pick the timing back up.
+      const active = await loadActiveSession();
+      if (active?.source === 'task' && active.taskId) {
+        const stillPending = loadedTasks.find(t => t.id === active.taskId && !t.completed);
+        if (stillPending) setTimerTaskId(active.taskId);
       }
     })();
     loadFocusLog().then(setFocusLog);
@@ -252,8 +263,9 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   const priorityGroup = displayTasks.filter(t => !t.completed && t.id !== timerTaskId && t.priority === 'high');
   const todoGroup = displayTasks.filter(t => !t.completed && t.id !== timerTaskId && t.priority !== 'high');
   const doneGroup = displayTasks.filter(t => t.completed);
-  const focusToday = computeFocusStats(focusLog).today;
-  const distractedToday = computeDistractedToday(distractionLog);
+  const focusTodayExact = computeFocusStats(focusLog).today;
+  const focusToday = Math.round(focusTodayExact);
+  const distractedToday = Math.round(computeDistractedToday(distractionLog));
 
   const completedCount = displayTasks.filter(t => t.completed).length;
   const totalCount     = displayTasks.length;
@@ -289,7 +301,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
 
   // ── Per-task countdown timer ──────────────────────────────────────────────────
   const logFocusMinutes = async (mins: number) => {
-    if (mins < 1) return;
+    if (mins <= 0) return;
     const log = await loadFocusLog();
     const updatedLog = [...log, { date: new Date().toDateString(), mins }];
     await saveFocusLog(updatedLog);
@@ -298,19 +310,24 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   };
 
   // Natural completion of a task-linked Focus session — mark the task done
-  // and log the focus minutes, same bookkeeping the old inline timer did.
+  // and log the focus minutes. The overlay stays open (showing "Session
+  // Complete!") until the user actually leaves it, which fires
+  // handleTaskSessionExit below — that's what clears timerTaskId.
   const handleTaskSessionFinish = (actualSeconds: number) => {
     if (!timerTaskId) return;
     void applyCompletion(timerTaskId, true);
-    void logFocusMinutes(Math.round(actualSeconds / 60));
-    setTimerTaskId(null);
+    void logFocusMinutes(actualSeconds / 60);
   };
 
-  // Leaving a task-linked Focus session — early abandon (task stays
-  // incomplete, nothing logged) or dismissing the "session complete" screen
-  // after a natural finish (which already ran handleTaskSessionFinish).
-  const handleTaskSessionExit = () => {
+  // Leaving a task-linked Focus session: early abandon (task stays
+  // incomplete, but whatever time actually ran gets banked) or dismissing
+  // the "session complete" screen after a natural finish (already logged
+  // by handleTaskSessionFinish, so wasNaturalCompletion skips re-logging).
+  const handleTaskSessionExit = (actualSeconds: number, wasNaturalCompletion: boolean) => {
     buttonPress();
+    if (!wasNaturalCompletion && actualSeconds > 0) {
+      void logFocusMinutes(actualSeconds / 60);
+    }
     setTimerTaskId(null);
   };
 
@@ -608,7 +625,9 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
             externalTask={{
               title: tasks.find(t => t.id === timerTaskId)!.title,
               durationMins: tasks.find(t => t.id === timerTaskId)!.duration,
+              id: timerTaskId,
             }}
+            sessionSource="task"
             onExternalFinish={handleTaskSessionFinish}
             onExternalExit={handleTaskSessionExit}
           />
