@@ -208,9 +208,11 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   const [newTaskRepeat, setNewTaskRepeat]   = useState(false);
   const [newTaskPriority, setNewTaskPriority] = useState(false);
 
-  // Edit duration modal (long press)
+  // Edit task modal (long press) — title, duration, priority
   const [editingTask, setEditingTask]     = useState<Task | null>(null);
+  const [editTitle, setEditTitle]         = useState('');
   const [editDuration, setEditDuration]   = useState(60);
+  const [editPriority, setEditPriority]   = useState(false);
 
   // Celebration
   const [confettiVisible, setConfettiVisible] = useState(false);
@@ -395,20 +397,24 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     buttonPress();
   };
 
-  // ── Edit duration (long press) ───────────────────────────────────────────────
+  // ── Edit task (long press) ────────────────────────────────────────────────────
   const handleLongPress = (id: string) => {
-    if (id === timerTaskId) return; // duration is locked in once a timer is running
+    if (id === timerTaskId) return; // locked in once a timer is running
     const task = tasks.find(t => t.id === id);
     if (!task) return;
     setEditingTask(task);
+    setEditTitle(task.title);
     setEditDuration(task.duration);
+    setEditPriority(task.priority === 'high');
     buttonPress();
   };
 
-  const handleSaveDuration = async () => {
-    if (!editingTask) return;
+  const handleSaveTaskEdit = async () => {
+    if (!editingTask || !editTitle.trim()) return;
     const updated = tasks.map(t =>
-      t.id === editingTask.id ? { ...t, duration: editDuration } : t
+      t.id === editingTask.id
+        ? { ...t, title: editTitle.trim(), duration: editDuration, priority: editPriority ? ('high' as const) : undefined }
+        : t
     );
     setTasks(updated);
     await StorageService.saveTodayTasks(updated);
@@ -550,10 +556,14 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
           </View>
         ) : (
           <>
-            {priorityGroup.length > 0 && (
-              <View style={[styles.blob, styles.blobPriority]}>
-                <Text style={[styles.blobLabel, styles.blobLabelPriority]}>High priority</Text>
-                {priorityGroup.map((task, index) => (
+            <View style={[styles.blob, styles.blobPriority]}>
+              <Text style={[styles.blobLabel, styles.blobLabelPriority]}>High priority</Text>
+              {priorityGroup.length === 0 ? (
+                <Text style={[styles.blobEmpty, styles.blobEmptyPriority]}>
+                  Drag a task up here, or double-tap one, to prioritize it.
+                </Text>
+              ) : (
+                priorityGroup.map((task, index) => (
                   <TaskItem
                     key={task.id}
                     task={task}
@@ -564,9 +574,9 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                     index={index}
                     variant="priority"
                   />
-                ))}
-              </View>
-            )}
+                ))
+              )}
+            </View>
 
             <View style={[styles.blob, styles.blobTodo]}>
               <Text style={[styles.blobLabel, styles.blobLabelTodo]}>To do</Text>
@@ -755,7 +765,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── Edit Duration Modal ──────────────────────────────────────────────── */}
+      {/* ── Edit Task Modal ──────────────────────────────────────────────────── */}
       <Modal
         visible={!!editingTask}
         animationType="slide"
@@ -769,16 +779,37 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
         <View style={styles.modalKAV} pointerEvents="box-none">
           <View style={styles.modalSheetSmall}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Edit Duration</Text>
-            {editingTask && (
-              <Text style={styles.editTaskName} numberOfLines={2}>{editingTask.title}</Text>
-            )}
+            <Text style={styles.modalTitle}>Edit Task</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={editTitle}
+              onChangeText={setEditTitle}
+              placeholder="Task title"
+              placeholderTextColor={Colors.textMuted}
+            />
             <DurationSlider value={editDuration} onChange={setEditDuration} />
+            <TouchableOpacity
+              style={styles.repeatRow}
+              onPress={() => setEditPriority(p => !p)}
+              activeOpacity={0.75}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.repeatLabel}>High priority</Text>
+                <Text style={styles.repeatSub}>Pin it above the rest of today's list</Text>
+              </View>
+              <View style={[styles.toggle, editPriority && styles.togglePriorityOn]}>
+                <View style={[styles.toggleThumb, editPriority && styles.toggleThumbOn]} />
+              </View>
+            </TouchableOpacity>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingTask(null)}>
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.createBtn} onPress={handleSaveDuration}>
+              <TouchableOpacity
+                style={[styles.createBtn, !editTitle.trim() && styles.createBtnDisabled]}
+                onPress={handleSaveTaskEdit}
+                disabled={!editTitle.trim()}
+              >
                 <View style={styles.createBtnGradient}>
                   <Text style={styles.createText}>Save</Text>
                 </View>
@@ -854,6 +885,7 @@ const styles = StyleSheet.create({
   blobLabelTodo: { color: Colors.gray[300] },
   blobLabelDone: { color: Colors.background },
   blobEmpty: { ...Typography.bodySmall, color: Colors.textMuted, paddingVertical: Spacing.sm },
+  blobEmptyPriority: { color: Colors.background, opacity: 0.75 },
 
   addBtn: { borderRadius: BorderRadius.sm, overflow: 'hidden' },
   addBtnGradient: { paddingHorizontal: Spacing.sm, paddingVertical: 5, backgroundColor: Colors.textPrimary },
@@ -939,7 +971,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   modalTitle: { ...Typography.headlineLarge, color: Colors.textPrimary, marginBottom: Spacing.md },
-  editTaskName: { ...Typography.bodyMedium, color: Colors.textSecondary, marginBottom: Spacing.md },
   fieldLabel: { ...Typography.labelSmall, color: Colors.textSecondary, marginBottom: 6 },
   modalInput: {
     backgroundColor: Colors.surface,
