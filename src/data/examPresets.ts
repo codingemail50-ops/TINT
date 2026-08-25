@@ -138,5 +138,6 @@ export const REALITY_CHECK_MESSAGES = [
 export const AVATARS = [
   'star', 'heart', 'bomb', 'coin', 'cherry',
   'watermelon', 'strawberry', 'mushroom', 'cat', 'fox',
-  'panda', 'pizza', 'donut',
+  'panda', 'pizza', 'donut', 'frog', 'owl',
+  'bear', 'alien', 'robot', 'grapes', 'apple',
 ];

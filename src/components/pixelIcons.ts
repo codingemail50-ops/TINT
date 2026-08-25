@@ -14,7 +14,8 @@ export type { PixelCell, PixelIconDef } from '../utils/pixelMask';
 
 export type PixelIconName =
   | 'star' | 'heart' | 'bomb' | 'coin' | 'cherry' | 'watermelon'
-  | 'strawberry' | 'mushroom' | 'cat' | 'fox' | 'panda' | 'pizza' | 'donut';
+  | 'strawberry' | 'mushroom' | 'cat' | 'fox' | 'panda' | 'pizza' | 'donut'
+  | 'frog' | 'owl' | 'bear' | 'alien' | 'robot' | 'grapes' | 'apple';
 
 function buildStar(): PixelIconDef {
   const cols = 13, rows = 13, cx = 6, cy = 6;
@@ -210,6 +211,127 @@ function buildDonut(): PixelIconDef {
   return b.build();
 }
 
+function buildFrog(): PixelIconDef {
+  const cols = 13, rows = 13;
+  const face = circleMask(cols, rows, 6, 8, 4.6);
+  const eyeL = circleMask(cols, rows, 3.6, 3, 2);
+  const eyeR = circleMask(cols, rows, 8.4, 3, 2);
+  const body = union(face, eyeL, eyeR);
+  return new IconBuilder(cols, rows)
+    .fill(body, '#5FBF4A')
+    .fill(circleMask(cols, rows, 3.6, 3, 1.3), '#DFF5C8')
+    .fill(circleMask(cols, rows, 8.4, 3, 1.3), '#DFF5C8')
+    .dot(4, 3, '#1B1B1B')
+    .dot(8, 3, '#1B1B1B')
+    .dot(5, 10, '#2E7D32')
+    .dot(7, 10, '#2E7D32')
+    .outline(body, '#2E5E1F')
+    .build();
+}
+
+function buildOwl(): PixelIconDef {
+  const cols = 13, rows = 13;
+  const face = circleMask(cols, rows, 6, 7, 5);
+  const tuftL = wedgeMask(cols, rows, 3, 2, false, 0, 3);
+  const tuftR = wedgeMask(cols, rows, 9, 2, false, 0, 3);
+  const beak = wedgeMask(cols, rows, 6, 1, true, 8, 10);
+  const body = union(face, tuftL, tuftR);
+  return new IconBuilder(cols, rows)
+    .fill(body, '#8B5E3C')
+    .fill(circleMask(cols, rows, 4, 6.5, 2), '#FFF3B0')
+    .fill(circleMask(cols, rows, 8, 6.5, 2), '#FFF3B0')
+    .dot(4, 6, '#1B1B1B')
+    .dot(8, 6, '#1B1B1B')
+    .fill(beak, '#F2A65A')
+    .outline(body, '#4A3320')
+    .build();
+}
+
+function buildBear(): PixelIconDef {
+  const cols = 13, rows = 13;
+  const face = circleMask(cols, rows, 6, 7, 5.2);
+  const earL = circleMask(cols, rows, 2.6, 2.6, 1.8);
+  const earR = circleMask(cols, rows, 9.4, 2.6, 1.8);
+  const body = union(face, earL, earR);
+  const muzzle = circleMask(cols, rows, 6, 8.6, 2.2, 1.8);
+  return new IconBuilder(cols, rows)
+    .fill(body, '#A9754F')
+    .fill(circleMask(cols, rows, 2.6, 2.6, 1), '#7A4E2E')
+    .fill(circleMask(cols, rows, 9.4, 2.6, 1), '#7A4E2E')
+    .fill(muzzle, '#E9CBA0')
+    .dot(4, 6, '#1B1B1B')
+    .dot(8, 6, '#1B1B1B')
+    .dot(6, 9, '#1B1B1B')
+    .outline(body, '#5C3A20')
+    .build();
+}
+
+function buildAlien(): PixelIconDef {
+  const cols = 13, rows = 13;
+  const head = circleMask(cols, rows, 6, 6, 4.6, 5.6);
+  const eyeL = circleMask(cols, rows, 3.8, 6, 1.5, 2.1);
+  const eyeR = circleMask(cols, rows, 8.2, 6, 1.5, 2.1);
+  return new IconBuilder(cols, rows)
+    .fill(head, '#7ED957')
+    .fill(eyeL, '#0D0D0D')
+    .fill(eyeR, '#0D0D0D')
+    .dot(4, 5, '#FFFFFF')
+    .dot(8, 5, '#FFFFFF')
+    .outline(head, '#2F7A1B')
+    .build();
+}
+
+function buildRobot(): PixelIconDef {
+  const cols = 13, rows = 13;
+  const head = rectMask(cols, rows, 2, 3, 10, 11);
+  const eyeL = rectMask(cols, rows, 4, 6, 5, 7);
+  const eyeR = rectMask(cols, rows, 7, 6, 8, 7);
+  const mouth = rectMask(cols, rows, 4, 9, 8, 9);
+  return new IconBuilder(cols, rows)
+    .fill(head, '#B0B8C0')
+    .fill(eyeL, '#4AA3FF')
+    .fill(eyeR, '#4AA3FF')
+    .fill(mouth, '#6B7480')
+    .dot(6, 1, '#8C8C8C')
+    .dot(6, 2, '#8C8C8C')
+    .dot(6, 0, '#FF6A00')
+    .outline(head, '#4A4F57')
+    .build();
+}
+
+function buildGrapes(): PixelIconDef {
+  const cols = 13, rows = 13;
+  const centers: [number, number][] = [
+    [4, 5], [8, 5], [6, 6.5], [3, 7.5], [6, 8.5], [9, 7.5], [4.5, 9.7], [7.5, 9.7],
+  ];
+  const circles = centers.map(([cx, cy]) => circleMask(cols, rows, cx, cy, 1.9));
+  const body = union(...circles);
+  return new IconBuilder(cols, rows)
+    .fill(body, '#7B4FA0')
+    .dot(5, 2, '#3FA34D')
+    .dot(6, 2, '#3FA34D')
+    .dot(7, 3, '#3FA34D')
+    .outline(body, '#4A2E63')
+    .build();
+}
+
+function buildApple(): PixelIconDef {
+  const cols = 13, rows = 13, cx = 6;
+  const round = circleMask(cols, rows, cx, 8, 4.6);
+  const dent = circleMask(cols, rows, cx, 3.6, 1.8);
+  const body = subtract(round, dent);
+  return new IconBuilder(cols, rows)
+    .fill(body, '#E63946')
+    .fill(circleMask(cols, rows, 4.4, 6.4, 1.2), '#FF8FA3')
+    .dot(6, 2, '#6B4226')
+    .dot(6, 1, '#6B4226')
+    .dot(7, 1, '#3FA34D')
+    .dot(8, 1, '#3FA34D')
+    .dot(8, 0, '#3FA34D')
+    .outline(body, '#7A1620')
+    .build();
+}
+
 export const PIXEL_ICONS: Record<PixelIconName, PixelIconDef> = {
   star: buildStar(),
   heart: buildHeart(),
@@ -224,6 +346,13 @@ export const PIXEL_ICONS: Record<PixelIconName, PixelIconDef> = {
   panda: buildPanda(),
   pizza: buildPizza(),
   donut: buildDonut(),
+  frog: buildFrog(),
+  owl: buildOwl(),
+  bear: buildBear(),
+  alien: buildAlien(),
+  robot: buildRobot(),
+  grapes: buildGrapes(),
+  apple: buildApple(),
 };
 
 export const PIXEL_ICON_NAMES = Object.keys(PIXEL_ICONS) as PixelIconName[];

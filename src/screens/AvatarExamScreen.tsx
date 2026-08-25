@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { EXAM_TYPES, ExamType, AVATARS, CustomExam } from '../data/examPresets';
 import { AvatarWall } from '../components/AvatarWall';
@@ -120,7 +119,6 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
                   onPress={() => toggleExam(exam.id, index)}
                   activeOpacity={0.75}
                 >
-                  <Ionicons name={exam.icon as any} size={24} color={checked ? '#000' : Colors.textSecondary} />
                   <Text style={[examS.label, checked && examS.labelActive]}>{exam.label}</Text>
                   <View style={[examS.checkbox, checked && examS.checkboxActive]}>
                     {checked && <Text style={examS.checkmark}>✓</Text>}
@@ -192,7 +190,7 @@ const examS = StyleSheet.create({
     alignItems: 'center',
   },
   cardActive: { borderColor: Colors.pop, backgroundColor: Colors.pop },
-  label: { fontSize: 16, fontFamily: Fonts.bold, color: Colors.textPrimary, marginLeft: 8, flex: 1 },
+  label: { fontSize: 16, fontFamily: Fonts.bold, color: Colors.textPrimary, flex: 1 },
   labelActive: { color: '#000' },
   checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
   checkboxActive: { backgroundColor: '#000', borderColor: '#000' },
