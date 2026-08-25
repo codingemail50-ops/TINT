@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { now as devNow } from './devClock';
 
 // How long the app was backgrounded *during an active focus session* —
 // the one distraction signal we can measure honestly without a native
@@ -24,6 +25,6 @@ export async function saveDistractionLog(log: DistractionLogEntry[]): Promise<vo
 }
 
 export function computeDistractedToday(log: DistractionLogEntry[]): number {
-  const todayStr = new Date().toDateString();
+  const todayStr = devNow().toDateString();
   return log.filter(e => e.date === todayStr).reduce((s, e) => s + e.mins, 0);
 }

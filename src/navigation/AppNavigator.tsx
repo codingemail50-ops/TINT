@@ -17,6 +17,7 @@ import { ExamType, CustomExam } from '../data/examPresets';
 import { supabase } from '../lib/supabase';
 import { FocusSessionProvider, useFocusSessionStatus } from '../context/FocusSessionContext';
 import { FocusMiniPlayer } from '../components/FocusMiniPlayer';
+import { loadDevOffset, subscribeDevClock } from '../utils/devClock';
 import {
   loadUserFromSupabase,
   syncAppStateToSupabase,
@@ -106,6 +107,9 @@ const AppNavigatorInner: React.FC = () => {
   // No splash animation — resolve session/local state directly on mount.
   useEffect(() => {
     void (async () => {
+      // Must resolve before anything below reads "today" — otherwise a
+      // saved dev day-skip offset wouldn't apply until the next reload.
+      await loadDevOffset();
       const userId = await ensureSession();
       userIdRef.current = userId;
 
@@ -138,6 +142,13 @@ const AppNavigatorInner: React.FC = () => {
       }
     })();
   }, []);
+
+  // Tab screens stay mounted now, so the dev-mode day-skip tool needs an
+  // explicit nudge to refresh appState (streak/history are date-dependent) —
+  // nothing else would trigger a refetch once past the initial boot.
+  useEffect(() => subscribeDevClock(() => {
+    void StorageService.getAppState().then(setAppState);
+  }), []);
 
   const navigateTo = (s: Screen) => setScreen(s);
 

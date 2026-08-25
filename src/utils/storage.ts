@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Task, CustomExam } from '../data/examPresets';
+import { now as devNow } from './devClock';
 
 export interface UserProfile {
   name: string;
@@ -64,17 +65,17 @@ export const StorageService = {
       const raw = await AsyncStorage.getItem(KEYS.TODAY_TASKS);
       if (!raw) return null;
       const { date, tasks } = JSON.parse(raw);
-      return date === new Date().toDateString() ? tasks : null;
+      return date === devNow().toDateString() ? tasks : null;
     } catch { return null; }
   },
 
   async saveTodayTasks(tasks: Task[]): Promise<void> {
-    await AsyncStorage.setItem(KEYS.TODAY_TASKS, JSON.stringify({ date: new Date().toDateString(), tasks }));
+    await AsyncStorage.setItem(KEYS.TODAY_TASKS, JSON.stringify({ date: devNow().toDateString(), tasks }));
   },
 
   async recordDayCompletion(tasks: Task[]): Promise<AppState> {
     const state = await this.getAppState();
-    const today = new Date().toDateString();
+    const today = devNow().toDateString();
     const completed = tasks.filter(t => t.completed).length;
     const consistency = tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0;
 
@@ -102,8 +103,8 @@ export function computeStreak(history: DayRecord[]): number {
   if (history.length === 0) return 0;
 
   const byDate = new Map(history.map(h => [h.date, h]));
-  const today = new Date().toDateString();
-  const cursor = new Date();
+  const today = devNow().toDateString();
+  const cursor = devNow();
 
   let streak = 0;
   let consecutiveMissed = 0;
@@ -144,7 +145,7 @@ export function computeLifetimeConsistency(history: DayRecord[]): number {
 export function getConsistencyData(history: DayRecord[]): { day: string; value: number; date: string }[] {
   const last7: { day: string; value: number; date: string }[] = [];
   for (let i = 6; i >= 0; i--) {
-    const d = new Date();
+    const d = devNow();
     d.setDate(d.getDate() - i);
     const dateStr = d.toDateString();
     const record = history.find(h => h.date === dateStr);
@@ -157,7 +158,7 @@ export function getConsistencyData(history: DayRecord[]): { day: string; value: 
 export function getHeatmapData(history: DayRecord[]): { date: string; value: number }[] {
   const result: { date: string; value: number }[] = [];
   for (let i = 69; i >= 0; i--) {
-    const d = new Date();
+    const d = devNow();
     d.setDate(d.getDate() - i);
     const dateStr = d.toDateString();
     const record = history.find(h => h.date === dateStr);

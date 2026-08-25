@@ -7,6 +7,7 @@ import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/t
 import { AppState } from '../utils/storage';
 import { FocusLogEntry, loadFocusLog, FocusTimeframe, FocusBucket, getFocusSummary, getFocusHeatmap } from '../utils/focusLog';
 import { DistractionLogEntry, loadDistractionLog } from '../utils/distractionLog';
+import { subscribeDevClock } from '../utils/devClock';
 import { REALITY_CHECK_MESSAGES } from '../data/examPresets';
 
 interface Props { appState: AppState }
@@ -303,6 +304,14 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
     loadFocusLog().then(setFocusLog);
     loadDistractionLog().then(setDistractionLog);
   }, []);
+
+  // Screens stay mounted across tab switches now, so the dev-mode day-skip
+  // tool needs an explicit nudge to refetch — otherwise this screen would
+  // keep showing data loaded before the day advanced.
+  useEffect(() => subscribeDevClock(() => {
+    loadFocusLog().then(setFocusLog);
+    loadDistractionLog().then(setDistractionLog);
+  }), []);
 
   const summary = useMemo(() => getFocusSummary(focusLog, timeframe, distractionLog), [focusLog, distractionLog, timeframe]);
 

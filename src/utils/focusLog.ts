@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { now as devNow } from './devClock';
 
 export interface FocusLogEntry {
   date: string;
@@ -27,8 +28,8 @@ function startOfWeek(d: Date): Date {
 }
 
 export function computeFocusStats(log: FocusLogEntry[]): { today: number; week: number; allTime: number } {
-  const todayStr = new Date().toDateString();
-  const weekStart = startOfWeek(new Date());
+  const todayStr = devNow().toDateString();
+  const weekStart = startOfWeek(devNow());
 
   let today = 0, week = 0, allTime = 0;
   for (const entry of log) {
@@ -45,7 +46,7 @@ const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 export function getLast7DaysFocus(log: FocusLogEntry[]): { day: string; mins: number; date: string }[] {
   const result: { day: string; mins: number; date: string }[] = [];
   for (let i = 6; i >= 0; i--) {
-    const d = new Date();
+    const d = devNow();
     d.setDate(d.getDate() - i);
     const dateStr = d.toDateString();
     const mins = log.filter(e => e.date === dateStr).reduce((s, e) => s + e.mins, 0);
@@ -64,7 +65,7 @@ export function getFocusHeatmap(log: FocusLogEntry[], days = 70): { date: string
   const byDate = new Set(log.filter(e => e.mins > 0).map(e => e.date));
   const result: { date: string; focused: boolean }[] = [];
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
+    const d = devNow();
     d.setDate(d.getDate() - i);
     const dateStr = d.toDateString();
     result.push({ date: dateStr, focused: byDate.has(dateStr) });
@@ -106,13 +107,13 @@ export function getFocusSummary(
   timeframe: FocusTimeframe,
   distractionLog: { date: string; mins: number }[] = []
 ): FocusSummary {
-  const now = new Date();
+  const now = devNow();
 
   if (timeframe === 'week') {
     const buckets: FocusBucket[] = [];
     let totalMins = 0, sessionCount = 0;
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
+      const d = new Date(now);
       d.setDate(d.getDate() - i);
       const dateStr = d.toDateString();
       const entries = log.filter(e => e.date === dateStr);

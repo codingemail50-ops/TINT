@@ -21,6 +21,7 @@ import { syncFocusLog } from '../utils/supabaseStorage';
 import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '../utils/focusLog';
 import { DistractionLogEntry, loadDistractionLog, computeDistractedToday } from '../utils/distractionLog';
 import { loadActiveSession } from '../utils/activeFocusSession';
+import { now as devNow, subscribeDevClock } from '../utils/devClock';
 
 const CATEGORIES = [
   'Study', 'Practice', 'Revision', 'Reading', 'Writing',
@@ -187,11 +188,10 @@ interface Props {
   onPreviewOnboarding?: () => void;
 }
 
-const todayStr = new Date().toDateString();
-
 export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, onNavigateFocus, onNavigateProfile, onNavigateAnalytics, onPreviewOnboarding }) => {
   const [tasks, setTasks]           = useState<Task[]>([]);
-  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [todayStr, setTodayStr]     = useState(() => devNow().toDateString());
+  const [selectedDate, setSelectedDate] = useState(() => devNow().toDateString());
   const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
   const [distractionLog, setDistractionLog] = useState<DistractionLogEntry[]>([]);
 
@@ -227,35 +227,46 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
 
   // Load today's tasks — a custom exam (from "Other") seeds the day the same
   // way a preset does, just from user-typed tasks instead of BASE_TASKS.
-  useEffect(() => {
-    (async () => {
-      let loadedTasks: Task[];
-      const saved = await StorageService.getTodayTasks();
-      if (saved) {
-        loadedTasks = saved;
-      } else {
-        loadedTasks = user?.customExam
-          ? user.customExam.tasks.map((t, i) => ({
-              id: `custom-${i}`, title: t.title, duration: t.duration,
-              category: user.customExam!.name, completed: false,
-            }))
-          : getCombinedPreset(examTypes).map(t => ({ ...t, completed: false }));
-        await StorageService.saveTodayTasks(loadedTasks);
-      }
-      setTasks(loadedTasks);
+  // Pulled out to a named function so it can also re-run when the dev-mode
+  // day-skip tool advances the clock (see devClock.ts) — screens stay
+  // mounted across tab switches now, so nothing else would trigger a refetch.
+  const refreshDay = useCallback(async () => {
+    let loadedTasks: Task[];
+    const saved = await StorageService.getTodayTasks();
+    if (saved) {
+      loadedTasks = saved;
+    } else {
+      loadedTasks = user?.customExam
+        ? user.customExam.tasks.map((t, i) => ({
+            id: `custom-${i}`, title: t.title, duration: t.duration,
+            category: user.customExam!.name, completed: false,
+          }))
+        : getCombinedPreset(examTypes).map(t => ({ ...t, completed: false }));
+      await StorageService.saveTodayTasks(loadedTasks);
+    }
+    setTasks(loadedTasks);
 
-      // A task-linked session was still running when the app process got
-      // killed — re-open its overlay so FocusScreen's own boot-resume logic
-      // (see activeFocusSession.ts) can pick the timing back up.
-      const active = await loadActiveSession();
-      if (active?.source === 'task' && active.taskId) {
-        const stillPending = loadedTasks.find(t => t.id === active.taskId && !t.completed);
-        if (stillPending) setTimerTaskId(active.taskId);
-      }
-    })();
-    loadFocusLog().then(setFocusLog);
-    loadDistractionLog().then(setDistractionLog);
-  }, []);
+    // A task-linked session was still running when the app process got
+    // killed — re-open its overlay so FocusScreen's own boot-resume logic
+    // (see activeFocusSession.ts) can pick the timing back up.
+    const active = await loadActiveSession();
+    if (active?.source === 'task' && active.taskId) {
+      const stillPending = loadedTasks.find(t => t.id === active.taskId && !t.completed);
+      if (stillPending) setTimerTaskId(active.taskId);
+    }
+
+    setFocusLog(await loadFocusLog());
+    setDistractionLog(await loadDistractionLog());
+  }, [user, examTypes]);
+
+  useEffect(() => { void refreshDay(); }, []);
+
+  useEffect(() => subscribeDevClock(() => {
+    const newToday = devNow().toDateString();
+    setSelectedDate(prev => (prev === todayStr ? newToday : prev));
+    setTodayStr(newToday);
+    void refreshDay();
+  }), [todayStr, refreshDay]);
 
   const viewingPast = selectedDate !== todayStr;
   const pastRecord  = viewingPast
@@ -282,7 +293,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   // ── Task completion (shared by instant un-toggle and timer completion) ───────
   const applyCompletion = useCallback(async (id: string, completed: boolean) => {
     const updated = tasks.map(t =>
-      t.id === id ? { ...t, completed, completedAt: completed ? new Date().toISOString() : undefined } : t
+      t.id === id ? { ...t, completed, completedAt: completed ? devNow().toISOString() : undefined } : t
     );
     setTasks(updated);
     await StorageService.saveTodayTasks(updated);
@@ -305,7 +316,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   const logFocusMinutes = async (mins: number) => {
     if (mins <= 0) return;
     const log = await loadFocusLog();
-    const updatedLog = [...log, { date: new Date().toDateString(), mins }];
+    const updatedLog = [...log, { date: devNow().toDateString(), mins }];
     await saveFocusLog(updatedLog);
     setFocusLog(updatedLog);
     if (userId) void syncFocusLog(userId, updatedLog);

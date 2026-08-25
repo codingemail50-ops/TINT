@@ -18,6 +18,7 @@ import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '..
 import { loadDistractionLog, saveDistractionLog } from '../utils/distractionLog';
 import { saveActiveSession, loadActiveSession, clearActiveSession } from '../utils/activeFocusSession';
 import { useFocusSessionStatus } from '../context/FocusSessionContext';
+import { now as devNow } from '../utils/devClock';
 import { PixelFlame } from '../components/PixelFlame';
 import { FlameBadge } from '../components/FlameBadge';
 import { KnurledDial } from '../components/KnurledDial';
@@ -191,7 +192,7 @@ export const FocusScreen: React.FC<Props> = ({
     setPhase('done');
     await clearActiveSession();
 
-    const entry: FocusLogEntry = { date: new Date().toDateString(), mins: completedDurationMins };
+    const entry: FocusLogEntry = { date: devNow().toDateString(), mins: completedDurationMins };
     const updatedLog = [...(await loadFocusLog()), entry];
     await saveFocusLog(updatedLog);
     setFocusLog(updatedLog);
@@ -201,7 +202,7 @@ export const FocusScreen: React.FC<Props> = ({
     backgroundedAtRef.current = null;
     if (distractedMins > 0) {
       const distractionLog = await loadDistractionLog();
-      await saveDistractionLog([...distractionLog, { date: new Date().toDateString(), mins: distractedMins }]);
+      await saveDistractionLog([...distractionLog, { date: devNow().toDateString(), mins: distractedMins }]);
     }
 
     await taskComplete();
@@ -316,10 +317,10 @@ export const FocusScreen: React.FC<Props> = ({
       const distractedMins = distractedSecondsRef.current / 60;
       if (distractedMins > 0) {
         const distractionLog = await loadDistractionLog();
-        await saveDistractionLog([...distractionLog, { date: new Date().toDateString(), mins: distractedMins }]);
+        await saveDistractionLog([...distractionLog, { date: devNow().toDateString(), mins: distractedMins }]);
       }
       if (elapsedSeconds > 0) {
-        const entry: FocusLogEntry = { date: new Date().toDateString(), mins: elapsedSeconds / 60 };
+        const entry: FocusLogEntry = { date: devNow().toDateString(), mins: elapsedSeconds / 60 };
         const updatedLog = [...(await loadFocusLog()), entry];
         await saveFocusLog(updatedLog);
         setFocusLog(updatedLog);

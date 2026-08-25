@@ -12,6 +12,7 @@ import {
 } from '../utils/supabaseStorage';
 import { loadFocusLog, saveFocusLog } from '../utils/focusLog';
 import { saveDistractionLog } from '../utils/distractionLog';
+import { now as devNow, advanceDevDay, resetDevOffset, getDevDayOffset, subscribeDevClock } from '../utils/devClock';
 import { FocusGoalScreen } from './FocusGoalScreen';
 import { useHaptics } from '../hooks/useHaptics';
 
@@ -30,7 +31,10 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
   const [results, setResults] = useState<CloudLeaderboardRow[]>([]);
   const [searching, setSearching] = useState(false);
   const [goalModalOpen, setGoalModalOpen] = useState(false);
+  const [devDayOffset, setDevDayOffset] = useState(getDevDayOffset());
   const { buttonPress } = useHaptics();
+
+  useEffect(() => subscribeDevClock(() => setDevDayOffset(getDevDayOffset())), []);
 
   const refreshFriends = useCallback(async () => {
     if (!userId) return;
@@ -87,15 +91,30 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
   const handleAddFocusMinutes = async () => {
     await buttonPress();
     const log = await loadFocusLog();
-    log.push({ date: new Date().toDateString(), mins: 30 });
+    log.push({ date: devNow().toDateString(), mins: 30 });
     await saveFocusLog(log);
     Alert.alert('Dev', '+30 min added to today’s focus log. Reopen Today to see it.');
+  };
+
+  // Advances the app's notion of "today" by a day (see devClock.ts) and
+  // notifies every screen that stayed mounted through the jump so Insights,
+  // the heatmap, and streak logic can all be tested ahead of the real clock.
+  const handleSkipDay = async () => {
+    await buttonPress();
+    await advanceDevDay(1);
+    Alert.alert('Dev', `Now ${getDevDayOffset()} day(s) ahead of real time.`);
+  };
+
+  const handleResetDayOffset = async () => {
+    await buttonPress();
+    await resetDevOffset();
+    Alert.alert('Dev', 'Back to real time.');
   };
 
   const handleAddStreakDay = () => {
     buttonPress();
     const nextOffset = appState.streak + 1;
-    const d = new Date();
+    const d = devNow();
     d.setDate(d.getDate() - nextOffset);
     const record: DayRecord = { date: d.toDateString(), tasks: [], completedCount: 1, totalCount: 1, consistency: 100 };
     const history = [...appState.history.filter(h => h.date !== record.date), record].slice(-60);
@@ -238,6 +257,14 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
               <TouchableOpacity style={styles.devBtn} onPress={handleAddStreakDay}>
                 <Text style={styles.devBtnText}>+1 day streak</Text>
               </TouchableOpacity>
+              <TouchableOpacity style={styles.devBtn} onPress={handleSkipDay}>
+                <Text style={styles.devBtnText}>Skip to next day</Text>
+              </TouchableOpacity>
+              {devDayOffset !== 0 && (
+                <TouchableOpacity style={styles.devBtn} onPress={handleResetDayOffset}>
+                  <Text style={styles.devBtnText}>Back to real time ({devDayOffset}d)</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={[styles.devBtn, styles.devBtnDanger]} onPress={handleResetTestData}>
                 <Text style={[styles.devBtnText, styles.devBtnDangerText]}>Reset test data</Text>
               </TouchableOpacity>
