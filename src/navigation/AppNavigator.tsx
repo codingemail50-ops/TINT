@@ -254,22 +254,24 @@ const AppNavigatorInner: React.FC = () => {
     }
   };
 
-  // Composed with Gesture.Native() so this doesn't compete for the touch
-  // responder with every button/touchable underneath it — without that,
-  // just starting to evaluate whether a touch *might* become a swipe was
-  // enough to occasionally swallow ordinary taps everywhere in the app.
-  const swipeGesture = Gesture.Simultaneous(
-    Gesture.Pan()
-      .enabled(showTabs)
-      .activeOffsetX([-35, 35])
-      .failOffsetY([-20, 20])
-      .onEnd(event => {
-        'worklet';
-        if (Math.abs(event.translationX) < 60) return;
-        runOnJS(goRelative)(event.translationX < 0 ? 1 : -1);
-      }),
-    Gesture.Native()
-  );
+  // NOTE: this used to also compose with Gesture.Native() to try to stop it
+  // competing with buttons for the touch responder — that broke vertical
+  // scrolling on every screen instead (Gesture.Native() isn't meant to be
+  // attached blanket-style over an arbitrary subtree with its own nested
+  // ScrollViews; it's for pairing with one specific native-backed
+  // component). Reverted to plain Pan with wide activation thresholds,
+  // which is what actually keeps it from claiming ordinary taps/scrolls —
+  // it only starts tracking once movement is clearly a deliberate
+  // horizontal swipe.
+  const swipeGesture = Gesture.Pan()
+    .enabled(showTabs)
+    .activeOffsetX([-35, 35])
+    .failOffsetY([-20, 20])
+    .onEnd(event => {
+      'worklet';
+      if (Math.abs(event.translationX) < 60) return;
+      runOnJS(goRelative)(event.translationX < 0 ? 1 : -1);
+    });
 
   // Mini-player shows whenever a session is actively running and its own
   // full-screen UI isn't the thing currently on screen (Focus tab for a

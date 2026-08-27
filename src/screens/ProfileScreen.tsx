@@ -91,7 +91,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
   const handleAddFocusMinutes = async () => {
     await buttonPress();
     const log = await loadFocusLog();
-    log.push({ date: devNow().toDateString(), mins: 30 });
+    log.push({ date: devNow().toDateString(), mins: 30, timestamp: devNow().toISOString() });
     await saveFocusLog(log);
     Alert.alert('Dev', '+30 min added to today’s focus log. Reopen Today to see it.');
   };

@@ -4,9 +4,29 @@ import { now as devNow } from './devClock';
 export interface FocusLogEntry {
   date: string;
   mins: number;
+  /** ISO wall-clock moment the session happened — optional since entries
+   *  logged before this field existed won't have it. Powers the hour-by-hour
+   *  "Day" timeframe; every other timeframe only ever needed `date`. */
+  timestamp?: string;
 }
 
 const FOCUS_LOG_KEY = 'tint_focus_log';
+
+// Today and the Focus tab both stay mounted permanently now (so a running
+// session survives tab switches), which means they each hold their own
+// snapshot of the focus log loaded once on mount — with no signal telling
+// one to refresh when the *other* logs a session, "focused for a minute"
+// would show up in Insights (which reloads fresh every visit) but nowhere
+// on the already-mounted screens. This is that signal.
+type Listener = () => void;
+const listeners = new Set<Listener>();
+export function subscribeFocusLog(fn: Listener): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+function notify() {
+  for (const l of listeners) l();
+}
 
 export async function loadFocusLog(): Promise<FocusLogEntry[]> {
   try {
@@ -17,6 +37,7 @@ export async function loadFocusLog(): Promise<FocusLogEntry[]> {
 
 export async function saveFocusLog(log: FocusLogEntry[]): Promise<void> {
   await AsyncStorage.setItem(FOCUS_LOG_KEY, JSON.stringify(log));
+  notify();
 }
 
 function startOfWeek(d: Date): Date {
@@ -73,7 +94,7 @@ export function getFocusHeatmap(log: FocusLogEntry[], days = 70): { date: string
   return result;
 }
 
-export type FocusTimeframe = 'week' | 'month' | 'year' | 'allTime';
+export type FocusTimeframe = 'day' | 'week' | 'month' | 'allTime';
 
 export interface FocusBucket { label: string; mins: number; distractedMins: number; dateLabel: string }
 
@@ -96,6 +117,12 @@ function shortDate(d: Date): string {
   return `${MONTH_LABELS[d.getMonth()]} ${d.getDate()}`;
 }
 
+function formatHourLabel(h: number): string {
+  const period = h < 12 ? 'AM' : 'PM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}${period}`;
+}
+
 // Buckets + rollup totals for a timeframe, so the Insights screen can show
 // one consistent "Duration / Sessions / Avg per day" summary no matter
 // which tab is selected — averages are per calendar day elapsed in the
@@ -105,9 +132,41 @@ function shortDate(d: Date): string {
 export function getFocusSummary(
   log: FocusLogEntry[],
   timeframe: FocusTimeframe,
-  distractionLog: { date: string; mins: number }[] = []
+  distractionLog: { date: string; mins: number; timestamp?: string }[] = []
 ): FocusSummary {
   const now = devNow();
+
+  if (timeframe === 'day') {
+    const todayStr = now.toDateString();
+    const hourMins = new Array(24).fill(0);
+    const hourDistracted = new Array(24).fill(0);
+    let totalMins = 0, sessionCount = 0;
+
+    for (const e of log) {
+      if (e.date !== todayStr) continue;
+      totalMins += e.mins; sessionCount += 1;
+      if (e.timestamp) {
+        const h = new Date(e.timestamp).getHours();
+        if (h >= 0 && h < 24) hourMins[h] += e.mins;
+      }
+    }
+    for (const e of distractionLog) {
+      if (e.date !== todayStr || !e.timestamp) continue;
+      const h = new Date(e.timestamp).getHours();
+      if (h >= 0 && h < 24) hourDistracted[h] += e.mins;
+    }
+
+    const buckets: FocusBucket[] = [];
+    for (let h = 0; h < 24; h++) {
+      buckets.push({
+        label: h % 3 === 0 ? formatHourLabel(h) : '',
+        mins: hourMins[h],
+        distractedMins: hourDistracted[h],
+        dateLabel: `${formatHourLabel(h)} Today`,
+      });
+    }
+    return { buckets, periodLabel: 'Today', totalMins, sessionCount, avgMinsPerDay: totalMins, avgSessionsPerDay: sessionCount };
+  }
 
   if (timeframe === 'week') {
     const buckets: FocusBucket[] = [];
@@ -138,28 +197,6 @@ export function getFocusSummary(
       buckets.push({ label: day === 1 || day % 5 === 1 ? String(day) : '', mins, distractedMins: sumMins(distractionLog, dateStr), dateLabel: shortDate(d) });
     }
     return { buckets, periodLabel: `${MONTH_LABELS[month]} ${year}`, totalMins, sessionCount, avgMinsPerDay: totalMins / daysElapsed, avgSessionsPerDay: sessionCount / daysElapsed };
-  }
-
-  if (timeframe === 'year') {
-    const year = now.getFullYear();
-    const monthsElapsed = now.getMonth() + 1;
-    const daysElapsed = Math.round((now.getTime() - new Date(year, 0, 1).getTime()) / MS_PER_DAY) + 1;
-    const buckets: FocusBucket[] = [];
-    let totalMins = 0, sessionCount = 0;
-    for (let m = 0; m < monthsElapsed; m++) {
-      const entries = log.filter(e => {
-        const d = new Date(e.date);
-        return !isNaN(d.getTime()) && d.getFullYear() === year && d.getMonth() === m;
-      });
-      const distracted = distractionLog.filter(e => {
-        const d = new Date(e.date);
-        return !isNaN(d.getTime()) && d.getFullYear() === year && d.getMonth() === m;
-      }).reduce((s, e) => s + e.mins, 0);
-      const mins = entries.reduce((s, e) => s + e.mins, 0);
-      totalMins += mins; sessionCount += entries.length;
-      buckets.push({ label: MONTH_LABELS[m], mins, distractedMins: distracted, dateLabel: `${MONTH_LABELS[m]} ${year}` });
-    }
-    return { buckets, periodLabel: String(year), totalMins, sessionCount, avgMinsPerDay: totalMins / daysElapsed, avgSessionsPerDay: sessionCount / daysElapsed };
   }
 
   // allTime — bucket by calendar month from the earliest log entry to now.

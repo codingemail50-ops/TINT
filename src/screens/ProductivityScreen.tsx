@@ -32,6 +32,12 @@ const PLOT_W = CHART_W - YAXIS_W;
 
 const DualBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
   const [touchIdx, setTouchIdx] = useState<number | null>(null);
+  // Measured from the actual rendered element rather than assumed from
+  // Dimensions.get('window') at module-load time — the two can drift apart
+  // (padding rounding, different devices), and when they do, touch-to-bucket
+  // mapping goes out of sync with where the bars are actually drawn. This
+  // is fed by onLayout below and drives both, so they can't disagree.
+  const [plotWidth, setPlotWidth] = useState(PLOT_W);
 
   const maxMins = Math.max(...buckets.map(b => Math.max(b.mins, b.distractedMins)), 60);
   const maxHours = Math.max(1, Math.ceil(maxMins / 60));
@@ -41,7 +47,7 @@ const DualBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
   const hourMarks: number[] = [];
   for (let h = step; h <= topHours; h += step) hourMarks.push(h);
 
-  const colW = PLOT_W / buckets.length;
+  const colW = plotWidth / buckets.length;
   const barW = Math.max(3, Math.min(20, colW - 4));
   const frontW = Math.max(2, barW * 0.55);
 
@@ -62,7 +68,7 @@ const DualBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
 
   const touched = touchIdx !== null ? buckets[touchIdx] : null;
   const tooltipLeft = touchIdx !== null
-    ? Math.max(0, Math.min(PLOT_W - TOOLTIP_W, touchIdx * colW + colW / 2 - TOOLTIP_W / 2))
+    ? Math.max(0, Math.min(plotWidth - TOOLTIP_W, touchIdx * colW + colW / 2 - TOOLTIP_W / 2))
     : 0;
 
   return (
@@ -73,7 +79,11 @@ const DualBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
             <Text key={h} style={[chartSt.yLabel, { bottom: (h * 60 / scaleMins) * CHART_H - 6 }]}>{h}h</Text>
           ))}
         </View>
-        <View style={[chartSt.chartArea, { height: CHART_H, width: PLOT_W }]} {...panResponder.panHandlers}>
+        <View
+          style={[chartSt.chartArea, { height: CHART_H }]}
+          onLayout={e => setPlotWidth(e.nativeEvent.layout.width)}
+          {...panResponder.panHandlers}
+        >
           {hourMarks.map(h => (
             <View key={h} style={[chartSt.gridline, { bottom: (h * 60 / scaleMins) * CHART_H }]} />
           ))}
@@ -122,7 +132,7 @@ const chartSt = StyleSheet.create({
   row: { flexDirection: 'row' },
   yAxis: { width: YAXIS_W, justifyContent: 'flex-end' },
   yLabel: { position: 'absolute', right: 6, fontSize: 9, color: Colors.textMuted, fontFamily: Fonts.regular },
-  chartArea: { justifyContent: 'flex-end', position: 'relative' },
+  chartArea: { flex: 1, justifyContent: 'flex-end', position: 'relative' },
   gridline: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: Colors.border },
   // Each bucket gets an equal-width flex column (matching dayRow's flex:1
   // labels below) so the bar always sits centered under its own label,
@@ -284,9 +294,9 @@ const donutSt = StyleSheet.create({
 });
 
 const TIMEFRAMES: { id: FocusTimeframe; label: string }[] = [
+  { id: 'day', label: 'Day' },
   { id: 'week', label: 'Week' },
   { id: 'month', label: 'Month' },
-  { id: 'year', label: 'Year' },
   { id: 'allTime', label: 'All Time' },
 ];
 

@@ -9,9 +9,20 @@ import { now as devNow } from './devClock';
 export interface DistractionLogEntry {
   date: string;
   mins: number;
+  timestamp?: string;
 }
 
 const DISTRACTION_LOG_KEY = 'tint_distraction_log';
+
+type Listener = () => void;
+const listeners = new Set<Listener>();
+export function subscribeDistractionLog(fn: Listener): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+function notify() {
+  for (const l of listeners) l();
+}
 
 export async function loadDistractionLog(): Promise<DistractionLogEntry[]> {
   try {
@@ -22,6 +33,7 @@ export async function loadDistractionLog(): Promise<DistractionLogEntry[]> {
 
 export async function saveDistractionLog(log: DistractionLogEntry[]): Promise<void> {
   await AsyncStorage.setItem(DISTRACTION_LOG_KEY, JSON.stringify(log));
+  notify();
 }
 
 export function computeDistractedToday(log: DistractionLogEntry[]): number {

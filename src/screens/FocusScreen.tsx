@@ -14,14 +14,14 @@ import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/t
 import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog } from '../utils/supabaseStorage';
 import { StorageService } from '../utils/storage';
-import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '../utils/focusLog';
+import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats, subscribeFocusLog } from '../utils/focusLog';
 import { loadDistractionLog, saveDistractionLog } from '../utils/distractionLog';
 import { saveActiveSession, loadActiveSession, clearActiveSession } from '../utils/activeFocusSession';
 import { useFocusSessionStatus } from '../context/FocusSessionContext';
 import { now as devNow } from '../utils/devClock';
 import { PixelFlame } from '../components/PixelFlame';
 import { FlameBadge } from '../components/FlameBadge';
-import { KnurledDial } from '../components/KnurledDial';
+import { BlobDial } from '../components/BlobDial';
 import { scallopPath } from '../utils/scallopPath';
 import { openPermissionSettings, getSelfReportedGrants, setSelfReportedGrant, BlockingPermission } from '../utils/appBlocking';
 import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY } from '../data/blockableApps';
@@ -171,6 +171,11 @@ export const FocusScreen: React.FC<Props> = ({
     })();
   }, []);
 
+  // Today stays mounted alongside this tab now — a task-linked session
+  // completed there should update this screen's Today/Week/All-Time stat
+  // cards too, even though this instance never wrote that data itself.
+  useEffect(() => subscribeFocusLog(() => { loadFocusLog().then(setFocusLog); }), []);
+
   useEffect(() => {
     Animated.timing(sheetY, {
       toValue: sheetOpen ? 0 : SHEET_HEIGHT,
@@ -192,7 +197,7 @@ export const FocusScreen: React.FC<Props> = ({
     setPhase('done');
     await clearActiveSession();
 
-    const entry: FocusLogEntry = { date: devNow().toDateString(), mins: completedDurationMins };
+    const entry: FocusLogEntry = { date: devNow().toDateString(), mins: completedDurationMins, timestamp: devNow().toISOString() };
     const updatedLog = [...(await loadFocusLog()), entry];
     await saveFocusLog(updatedLog);
     setFocusLog(updatedLog);
@@ -202,7 +207,7 @@ export const FocusScreen: React.FC<Props> = ({
     backgroundedAtRef.current = null;
     if (distractedMins > 0) {
       const distractionLog = await loadDistractionLog();
-      await saveDistractionLog([...distractionLog, { date: devNow().toDateString(), mins: distractedMins }]);
+      await saveDistractionLog([...distractionLog, { date: devNow().toDateString(), mins: distractedMins, timestamp: devNow().toISOString() }]);
     }
 
     await taskComplete();
@@ -317,10 +322,10 @@ export const FocusScreen: React.FC<Props> = ({
       const distractedMins = distractedSecondsRef.current / 60;
       if (distractedMins > 0) {
         const distractionLog = await loadDistractionLog();
-        await saveDistractionLog([...distractionLog, { date: devNow().toDateString(), mins: distractedMins }]);
+        await saveDistractionLog([...distractionLog, { date: devNow().toDateString(), mins: distractedMins, timestamp: devNow().toISOString() }]);
       }
       if (elapsedSeconds > 0) {
-        const entry: FocusLogEntry = { date: devNow().toDateString(), mins: elapsedSeconds / 60 };
+        const entry: FocusLogEntry = { date: devNow().toDateString(), mins: elapsedSeconds / 60, timestamp: devNow().toISOString() };
         const updatedLog = [...(await loadFocusLog()), entry];
         await saveFocusLog(updatedLog);
         setFocusLog(updatedLog);
@@ -464,19 +469,18 @@ export const FocusScreen: React.FC<Props> = ({
     await setSelfReportedGrant(permission, next);
   };
 
-  // Composed with Gesture.Native() so it doesn't contest the touch
-  // responder with the close/pause buttons it wraps.
-  const swipeGesture = Gesture.Simultaneous(
-    Gesture.Pan()
-      .activeOffsetY([-20, 20])
-      .failOffsetX([-25, 25])
-      .onEnd(event => {
-        'worklet';
-        if (event.translationY < -50) runOnJS(setSheetOpen)(true);
-        else if (event.translationY > 50) runOnJS(setSheetOpen)(false);
-      }),
-    Gesture.Native()
-  );
+  // See AppNavigator's swipeGesture for why this isn't composed with
+  // Gesture.Native() — that combinator broke scrolling instead of fixing
+  // button responsiveness. Wide activeOffsetY alone keeps it from
+  // swallowing the close/pause button taps it wraps.
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetY([-20, 20])
+    .failOffsetX([-25, 25])
+    .onEnd(event => {
+      'worklet';
+      if (event.translationY < -50) runOnJS(setSheetOpen)(true);
+      else if (event.translationY > 50) runOnJS(setSheetOpen)(false);
+    });
 
   const stats = computeFocusStats(focusLog);
 
@@ -500,7 +504,7 @@ export const FocusScreen: React.FC<Props> = ({
           {phase === 'setup' && (
             <>
               <Animated.View style={[styles.dialSection, { opacity: dialFadeAnim }]}>
-                <KnurledDial
+                <BlobDial
                   size={BLOB_WRAP}
                   minValue={5}
                   maxValue={240}

@@ -18,8 +18,8 @@ import { FocusScreen } from './FocusScreen';
 import { UCEEDCountdown, NIDCountdown, NIFTCountdown } from '../components/ExamCountdowns';
 import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog } from '../utils/supabaseStorage';
-import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats } from '../utils/focusLog';
-import { DistractionLogEntry, loadDistractionLog, computeDistractedToday } from '../utils/distractionLog';
+import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats, subscribeFocusLog } from '../utils/focusLog';
+import { DistractionLogEntry, loadDistractionLog, computeDistractedToday, subscribeDistractionLog } from '../utils/distractionLog';
 import { loadActiveSession } from '../utils/activeFocusSession';
 import { now as devNow, subscribeDevClock } from '../utils/devClock';
 
@@ -268,6 +268,13 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     void refreshDay();
   }), [todayStr, refreshDay]);
 
+  // The Focus tab stays mounted alongside Today now, and logs sessions of
+  // its own — without this, a standalone (non-task-linked) session
+  // completed there would show up in Insights (which reloads every visit)
+  // but never update Today's Focused/Distracted pills or bonfire progress.
+  useEffect(() => subscribeFocusLog(() => { loadFocusLog().then(setFocusLog); }), []);
+  useEffect(() => subscribeDistractionLog(() => { loadDistractionLog().then(setDistractionLog); }), []);
+
   const viewingPast = selectedDate !== todayStr;
   const pastRecord  = viewingPast
     ? appState.history.find(h => h.date === selectedDate)
@@ -316,7 +323,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   const logFocusMinutes = async (mins: number) => {
     if (mins <= 0) return;
     const log = await loadFocusLog();
-    const updatedLog = [...log, { date: devNow().toDateString(), mins }];
+    const updatedLog = [...log, { date: devNow().toDateString(), mins, timestamp: devNow().toISOString() }];
     await saveFocusLog(updatedLog);
     setFocusLog(updatedLog);
     if (userId) void syncFocusLog(userId, updatedLog);
