@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable, Alert,
-  Animated, AppState as RNAppState, AppStateStatus, Dimensions,
+  View, Text, StyleSheet, TouchableOpacity, Pressable, Alert,
+  Animated, AppState as RNAppState, AppStateStatus,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
@@ -58,8 +56,6 @@ const TRACE_SCALLOP = scallopPath(BLOB_SIZE / 2, BLOB_SIZE / 2, BLOB_R + 5, 15, 
 const TRACE_PATH = TRACE_SCALLOP.d;
 const TRACE_LENGTH = TRACE_SCALLOP.length;
 
-const SCREEN_H = Dimensions.get('window').height;
-const SHEET_HEIGHT = Math.min(560, SCREEN_H * 0.78);
 // AppNavigator's bottom tab bar is always painted on top of whatever screen
 // is showing (it's a sibling rendered after the screen content, not part of
 // it), and FocusScreen is never shown without it — either as the Focus tab
@@ -122,7 +118,6 @@ export const FocusScreen: React.FC<Props> = ({
   const [streak, setStreak] = useState(0);
 
   const [blockedApps, setBlockedApps] = useState<string[]>(DEFAULT_BLOCKED_APPS);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
@@ -143,7 +138,6 @@ export const FocusScreen: React.FC<Props> = ({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const dialFadeAnim = useRef(new Animated.Value(1)).current;
   const blobEnterAnim = useRef(new Animated.Value(1)).current;
-  const sheetY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const { taskComplete, buttonPress } = useHaptics();
   const { setStatus } = useFocusSessionStatus();
   const bootstrappedRef = useRef(false);
@@ -175,14 +169,6 @@ export const FocusScreen: React.FC<Props> = ({
   // completed there should update this screen's Today/Week/All-Time stat
   // cards too, even though this instance never wrote that data itself.
   useEffect(() => subscribeFocusLog(() => { loadFocusLog().then(setFocusLog); }), []);
-
-  useEffect(() => {
-    Animated.timing(sheetY, {
-      toValue: sheetOpen ? 0 : SHEET_HEIGHT,
-      duration: 260,
-      useNativeDriver: true,
-    }).start();
-  }, [sheetOpen, sheetY]);
 
   // Takes the completed duration explicitly rather than reading `duration`
   // from closure — needed because the boot-time resume path (below) may
@@ -315,7 +301,6 @@ export const FocusScreen: React.FC<Props> = ({
     endTimeRef.current = 0;
     setPaused(false);
     setConfirmOpen(false);
-    setSheetOpen(false);
     await clearActiveSession();
 
     if (mode === 'early') {
@@ -469,19 +454,6 @@ export const FocusScreen: React.FC<Props> = ({
     await setSelfReportedGrant(permission, next);
   };
 
-  // See AppNavigator's swipeGesture for why this isn't composed with
-  // Gesture.Native() — that combinator broke scrolling instead of fixing
-  // button responsiveness. Wide activeOffsetY alone keeps it from
-  // swallowing the close/pause button taps it wraps.
-  const swipeGesture = Gesture.Pan()
-    .activeOffsetY([-20, 20])
-    .failOffsetX([-25, 25])
-    .onEnd(event => {
-      'worklet';
-      if (event.translationY < -50) runOnJS(setSheetOpen)(true);
-      else if (event.translationY > 50) runOnJS(setSheetOpen)(false);
-    });
-
   const stats = computeFocusStats(focusLog);
 
   const totalSeconds = duration * 60;
@@ -534,6 +506,60 @@ export const FocusScreen: React.FC<Props> = ({
                   <Text style={styles.statLabel}>All-Time</Text>
                 </View>
               </View>
+
+              {/* Managed here, before a session starts, instead of a
+                  swipe-up sheet mid-session — deciding what to block is a
+                  setup decision, not something to fumble with while
+                  already trying to focus. */}
+              <View style={styles.appsSection}>
+                <Text style={styles.appsTitle}>Blocked Apps</Text>
+                <Text style={styles.appsSub}>Stay away from these while a session runs.</Text>
+
+                <Text style={styles.permTitle}>Permissions</Text>
+                <Text style={styles.permSub}>Grant these once so blocking can actually work on your phone.</Text>
+                {PERMISSIONS.map(perm => (
+                  <View key={perm.id} style={styles.permRow}>
+                    <Ionicons name={perm.icon} size={20} color={Colors.textPrimary} />
+                    <View style={styles.permTextWrap}>
+                      <Text style={styles.appName}>{perm.label}</Text>
+                      <Text style={styles.permDescription}>{perm.description}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => handleGrantPermission(perm.id)} activeOpacity={0.7}>
+                      <Text style={styles.permGrantText}>Grant</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleToggleGrant(perm.id)} activeOpacity={0.7}>
+                      <View style={[styles.appToggle, grants[perm.id] && styles.appToggleOn]}>
+                        <View style={[styles.appToggleDot, grants[perm.id] && styles.appToggleDotOn]} />
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                <Text style={[styles.permTitle, styles.appsListTitle]}>Apps</Text>
+                {FOCUS_APPS.map(app => {
+                  const on = blockedApps.includes(app.id);
+                  return (
+                    <TouchableOpacity
+                      key={app.id}
+                      style={styles.appRow}
+                      onPress={() => toggleBlockedApp(app.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name={app.icon} size={20} color={Colors.textPrimary} />
+                      <Text style={styles.appName}>{app.label}</Text>
+                      <View style={[styles.appToggle, on && styles.appToggleOn]}>
+                        <View style={[styles.appToggleDot, on && styles.appToggleDotOn]} />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+                <TouchableOpacity style={styles.addAppRow} onPress={addCustomApp} activeOpacity={0.7}>
+                  <View style={styles.addAppIcon}>
+                    <Ionicons name="add" size={14} color={Colors.primary} />
+                  </View>
+                  <Text style={styles.addAppText}>Add app to block</Text>
+                </TouchableOpacity>
+              </View>
             </>
           )}
 
@@ -555,53 +581,44 @@ export const FocusScreen: React.FC<Props> = ({
       )}
 
       {phase === 'active' && (
-        <GestureDetector gesture={swipeGesture}>
-          <View style={styles.activeScreen}>
-            <View style={styles.topBar}>
-              <Text style={styles.wordmark}>There is no tomorrow</Text>
-              <View style={styles.topRight}>
-                <FlameBadge streak={streak} size={38} />
-                <TouchableOpacity style={styles.closeBtn} onPress={openConfirm} activeOpacity={0.7}>
-                  <Ionicons name="close" size={16} color={Colors.textSecondary} />
+        <View style={styles.activeScreen}>
+          <View style={styles.topBar}>
+            <Text style={styles.wordmark}>There is no tomorrow</Text>
+            <View style={styles.topRight}>
+              <FlameBadge streak={streak} size={38} />
+              <TouchableOpacity style={styles.closeBtn} onPress={openConfirm} activeOpacity={0.7}>
+                <Ionicons name="close" size={16} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.hero}>
+            <Animated.View style={[
+              styles.blobWrap,
+              { opacity: blobEnterAnim, transform: [{ scale: blobEnterAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] },
+            ]}>
+              <Svg width={BLOB_WRAP} height={BLOB_WRAP} viewBox={`0 0 ${BLOB_SIZE} ${BLOB_SIZE}`}>
+                <Path d={BLOB_PATH} fill={Colors.gray[100]} />
+                <Path
+                  d={TRACE_PATH}
+                  fill="none"
+                  stroke={Colors.gray[500]}
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeDasharray={TRACE_LENGTH}
+                  strokeDashoffset={traceDashoffset}
+                />
+              </Svg>
+              <View style={styles.blobContent}>
+                <Text style={styles.blobTask} numberOfLines={1}>{externalTask?.title ?? 'Focus Session'}</Text>
+                <Text style={styles.blobTime}>{formatMMSS(timeLeft)}</Text>
+                <TouchableOpacity style={styles.pauseCircle} onPress={togglePause} activeOpacity={0.75}>
+                  <Ionicons name={paused ? 'play' : 'pause'} size={20} color={Colors.gray[100]} />
                 </TouchableOpacity>
               </View>
-            </View>
-
-            <View style={styles.hero}>
-              <Animated.View style={[
-                styles.blobWrap,
-                { opacity: blobEnterAnim, transform: [{ scale: blobEnterAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] },
-              ]}>
-                <Svg width={BLOB_WRAP} height={BLOB_WRAP} viewBox={`0 0 ${BLOB_SIZE} ${BLOB_SIZE}`}>
-                  <Path d={BLOB_PATH} fill={Colors.gray[100]} />
-                  <Path
-                    d={TRACE_PATH}
-                    fill="none"
-                    stroke={Colors.gray[500]}
-                    strokeWidth={2.5}
-                    strokeLinecap="round"
-                    strokeDasharray={TRACE_LENGTH}
-                    strokeDashoffset={traceDashoffset}
-                  />
-                </Svg>
-                <View style={styles.blobContent}>
-                  <Text style={styles.blobTask} numberOfLines={1}>{externalTask?.title ?? 'Focus Session'}</Text>
-                  <Text style={styles.blobTime}>{formatMMSS(timeLeft)}</Text>
-                  <TouchableOpacity style={styles.pauseCircle} onPress={togglePause} activeOpacity={0.75}>
-                    <Ionicons name={paused ? 'play' : 'pause'} size={20} color={Colors.gray[100]} />
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-            </View>
-
-            {!sheetOpen && (
-              <View style={styles.swipeHint} pointerEvents="none">
-                <Ionicons name="chevron-up" size={16} color={Colors.textMuted} />
-                <Text style={styles.swipeHintText}>Swipe up for blocked apps</Text>
-              </View>
-            )}
+            </Animated.View>
           </View>
-        </GestureDetector>
+        </View>
       )}
 
       {confirmOpen && (
@@ -644,61 +661,6 @@ export const FocusScreen: React.FC<Props> = ({
         </Pressable>
       )}
 
-      {phase === 'active' && (
-        <Animated.View
-          style={[styles.appsSheet, { transform: [{ translateY: sheetY }] }]}
-          pointerEvents={sheetOpen ? 'auto' : 'none'}
-        >
-          <View style={styles.appsHandle} />
-          <Text style={styles.appsTitle}>Blocked Apps</Text>
-          <Text style={styles.appsSub}>Stay away from these while this session runs.</Text>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.permTitle}>Permissions</Text>
-            <Text style={styles.permSub}>Grant these once so blocking can actually work on your phone.</Text>
-            {PERMISSIONS.map(perm => (
-              <View key={perm.id} style={styles.permRow}>
-                <Ionicons name={perm.icon} size={20} color={Colors.textPrimary} />
-                <View style={styles.permTextWrap}>
-                  <Text style={styles.appName}>{perm.label}</Text>
-                  <Text style={styles.permDescription}>{perm.description}</Text>
-                </View>
-                <TouchableOpacity onPress={() => handleGrantPermission(perm.id)} activeOpacity={0.7}>
-                  <Text style={styles.permGrantText}>Grant</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleToggleGrant(perm.id)} activeOpacity={0.7}>
-                  <View style={[styles.appToggle, grants[perm.id] && styles.appToggleOn]}>
-                    <View style={[styles.appToggleDot, grants[perm.id] && styles.appToggleDotOn]} />
-                  </View>
-                </TouchableOpacity>
-              </View>
-            ))}
-            <Text style={[styles.permTitle, styles.appsListTitle]}>Apps</Text>
-            {FOCUS_APPS.map(app => {
-              const on = blockedApps.includes(app.id);
-              return (
-                <TouchableOpacity
-                  key={app.id}
-                  style={styles.appRow}
-                  onPress={() => toggleBlockedApp(app.id)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name={app.icon} size={20} color={Colors.textPrimary} />
-                  <Text style={styles.appName}>{app.label}</Text>
-                  <View style={[styles.appToggle, on && styles.appToggleOn]}>
-                    <View style={[styles.appToggleDot, on && styles.appToggleDotOn]} />
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity style={styles.addAppRow} onPress={addCustomApp} activeOpacity={0.7}>
-              <View style={styles.addAppIcon}>
-                <Ionicons name="add" size={14} color={Colors.primary} />
-              </View>
-              <Text style={styles.addAppText}>Add app to block</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </Animated.View>
-      )}
     </View>
   );
 };
@@ -763,9 +725,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center',
   },
 
-  swipeHint: { alignItems: 'center', gap: 2, paddingBottom: 30 },
-  swipeHintText: { fontSize: 10.5, color: Colors.textMuted, fontFamily: Fonts.regular },
-
   // ── Hold-to-end confirm overlay ──────────────────────────────────────────
   confirmOverlay: { flex: 1, justifyContent: 'flex-end' },
   confirmClose: { position: 'absolute', top: 24, right: 22 },
@@ -800,15 +759,14 @@ const styles = StyleSheet.create({
   doneTitle: { ...Typography.headlineLarge, color: Colors.textPrimary },
   doneSub: { ...Typography.bodyMedium, color: Colors.textSecondary, marginBottom: Spacing.lg },
 
-  // ── Blocked-apps swipe-up sheet ───────────────────────────────────────────
-  appsSheet: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, height: SHEET_HEIGHT,
+  // ── Blocked apps (setup phase, not a mid-session sheet anymore) ──────────
+  appsSection: {
     backgroundColor: Colors.surfaceElevated,
-    borderTopWidth: 1, borderTopColor: Colors.border,
-    borderTopLeftRadius: BorderRadius.xl, borderTopRightRadius: BorderRadius.xl,
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 + TAB_BAR_CLEARANCE,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1, borderColor: Colors.border,
+    paddingHorizontal: 20, paddingTop: 18, paddingBottom: 6,
+    marginTop: Spacing.xl,
   },
-  appsHandle: { width: 38, height: 4, backgroundColor: Colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   appsTitle: { fontSize: 17, fontFamily: Fonts.bold, color: Colors.textPrimary, marginBottom: 4 },
   appsSub: { fontSize: 12.5, color: Colors.textSecondary, marginBottom: 18, fontFamily: Fonts.regular },
   permTitle: { fontSize: 12.5, fontFamily: Fonts.bold, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
