@@ -316,8 +316,16 @@ const AppNavigatorInner: React.FC = () => {
               timer/session state worth preserving, so they stay simple
               mount-on-visit — keeping four heavy screens (charts, podium,
               animations) alive simultaneously all the time was the likely
-              cause of the app feeling sluggish. */}
-          {showTabs && (
+              cause of the app feeling sluggish.
+
+              Onboarding screens are the one exception: they fully unmount
+              these two instead of just hiding them. Stacking a third heavy
+              animated screen (the avatar wall) on top of two already-mounted
+              ones was crashing on-device — this is a dev-only preview
+              flow, so losing an in-progress session for the rare case where
+              one happens to be running when it's opened is an acceptable
+              trade for not crashing. */}
+          {showTabs && !ONBOARDING_SCREENS.has(screen) && (
             <View style={[styles.tabScreenSlot, screen !== 'todo' && styles.hidden]}>
               <TodoScreen
                 appState={appState}
@@ -329,7 +337,7 @@ const AppNavigatorInner: React.FC = () => {
               />
             </View>
           )}
-          {showTabs && (
+          {showTabs && !ONBOARDING_SCREENS.has(screen) && (
             <View style={[styles.tabScreenSlot, screen !== 'focus' && styles.hidden]}>
               <FocusScreen
                 userId={userIdRef.current ?? undefined}

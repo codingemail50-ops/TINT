@@ -37,6 +37,15 @@ const BAR_COL_WIDTH = 68;
 const DualBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
   const [touchIdx, setTouchIdx] = useState<number | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+  // The tooltip's left position was being clamped against the full
+  // scrollable content width, not the currently visible slice of it — so a
+  // bar near the edge of whatever's scrolled into view (but not near the
+  // edge of ALL history) could still get a tooltip that ran off the
+  // viewport and was clipped by the ScrollView's own bounds. Clamping
+  // against the actual visible window (scrollX..scrollX+viewportWidth)
+  // fixes that regardless of scroll position.
+  const [scrollX, setScrollX] = useState(0);
+  const [viewportWidth, setViewportWidth] = useState(0);
 
   const maxMins = Math.max(...buckets.map(b => Math.max(b.mins, b.distractedMins)), 60);
   const maxHours = Math.max(1, Math.ceil(maxMins / 60));
@@ -57,8 +66,10 @@ const DualBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
   }, [buckets.length]);
 
   const touched = touchIdx !== null ? buckets[touchIdx] : null;
+  const viewMin = scrollX;
+  const viewMax = Math.max(viewMin, scrollX + viewportWidth - TOOLTIP_W);
   const tooltipLeft = touchIdx !== null
-    ? Math.max(0, Math.min(contentWidth - TOOLTIP_W, touchIdx * BAR_COL_WIDTH + BAR_COL_WIDTH / 2 - TOOLTIP_W / 2))
+    ? Math.max(viewMin, Math.min(viewMax, touchIdx * BAR_COL_WIDTH + BAR_COL_WIDTH / 2 - TOOLTIP_W / 2))
     : 0;
 
   return (
@@ -68,7 +79,15 @@ const DualBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
           <Text key={h} style={[chartSt.yLabel, { bottom: (h * 60 / scaleMins) * CHART_H - 6 }]}>{h}h</Text>
         ))}
       </View>
-      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} style={chartSt.scroller}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={chartSt.scroller}
+        onLayout={e => setViewportWidth(e.nativeEvent.layout.width)}
+        onScroll={e => setScrollX(e.nativeEvent.contentOffset.x)}
+        scrollEventThrottle={16}
+      >
         <View style={{ width: contentWidth }}>
           <View style={[chartSt.chartArea, { height: CHART_H }]}>
             {hourMarks.map(h => (

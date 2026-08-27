@@ -11,14 +11,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
 import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog } from '../utils/supabaseStorage';
-import { StorageService } from '../utils/storage';
 import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats, subscribeFocusLog } from '../utils/focusLog';
 import { loadDistractionLog, saveDistractionLog } from '../utils/distractionLog';
 import { saveActiveSession, loadActiveSession, clearActiveSession } from '../utils/activeFocusSession';
 import { useFocusSessionStatus } from '../context/FocusSessionContext';
 import { now as devNow } from '../utils/devClock';
 import { PixelFlame } from '../components/PixelFlame';
-import { FlameBadge } from '../components/FlameBadge';
 import { BlobDial } from '../components/BlobDial';
 import { scallopPath } from '../utils/scallopPath';
 import { openPermissionSettings, getSelfReportedGrants, setSelfReportedGrant, BlockingPermission } from '../utils/appBlocking';
@@ -118,7 +116,6 @@ export const FocusScreen: React.FC<Props> = ({
   const [duration, setDuration] = useState(externalTask?.durationMins ?? DEFAULT_DURATION);
   const [timeLeft, setTimeLeft] = useState((externalTask?.durationMins ?? DEFAULT_DURATION) * 60);
   const [paused, setPaused] = useState(false);
-  const [streak, setStreak] = useState(0);
 
   const [blockedApps, setBlockedApps] = useState<string[]>(DEFAULT_BLOCKED_APPS);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -162,8 +159,6 @@ export const FocusScreen: React.FC<Props> = ({
         else await AsyncStorage.setItem(KEYS.BLOCKED_APPS, JSON.stringify(DEFAULT_BLOCKED_APPS));
       } catch {}
       setFocusLog(await loadFocusLog());
-      const state = await StorageService.getAppState();
-      setStreak(state.streak);
       setGrants(await getSelfReportedGrants());
     })();
   }, []);
@@ -267,6 +262,13 @@ export const FocusScreen: React.FC<Props> = ({
       source: phase === 'active' ? sessionSource : null,
     });
   }, [phase, paused, timeLeft, externalTask?.title, sessionSource, setStatus]);
+
+  // Separate effect, empty deps, so this only fires on true unmount — not on
+  // every tick alongside the effect above. This instance can now actually
+  // unmount mid-session (AppNavigator unmounts rather than hides it while
+  // the onboarding preview is open), so without this the mini-player could
+  // keep showing a frozen, stale "active" status for a screen that's gone.
+  useEffect(() => () => setStatus({ active: false, paused: false, timeLeft: 0, title: '', source: null }), [setStatus]);
 
   useEffect(() => {
     const onChange = (state: AppStateStatus) => {
@@ -587,12 +589,9 @@ export const FocusScreen: React.FC<Props> = ({
         <View style={styles.activeScreen}>
           <View style={styles.topBar}>
             <Text style={styles.wordmark}>There is no tomorrow</Text>
-            <View style={styles.topRight}>
-              <FlameBadge streak={streak} size={38} />
-              <TouchableOpacity style={styles.closeBtn} onPress={openConfirm} activeOpacity={0.7}>
-                <Ionicons name="close" size={16} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.closeBtn} onPress={openConfirm} activeOpacity={0.7}>
+              <Ionicons name="close" size={16} color={Colors.textSecondary} />
+            </TouchableOpacity>
           </View>
 
           {/* Subtle on purpose — the timer itself is what this screen is
@@ -710,7 +709,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.pixel, fontSize: 19, color: Colors.gray[400],
     letterSpacing: 0.5, textTransform: 'uppercase',
   },
-  topRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   closeBtn: {
     width: 34, height: 34, borderRadius: BorderRadius.sm,
     borderWidth: 1, borderColor: Colors.border,
