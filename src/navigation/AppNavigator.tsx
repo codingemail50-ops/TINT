@@ -306,11 +306,15 @@ const AppNavigatorInner: React.FC = () => {
           {screen === 'focusGoal' && (
             <FocusGoalScreen onComplete={handleFocusGoalComplete} onBack={() => setScreen('createAccount')} />
           )}
-          {/* The four tab screens stay mounted (visibility toggled via
+          {/* Today and Focus stay mounted (visibility toggled via
               display:none) instead of being swapped in and out of the tree —
               otherwise navigating away destroys their state, which is
               exactly what was happening to a running Focus session the
-              moment you switched tabs. */}
+              moment you switched tabs. Progress and Rank don't hold any
+              timer/session state worth preserving, so they stay simple
+              mount-on-visit — keeping four heavy screens (charts, podium,
+              animations) alive simultaneously all the time was the likely
+              cause of the app feeling sluggish. */}
           {showTabs && (
             <View style={[styles.tabScreenSlot, screen !== 'todo' && styles.hidden]}>
               <TodoScreen
@@ -333,16 +337,8 @@ const AppNavigatorInner: React.FC = () => {
               />
             </View>
           )}
-          {showTabs && (
-            <View style={[styles.tabScreenSlot, screen !== 'productivity' && styles.hidden]}>
-              <ProductivityScreen appState={appState} />
-            </View>
-          )}
-          {showTabs && (
-            <View style={[styles.tabScreenSlot, screen !== 'leaderboard' && styles.hidden]}>
-              <LeaderboardScreen appState={appState} userId={userIdRef.current ?? undefined} />
-            </View>
-          )}
+          {screen === 'productivity' && <ProductivityScreen appState={appState} />}
+          {screen === 'leaderboard' && <LeaderboardScreen appState={appState} userId={userIdRef.current ?? undefined} />}
           {screen === 'profile' && (
             <ProfileScreen
               appState={appState}
