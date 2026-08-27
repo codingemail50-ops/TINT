@@ -21,9 +21,14 @@ interface Props {
   userId?: string;
   onStateChange: (state: AppState) => void;
   onBack: () => void;
+  /** Dev-only: replays onboarding from step 1, for testing that flow
+   *  without the risk the "tap the wordmark" shortcut turned out to carry
+   *  on-device (Today and Focus stay mounted underneath it, and layering a
+   *  third heavy animated screen on top was crashing on some phones). */
+  onPreviewOnboarding?: () => void;
 }
 
-export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange, onBack }) => {
+export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange, onBack, onPreviewOnboarding }) => {
   const [friends, setFriends] = useState<CloudLeaderboardRow[]>([]);
   const [incoming, setIncoming] = useState<FriendRequestRow[]>([]);
   const [outgoingIds, setOutgoingIds] = useState<Set<string>>(new Set());
@@ -263,6 +268,11 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
               {devDayOffset !== 0 && (
                 <TouchableOpacity style={styles.devBtn} onPress={handleResetDayOffset}>
                   <Text style={styles.devBtnText}>Back to real time ({devDayOffset}d)</Text>
+                </TouchableOpacity>
+              )}
+              {onPreviewOnboarding && (
+                <TouchableOpacity style={styles.devBtn} onPress={onPreviewOnboarding}>
+                  <Text style={styles.devBtnText}>Preview onboarding / sign-in</Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={[styles.devBtn, styles.devBtnDanger]} onPress={handleResetTestData}>

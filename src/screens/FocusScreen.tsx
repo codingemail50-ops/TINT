@@ -785,9 +785,9 @@ const styles = StyleSheet.create({
   },
   appName: { flex: 1, fontSize: 14.5, color: Colors.textPrimary, fontFamily: Fonts.regular },
   appToggle: { width: 40, height: 24, borderRadius: 12, backgroundColor: Colors.border, justifyContent: 'center' },
-  appToggleOn: { backgroundColor: Colors.gray[500] },
+  appToggleOn: { backgroundColor: Colors.pop },
   appToggleDot: { width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.textPrimary, marginLeft: 3 },
-  appToggleDotOn: { marginLeft: 19 },
+  appToggleDotOn: { marginLeft: 19, backgroundColor: Colors.background },
   addAppRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 },
   addAppIcon: {
     width: 24, height: 24, borderRadius: 12,

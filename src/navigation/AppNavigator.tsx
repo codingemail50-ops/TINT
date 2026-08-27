@@ -326,7 +326,6 @@ const AppNavigatorInner: React.FC = () => {
                 onNavigateFocus={() => navigateTo('focus')}
                 onNavigateProfile={() => navigateTo('profile')}
                 onNavigateAnalytics={() => navigateTo('productivity')}
-                onPreviewOnboarding={handleOpenOnboardingPreview}
               />
             </View>
           )}
@@ -347,6 +346,7 @@ const AppNavigatorInner: React.FC = () => {
               userId={userIdRef.current ?? undefined}
               onStateChange={handleStateChange}
               onBack={() => navigateTo('todo')}
+              onPreviewOnboarding={handleOpenOnboardingPreview}
             />
           )}
         </View>

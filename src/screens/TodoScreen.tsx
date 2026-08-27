@@ -184,11 +184,9 @@ interface Props {
   onNavigateFocus: () => void;
   onNavigateProfile: () => void;
   onNavigateAnalytics: () => void;
-  /** Temporary dev shortcut to replay onboarding from step 1, tappable off the wordmark — remove later. */
-  onPreviewOnboarding?: () => void;
 }
 
-export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, onNavigateFocus, onNavigateProfile, onNavigateAnalytics, onPreviewOnboarding }) => {
+export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, onNavigateFocus, onNavigateProfile, onNavigateAnalytics }) => {
   const [tasks, setTasks]           = useState<Task[]>([]);
   const [todayStr, setTodayStr]     = useState(() => devNow().toDateString());
   const [selectedDate, setSelectedDate] = useState(() => devNow().toDateString());
@@ -454,15 +452,10 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
         }),
       }]}>
         <View style={styles.headerTop}>
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            onPress={onPreviewOnboarding}
-            activeOpacity={onPreviewOnboarding ? 0.6 : 1}
-            disabled={!onPreviewOnboarding}
-          >
+          <View style={{ flex: 1 }}>
             <Text style={styles.tagline}>THERE IS</Text>
             <Text style={styles.tagline}>NO TOMORROW</Text>
-          </TouchableOpacity>
+          </View>
           <FlameBadge streak={appState.streak} size={46} onPress={onNavigateProfile} avatar={appState.user?.avatar} />
         </View>
 
