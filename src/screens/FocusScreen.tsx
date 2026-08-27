@@ -47,10 +47,13 @@ const KEYS = {
   BLOCKED_APPS: BLOCKED_APPS_STORAGE_KEY,
 };
 
-const BLOB_SIZE = 240;
+// Bigger than it used to be — the running timer is the whole point of this
+// screen and should read as the dominant thing on it, not compete with
+// anything else for attention.
+const BLOB_SIZE = 300;
 const BLOB_WRAP = BLOB_SIZE + 24;
-const BLOB_R = 86;
-const BLOB_AMP = 5;
+const BLOB_R = 108;
+const BLOB_AMP = 6;
 const BLOB_PATH = scallopPath(BLOB_SIZE / 2, BLOB_SIZE / 2, BLOB_R, 15, BLOB_AMP).d;
 const TRACE_SCALLOP = scallopPath(BLOB_SIZE / 2, BLOB_SIZE / 2, BLOB_R + 5, 15, BLOB_AMP);
 const TRACE_PATH = TRACE_SCALLOP.d;
@@ -592,6 +595,12 @@ export const FocusScreen: React.FC<Props> = ({
             </View>
           </View>
 
+          {/* Subtle on purpose — the timer itself is what this screen is
+              for, this is just context for which task it's tied to. */}
+          <Text style={styles.activeTaskLabel} numberOfLines={1}>
+            {externalTask?.title ?? 'Focus Session'}
+          </Text>
+
           <View style={styles.hero}>
             <Animated.View style={[
               styles.blobWrap,
@@ -610,7 +619,6 @@ export const FocusScreen: React.FC<Props> = ({
                 />
               </Svg>
               <View style={styles.blobContent}>
-                <Text style={styles.blobTask} numberOfLines={1}>{externalTask?.title ?? 'Focus Session'}</Text>
                 <Text style={styles.blobTime}>{formatMMSS(timeLeft)}</Text>
                 <TouchableOpacity style={styles.pauseCircle} onPress={togglePause} activeOpacity={0.75}>
                   <Ionicons name={paused ? 'play' : 'pause'} size={20} color={Colors.gray[100]} />
@@ -628,9 +636,6 @@ export const FocusScreen: React.FC<Props> = ({
             locations={[0, 0.45, 1]}
             style={styles.confirmOverlay}
           >
-            <TouchableOpacity style={styles.confirmClose} onPress={closeConfirm} activeOpacity={0.7}>
-              <Ionicons name="close" size={20} color="rgba(255,255,255,0.7)" />
-            </TouchableOpacity>
             <Text style={styles.confirmTimer}>{formatMMSS(timeLeft)}</Text>
 
             {/* Plain View, not a Pressable — a tap anywhere on this card
@@ -712,14 +717,17 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
+  // Deliberately quiet — the timer below is the focal point, this is just
+  // context for which task it's tied to.
+  activeTaskLabel: {
+    fontSize: 12.5, fontFamily: Fonts.medium, color: Colors.textMuted,
+    textAlign: 'center', marginTop: Spacing.md, textTransform: 'uppercase', letterSpacing: 0.5,
+  },
+
   hero: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   blobWrap: { width: BLOB_WRAP, height: BLOB_WRAP, alignItems: 'center', justifyContent: 'center' },
   blobContent: { position: 'absolute', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  blobTask: {
-    fontSize: 12, fontFamily: Fonts.bold, color: Colors.gray[700],
-    textTransform: 'uppercase', letterSpacing: 0.5,
-  },
-  blobTime: { fontFamily: Fonts.pixel, fontSize: 52, color: Colors.ink, letterSpacing: 0, marginBottom: 10 },
+  blobTime: { fontFamily: Fonts.pixel, fontSize: 64, color: Colors.ink, letterSpacing: 0, marginBottom: 14 },
   pauseCircle: {
     width: 50, height: 50, borderRadius: 25,
     backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center',
@@ -727,7 +735,6 @@ const styles = StyleSheet.create({
 
   // ── Hold-to-end confirm overlay ──────────────────────────────────────────
   confirmOverlay: { flex: 1, justifyContent: 'flex-end' },
-  confirmClose: { position: 'absolute', top: 24, right: 22 },
   confirmTimer: {
     position: 'absolute', top: 130, left: 0, right: 0, textAlign: 'center',
     fontFamily: Fonts.pixel, fontSize: 58, color: 'rgba(255,255,255,0.5)',

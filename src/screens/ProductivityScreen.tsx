@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, PanResponder } from 'react-native';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
@@ -24,20 +24,19 @@ function formatMinsShort(mins: number): string {
 }
 
 // ── Focus-vs-distracted bar chart, orange over white ─────────────────────────
-const CHART_H = 150;
-const YAXIS_W = 26;
+const CHART_H = 190;
+const YAXIS_W = 30;
 const TOOLTIP_W = 132;
-const CHART_W = Dimensions.get('window').width - (Spacing.xl + Spacing.md) * 2;
-const PLOT_W = CHART_W - YAXIS_W;
+// Fixed width per bucket — generous enough that ~4-5 fit on screen at once
+// with a real, readable date under each, rather than squeezing every bucket
+// for a timeframe into one fixed width (illegible bars, sparse labels, and
+// touch-to-bucket mapping that only worked by coincidence). More buckets
+// than fit on screen just scroll instead.
+const BAR_COL_WIDTH = 68;
 
 const DualBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
   const [touchIdx, setTouchIdx] = useState<number | null>(null);
-  // Measured from the actual rendered element rather than assumed from
-  // Dimensions.get('window') at module-load time — the two can drift apart
-  // (padding rounding, different devices), and when they do, touch-to-bucket
-  // mapping goes out of sync with where the bars are actually drawn. This
-  // is fed by onLayout below and drives both, so they can't disagree.
-  const [plotWidth, setPlotWidth] = useState(PLOT_W);
+  const scrollRef = useRef<ScrollView>(null);
 
   const maxMins = Math.max(...buckets.map(b => Math.max(b.mins, b.distractedMins)), 60);
   const maxHours = Math.max(1, Math.ceil(maxMins / 60));
@@ -47,83 +46,77 @@ const DualBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
   const hourMarks: number[] = [];
   for (let h = step; h <= topHours; h += step) hourMarks.push(h);
 
-  const colW = plotWidth / buckets.length;
-  const barW = Math.max(3, Math.min(20, colW - 4));
+  const barW = 22;
   const frontW = Math.max(2, barW * 0.55);
+  const contentWidth = buckets.length * BAR_COL_WIDTH;
 
-  const panResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: e => {
-      const idx = Math.max(0, Math.min(buckets.length - 1, Math.floor(e.nativeEvent.locationX / colW)));
-      setTouchIdx(idx);
-    },
-    onPanResponderMove: e => {
-      const idx = Math.max(0, Math.min(buckets.length - 1, Math.floor(e.nativeEvent.locationX / colW)));
-      setTouchIdx(idx);
-    },
-    onPanResponderRelease: () => setTouchIdx(null),
-    onPanResponderTerminate: () => setTouchIdx(null),
-  }), [buckets.length, colW]);
+  // Most recent bucket (today / this month / this hour) is what people
+  // check by default — land there instead of at the start of history.
+  useEffect(() => {
+    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: false }));
+  }, [buckets.length]);
 
   const touched = touchIdx !== null ? buckets[touchIdx] : null;
   const tooltipLeft = touchIdx !== null
-    ? Math.max(0, Math.min(plotWidth - TOOLTIP_W, touchIdx * colW + colW / 2 - TOOLTIP_W / 2))
+    ? Math.max(0, Math.min(contentWidth - TOOLTIP_W, touchIdx * BAR_COL_WIDTH + BAR_COL_WIDTH / 2 - TOOLTIP_W / 2))
     : 0;
 
   return (
-    <View>
-      <View style={chartSt.row}>
-        <View style={[chartSt.yAxis, { height: CHART_H }]}>
-          {hourMarks.map(h => (
-            <Text key={h} style={[chartSt.yLabel, { bottom: (h * 60 / scaleMins) * CHART_H - 6 }]}>{h}h</Text>
-          ))}
-        </View>
-        <View
-          style={[chartSt.chartArea, { height: CHART_H }]}
-          onLayout={e => setPlotWidth(e.nativeEvent.layout.width)}
-          {...panResponder.panHandlers}
-        >
-          {hourMarks.map(h => (
-            <View key={h} style={[chartSt.gridline, { bottom: (h * 60 / scaleMins) * CHART_H }]} />
-          ))}
-          <View style={chartSt.barRow}>
-            {buckets.map((b, i) => {
-              const focusH = Math.max(b.mins > 0 ? 2 : 0, (b.mins / scaleMins) * CHART_H);
-              const distH = Math.max(b.distractedMins > 0 ? 2 : 0, (b.distractedMins / scaleMins) * CHART_H);
-              const focusFront = b.mins <= b.distractedMins;
-              const [bottomBar, topBar] = focusFront
-                ? [{ height: distH, width: barW, backgroundColor: Colors.primary }, { height: focusH, width: frontW, backgroundColor: Colors.pop }]
-                : [{ height: focusH, width: barW, backgroundColor: Colors.pop }, { height: distH, width: frontW, backgroundColor: Colors.primary }];
-              return (
-                <View key={i} style={chartSt.barCol}>
-                  <View style={[chartSt.bar, chartSt.barBack, bottomBar]} />
-                  <View style={[chartSt.bar, chartSt.barFront, topBar]} />
-                </View>
-              );
-            })}
-          </View>
-          {touched && (
-            <View style={[chartSt.tooltip, { left: tooltipLeft, width: TOOLTIP_W }]}>
-              <Text style={chartSt.tooltipDate}>{touched.dateLabel}</Text>
-              <View style={chartSt.tooltipRow}>
-                <View style={[chartSt.tooltipDot, { backgroundColor: Colors.pop }]} />
-                <Text style={chartSt.tooltipText}>Focus {formatMinsShort(touched.mins)}</Text>
-              </View>
-              <View style={chartSt.tooltipRow}>
-                <View style={[chartSt.tooltipDot, { backgroundColor: Colors.primary }]} />
-                <Text style={chartSt.tooltipText}>Distracted {formatMinsShort(touched.distractedMins)}</Text>
-              </View>
-            </View>
-          )}
-        </View>
-      </View>
-      <View style={chartSt.dayRow}>
-        <View style={{ width: YAXIS_W }} />
-        {buckets.map((b, i) => (
-          <Text key={i} style={chartSt.dayLabel}>{b.label}</Text>
+    <View style={chartSt.row}>
+      <View style={[chartSt.yAxis, { height: CHART_H }]}>
+        {hourMarks.map(h => (
+          <Text key={h} style={[chartSt.yLabel, { bottom: (h * 60 / scaleMins) * CHART_H - 6 }]}>{h}h</Text>
         ))}
       </View>
+      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} style={chartSt.scroller}>
+        <View style={{ width: contentWidth }}>
+          <View style={[chartSt.chartArea, { height: CHART_H }]}>
+            {hourMarks.map(h => (
+              <View key={h} style={[chartSt.gridline, { bottom: (h * 60 / scaleMins) * CHART_H }]} />
+            ))}
+            <View style={chartSt.barRow}>
+              {buckets.map((b, i) => {
+                const focusH = Math.max(b.mins > 0 ? 2 : 0, (b.mins / scaleMins) * CHART_H);
+                const distH = Math.max(b.distractedMins > 0 ? 2 : 0, (b.distractedMins / scaleMins) * CHART_H);
+                const focusFront = b.mins <= b.distractedMins;
+                const [bottomBar, topBar] = focusFront
+                  ? [{ height: distH, width: barW, backgroundColor: Colors.primary }, { height: focusH, width: frontW, backgroundColor: Colors.pop }]
+                  : [{ height: focusH, width: barW, backgroundColor: Colors.pop }, { height: distH, width: frontW, backgroundColor: Colors.primary }];
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    style={[chartSt.barCol, { width: BAR_COL_WIDTH }]}
+                    activeOpacity={1}
+                    onPressIn={() => setTouchIdx(i)}
+                    onPressOut={() => setTouchIdx(null)}
+                  >
+                    <View style={[chartSt.bar, chartSt.barBack, bottomBar]} />
+                    <View style={[chartSt.bar, chartSt.barFront, topBar]} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {touched && (
+              <View style={[chartSt.tooltip, { left: tooltipLeft, width: TOOLTIP_W }]}>
+                <Text style={chartSt.tooltipDate}>{touched.dateLabel}</Text>
+                <View style={chartSt.tooltipRow}>
+                  <View style={[chartSt.tooltipDot, { backgroundColor: Colors.pop }]} />
+                  <Text style={chartSt.tooltipText}>Focus {formatMinsShort(touched.mins)}</Text>
+                </View>
+                <View style={chartSt.tooltipRow}>
+                  <View style={[chartSt.tooltipDot, { backgroundColor: Colors.primary }]} />
+                  <Text style={chartSt.tooltipText}>Distracted {formatMinsShort(touched.distractedMins)}</Text>
+                </View>
+              </View>
+            )}
+          </View>
+          <View style={chartSt.dayRow}>
+            {buckets.map((b, i) => (
+              <Text key={i} style={[chartSt.dayLabel, { width: BAR_COL_WIDTH }]} numberOfLines={1}>{b.label}</Text>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
     </View>
   );
 };
@@ -132,18 +125,18 @@ const chartSt = StyleSheet.create({
   row: { flexDirection: 'row' },
   yAxis: { width: YAXIS_W, justifyContent: 'flex-end' },
   yLabel: { position: 'absolute', right: 6, fontSize: 9, color: Colors.textMuted, fontFamily: Fonts.regular },
-  chartArea: { flex: 1, justifyContent: 'flex-end', position: 'relative' },
+  scroller: { flex: 1 },
+  chartArea: { justifyContent: 'flex-end', position: 'relative' },
   gridline: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: Colors.border },
-  // Each bucket gets an equal-width flex column (matching dayRow's flex:1
-  // labels below) so the bar always sits centered under its own label,
-  // regardless of how many buckets the timeframe produces.
+  // Fixed-width columns (BAR_COL_WIDTH) now, not flex — the chart scrolls
+  // horizontally instead of squeezing every bucket into the screen width.
   barRow: { flexDirection: 'row', alignItems: 'flex-end', height: '100%' },
-  barCol: { flex: 1, height: '100%', alignItems: 'center', justifyContent: 'flex-end' },
+  barCol: { height: '100%', alignItems: 'center', justifyContent: 'flex-end' },
   bar: { position: 'absolute', bottom: 0, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
   barBack: { zIndex: 1 },
   barFront: { zIndex: 2 },
   dayRow: { flexDirection: 'row', marginTop: Spacing.sm },
-  dayLabel: { flex: 1, textAlign: 'center', fontSize: 11, color: Colors.textMuted, fontFamily: Fonts.regular },
+  dayLabel: { textAlign: 'center', fontSize: 11, color: Colors.textMuted, fontFamily: Fonts.regular },
   tooltip: {
     position: 'absolute', top: -8, backgroundColor: Colors.gray[900], borderRadius: BorderRadius.md,
     padding: Spacing.sm, borderWidth: 1, borderColor: Colors.border, zIndex: 10, gap: 3,

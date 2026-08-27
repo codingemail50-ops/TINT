@@ -159,7 +159,7 @@ export function getFocusSummary(
     const buckets: FocusBucket[] = [];
     for (let h = 0; h < 24; h++) {
       buckets.push({
-        label: h % 3 === 0 ? formatHourLabel(h) : '',
+        label: formatHourLabel(h),
         mins: hourMins[h],
         distractedMins: hourDistracted[h],
         dateLabel: `${formatHourLabel(h)} Today`,
@@ -194,7 +194,7 @@ export function getFocusSummary(
       const entries = log.filter(e => e.date === dateStr);
       const mins = entries.reduce((s, e) => s + e.mins, 0);
       totalMins += mins; sessionCount += entries.length;
-      buckets.push({ label: day === 1 || day % 5 === 1 ? String(day) : '', mins, distractedMins: sumMins(distractionLog, dateStr), dateLabel: shortDate(d) });
+      buckets.push({ label: String(day), mins, distractedMins: sumMins(distractionLog, dateStr), dateLabel: shortDate(d) });
     }
     return { buckets, periodLabel: `${MONTH_LABELS[month]} ${year}`, totalMins, sessionCount, avgMinsPerDay: totalMins / daysElapsed, avgSessionsPerDay: sessionCount / daysElapsed };
   }
