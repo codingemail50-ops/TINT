@@ -1,6 +1,31 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import { View, Animated, StyleSheet, TouchableOpacity, Dimensions, Easing } from 'react-native';
 import { PixelIcon } from './PixelIcon';
+
+// Split out and memoized so tapping a new avatar only re-renders the (at
+// most two) cells whose selected state actually flipped, instead of every
+// cell in the wall — with hundreds of cells mounted, re-rendering all of
+// them on every tap is what made avatar selection feel laggy.
+const WallCell: React.FC<{
+  name: string;
+  cellSize: number;
+  isSelected: boolean;
+  onPick?: (name: string) => void;
+}> = memo(({ name, cellSize, isSelected, onPick }) => {
+  const Wrapper = onPick ? TouchableOpacity : View;
+  return (
+    <Wrapper
+      style={[
+        styles.cell,
+        { width: cellSize, height: cellSize },
+        isSelected && styles.cellSelected,
+      ]}
+      {...(onPick ? { onPress: () => onPick(name), activeOpacity: 0.7 } : {})}
+    >
+      <PixelIcon name={name} size={cellSize * 0.66} />
+    </Wrapper>
+  );
+});
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -38,7 +63,11 @@ export const AvatarWall: React.FC<Props> = ({
   alternateDirection = false, durationMs = 14000, selected, onPick,
 }) => {
   const cell = cellSize + gap;
-  const repeatCount = Math.max(3, Math.ceil((SCREEN_W * 1.7) / (cell * icons.length))) * icons.length;
+  // 1.3 screen-widths per copy (was 1.7) — still comfortably covers the
+  // loop margin without the extra columns of native views that weren't
+  // buying any visible coverage, since the wall's own rotate+scale
+  // transform already overshoots past the screen edges.
+  const repeatCount = Math.max(3, Math.ceil((SCREEN_W * 1.3) / (cell * icons.length))) * icons.length;
   const unit: string[] = [];
   for (let i = 0; i < repeatCount; i++) unit.push(icons[i % icons.length]);
   const unitWidth = unit.length * cell;
@@ -78,23 +107,15 @@ export const AvatarWall: React.FC<Props> = ({
               },
             ]}
           >
-            {doubled.map((name, i) => {
-              const isSelected = !!selected && name === selected;
-              const Wrapper = onPick ? TouchableOpacity : View;
-              return (
-                <Wrapper
-                  key={i}
-                  style={[
-                    styles.cell,
-                    { width: cellSize, height: cellSize },
-                    isSelected && styles.cellSelected,
-                  ]}
-                  {...(onPick ? { onPress: () => onPick(name), activeOpacity: 0.7 } : {})}
-                >
-                  <PixelIcon name={name} size={cellSize * 0.66} />
-                </Wrapper>
-              );
-            })}
+            {doubled.map((name, i) => (
+              <WallCell
+                key={i}
+                name={name}
+                cellSize={cellSize}
+                isSelected={!!selected && name === selected}
+                onPick={onPick}
+              />
+            ))}
           </Animated.View>
         ))}
       </View>

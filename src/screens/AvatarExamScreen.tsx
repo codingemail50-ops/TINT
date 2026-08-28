@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { EXAM_TYPES, ExamType, AVATARS, CustomExam } from '../data/examPresets';
 import { AvatarWall } from '../components/AvatarWall';
+import { PixelIcon } from '../components/PixelIcon';
 import { CustomExamModal } from '../components/CustomExamModal';
 import { useHaptics } from '../hooks/useHaptics';
 
@@ -54,6 +55,7 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
     ]).start();
   };
 
+  const avatarLabel = avatar.charAt(0).toUpperCase() + avatar.slice(1);
   const canProceed = selectedExams.size > 0 || !!customExam;
 
   const handleOther = () => {
@@ -85,11 +87,18 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
           the heading never sits on top of the moving icons. */}
       <View style={styles.header}>
         <Text style={styles.pixelTitle}>Choose Your Avatar</Text>
-        <Text style={styles.sub}>Tap an avatar in the wall to pick it.</Text>
+        <View style={styles.selectedRow}>
+          <View style={styles.selectedPreview}>
+            <PixelIcon name={avatar} size={26} />
+          </View>
+          <Text style={styles.sub}>
+            Selected: <Text style={styles.selectedName}>{avatarLabel}</Text> — tap the wall to change.
+          </Text>
+        </View>
       </View>
 
       <View style={styles.wallSection}>
-        <AvatarWall icons={AVATARS} selected={avatar} onPick={onPickAvatar} rows={6} cellSize={56} angleDeg={-7} />
+        <AvatarWall icons={AVATARS} selected={avatar} onPick={onPickAvatar} rows={6} cellSize={56} angleDeg={-7} durationMs={26000} />
         <LinearGradient
           colors={['rgba(6,6,8,0.9)', 'rgba(6,6,8,0)', 'rgba(6,6,8,0.9)']}
           locations={[0, 0.5, 1]}
@@ -206,7 +215,14 @@ const styles = StyleSheet.create({
   header: { paddingTop: 100, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.md, backgroundColor: Colors.background },
   pixelTitle: { fontFamily: Fonts.pixel, fontSize: 34, color: Colors.textPrimary, letterSpacing: 0.5, marginBottom: 4 },
   wallSection: { height: WALL_HEIGHT, overflow: 'hidden', backgroundColor: Colors.background },
-  sub: { fontSize: 13, color: Colors.textSecondary, lineHeight: 20, fontFamily: Fonts.regular },
+  sub: { fontSize: 13, color: Colors.textSecondary, lineHeight: 20, fontFamily: Fonts.regular, flexShrink: 1 },
+  selectedRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  selectedPreview: {
+    width: 34, height: 34, borderRadius: BorderRadius.md,
+    backgroundColor: Colors.surfaceElevated, borderWidth: 2, borderColor: Colors.pop,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  selectedName: { color: Colors.pop, fontFamily: Fonts.semibold },
   scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg, paddingBottom: Spacing.xl },
   footer: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl, paddingTop: Spacing.sm, gap: Spacing.sm },
   nextBtn: { borderRadius: BorderRadius.md, overflow: 'hidden' },

@@ -105,7 +105,7 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
         {/* Tiled the whole screen height on purpose (not just a header band) —
             the wall stays faintly visible above AND below the form instead
             of fading to solid black by the bottom. */}
-        {!!avatar && <AvatarWall icons={[avatar]} alternateDirection rows={28} cellSize={52} angleDeg={-8} />}
+        {!!avatar && <AvatarWall icons={[avatar]} alternateDirection rows={20} cellSize={52} angleDeg={-8} durationMs={22000} />}
         <LinearGradient
           colors={['rgba(6,6,8,0.45)', 'rgba(6,6,8,0.75)', 'rgba(6,6,8,0.75)', 'rgba(6,6,8,0.45)']}
           locations={[0, 0.35, 0.75, 1]}
