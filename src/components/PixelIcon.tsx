@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleProp, ViewStyle } from 'react-native';
-import Svg, { Rect } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { PIXEL_ICONS, PixelIconName } from './pixelIcons';
 
 interface Props {
@@ -16,10 +16,23 @@ export const PixelIcon: React.FC<Props> = ({ name, size = 40, style }) => {
   const px = size / def.cols;
   const height = px * def.rows;
 
+  // One <Path> per distinct color instead of one <Rect> per filled pixel —
+  // a single icon can have 50-100+ cells, and AvatarWall mounts hundreds of
+  // these at once for the onboarding wallpaper, so per-cell native views
+  // there add up to tens of thousands and crash real Android devices
+  // (never showed up on web/Playwright, which doesn't hit that limit).
+  const paths = useMemo(() => {
+    const byColor = new Map<string, string>();
+    for (const c of def.cells) {
+      byColor.set(c.color, (byColor.get(c.color) ?? '') + `M${c.x},${c.y}h1v1h-1z`);
+    }
+    return Array.from(byColor.entries());
+  }, [def]);
+
   return (
     <Svg width={size} height={height} viewBox={`0 0 ${def.cols} ${def.rows}`} style={style}>
-      {def.cells.map((c, i) => (
-        <Rect key={i} x={c.x} y={c.y} width={1} height={1} fill={c.color} />
+      {paths.map(([color, d]) => (
+        <Path key={color} d={d} fill={color} />
       ))}
     </Svg>
   );

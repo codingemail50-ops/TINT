@@ -25,6 +25,12 @@ import {
   checkUserExists,
 } from '../utils/supabaseStorage';
 
+// No real backend/database yet — every launch should drop straight into
+// onboarding so testing the sign-in flow doesn't require clearing storage
+// by hand each time. Flip this off once Supabase/auth is actually wired up
+// and returning users should skip straight back into the app.
+const FORCE_ONBOARDING_ON_LAUNCH = true;
+
 // Every device still gets an anonymous Supabase session created behind the
 // scenes on first launch — signing up upgrades that same session to a real
 // account (same user id) rather than discarding it, so a guest who later
@@ -113,33 +119,36 @@ const AppNavigatorInner: React.FC = () => {
       const userId = await ensureSession();
       userIdRef.current = userId;
 
-      if (userId) {
-        const exists = await checkUserExists(userId);
-        if (exists) {
-          const loaded = await loadUserFromSupabase(userId);
-          if (loaded) {
-            setAppState(loaded);
-            setShowTabs(true);
-            setScreen('todo');
-            Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-            return;
+      if (!FORCE_ONBOARDING_ON_LAUNCH) {
+        if (userId) {
+          const exists = await checkUserExists(userId);
+          if (exists) {
+            const loaded = await loadUserFromSupabase(userId);
+            if (loaded) {
+              setAppState(loaded);
+              setShowTabs(true);
+              setScreen('todo');
+              Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+              return;
+            }
           }
+        }
+
+        // No cloud profile yet (brand-new anonymous user, or offline) — fall back to local storage
+        const state = await StorageService.getAppState();
+        setAppState(state);
+        const user = await StorageService.getUser();
+        if (user) {
+          // Existing local user with no cloud row yet (e.g. was offline before) — push it up now
+          if (userId) void saveNewUserToSupabase(userId, '', user);
+          setShowTabs(true);
+          setScreen('todo');
+          Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+          return;
         }
       }
 
-      // No cloud profile yet (brand-new anonymous user, or offline) — fall back to local storage
-      const state = await StorageService.getAppState();
-      setAppState(state);
-      const user = await StorageService.getUser();
-      if (user) {
-        // Existing local user with no cloud row yet (e.g. was offline before) — push it up now
-        if (userId) void saveNewUserToSupabase(userId, '', user);
-        setShowTabs(true);
-        setScreen('todo');
-        Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-      } else {
-        setScreen('avatarExam');
-      }
+      setScreen('avatarExam');
     })();
   }, []);
 
