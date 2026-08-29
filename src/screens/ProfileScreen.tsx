@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Alert } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts, Typography } from '../constants/theme';
@@ -332,11 +333,17 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
       </ScrollView>
 
       <Modal visible={goalModalOpen} animationType="slide" onRequestClose={() => setGoalModalOpen(false)}>
-        <FocusGoalScreen
-          initialMins={goalMins}
-          onComplete={handleGoalChange}
-          onBack={() => setGoalModalOpen(false)}
-        />
+        {/* React Native's Modal renders in its own native view hierarchy,
+            outside the app's root GestureHandlerRootView (in App.tsx) --
+            without its own nested one here, the BlobDial's drag gesture
+            inside FocusGoalScreen silently doesn't register at all. */}
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <FocusGoalScreen
+            initialMins={goalMins}
+            onComplete={handleGoalChange}
+            onBack={() => setGoalModalOpen(false)}
+          />
+        </GestureHandlerRootView>
       </Modal>
 
       <Modal visible={logoutConfirmOpen} transparent animationType="fade" onRequestClose={() => setLogoutConfirmOpen(false)}>
