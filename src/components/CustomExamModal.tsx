@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { CustomExam } from '../data/examPresets';
 import { useHaptics } from '../hooks/useHaptics';
+import { DateWheelPicker } from './DateWheelPicker';
 
 interface DraftTask { title: string; duration: string }
 
@@ -17,7 +18,11 @@ interface Props {
   onSave: (exam: CustomExam) => void;
 }
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function formatDateDisplay(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+}
 
 function toDraftTasks(exam?: CustomExam | null): DraftTask[] {
   if (exam && exam.tasks.length > 0) return exam.tasks.map(t => ({ title: t.title, duration: String(t.duration) }));
@@ -30,6 +35,7 @@ function toDraftTasks(exam?: CustomExam | null): DraftTask[] {
 export const CustomExamModal: React.FC<Props> = ({ visible, initial, onClose, onSave }) => {
   const [name, setName] = useState(initial?.name ?? '');
   const [date, setDate] = useState(initial?.date ?? '');
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [tasks, setTasks] = useState<DraftTask[]>(toDraftTasks(initial));
   const { buttonPress } = useHaptics();
 
@@ -51,7 +57,7 @@ export const CustomExamModal: React.FC<Props> = ({ visible, initial, onClose, on
     .map(t => ({ title: t.title.trim(), duration: parseInt(t.duration, 10) || 0 }))
     .filter(t => t.title.length > 0 && t.duration > 0);
 
-  const canSave = name.trim().length > 0 && DATE_RE.test(date.trim()) && validTasks.length > 0;
+  const canSave = name.trim().length > 0 && date.trim().length > 0 && validTasks.length > 0;
 
   const handleSave = () => {
     if (!canSave) return;
@@ -81,14 +87,12 @@ export const CustomExamModal: React.FC<Props> = ({ visible, initial, onClose, on
             />
 
             <Text style={styles.label}>Exam date</Text>
-            <TextInput
-              style={styles.input}
-              value={date}
-              onChangeText={setDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={Colors.textMuted}
-              keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'default'}
-            />
+            <TouchableOpacity style={styles.dateBtn} onPress={() => setDatePickerOpen(true)} activeOpacity={0.75}>
+              <Ionicons name="calendar-outline" size={18} color={date ? Colors.textPrimary : Colors.textMuted} />
+              <Text style={[styles.dateBtnText, !date && { color: Colors.textMuted }]}>
+                {date ? formatDateDisplay(date) : 'Tap to pick a date'}
+              </Text>
+            </TouchableOpacity>
 
             <Text style={styles.label}>Daily tasks</Text>
             {tasks.map((t, i) => (
@@ -137,6 +141,13 @@ export const CustomExamModal: React.FC<Props> = ({ visible, initial, onClose, on
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <DateWheelPicker
+        visible={datePickerOpen}
+        initialDate={date || undefined}
+        onClose={() => setDatePickerOpen(false)}
+        onConfirm={iso => { setDate(iso); setDatePickerOpen(false); }}
+      />
     </Modal>
   );
 };
@@ -159,6 +170,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md, paddingVertical: 12, color: Colors.textPrimary,
     fontSize: 15, fontFamily: Fonts.regular, borderWidth: 1, borderColor: Colors.border,
   },
+  dateBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md, paddingVertical: 14, borderWidth: 1, borderColor: Colors.border,
+  },
+  dateBtnText: { fontSize: 15, fontFamily: Fonts.regular, color: Colors.textPrimary },
   taskRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 },
   taskTitleInput: { flex: 1 },
   taskDurationInput: { width: 64, textAlign: 'center' },

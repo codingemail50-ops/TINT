@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts, Typography } from '../constants/theme';
 import { PixelIcon } from '../components/PixelIcon';
-import { AppState, DayRecord, computeStreak } from '../utils/storage';
+import { AppState, DayRecord, computeStreak, StorageService } from '../utils/storage';
 import {
   CloudLeaderboardRow, FriendRequestRow,
   loadFriendsLeaderboard, loadIncomingRequests, loadOutgoingRequests,
@@ -12,7 +12,9 @@ import {
 } from '../utils/supabaseStorage';
 import { loadFocusLog, saveFocusLog } from '../utils/focusLog';
 import { saveDistractionLog } from '../utils/distractionLog';
+import { clearActiveSession } from '../utils/activeFocusSession';
 import { now as devNow, advanceDevDay, resetDevOffset, getDevDayOffset, subscribeDevClock } from '../utils/devClock';
+import { supabase } from '../lib/supabase';
 import { FocusGoalScreen } from './FocusGoalScreen';
 import { useHaptics } from '../hooks/useHaptics';
 
@@ -26,9 +28,13 @@ interface Props {
    *  on-device (Today and Focus stay mounted underneath it, and layering a
    *  third heavy animated screen on top was crashing on some phones). */
   onPreviewOnboarding?: () => void;
+  /** Signs out of Supabase and clears local device data, then sends the
+   *  user back to onboarding — owned by AppNavigator since it needs to
+   *  reset navigation/screen state too, not just this screen's own. */
+  onLogout: () => void;
 }
 
-export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange, onBack, onPreviewOnboarding }) => {
+export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange, onBack, onPreviewOnboarding, onLogout }) => {
   const [friends, setFriends] = useState<CloudLeaderboardRow[]>([]);
   const [incoming, setIncoming] = useState<FriendRequestRow[]>([]);
   const [outgoingIds, setOutgoingIds] = useState<Set<string>>(new Set());
@@ -151,6 +157,26 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
     Alert.alert('Dev', 'Streak, history, focus log, and distraction log reset.');
   };
 
+  // A custom modal instead of a multi-button Alert.alert — React Native
+  // Web doesn't actually implement Alert's button callbacks (it's a no-op
+  // there), so a native-only Alert here would silently do nothing when
+  // tested on web and could easily hide a real bug from that testing path.
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+
+  // Clears local device data too, not just the Supabase session — otherwise
+  // the next account to sign in on this device would inherit the previous
+  // one's streak/focus history, since none of it is namespaced per-user.
+  const performLogout = async () => {
+    setLogoutConfirmOpen(false);
+    await buttonPress();
+    await supabase.auth.signOut();
+    await StorageService.clearAllUserData();
+    await saveFocusLog([]);
+    await saveDistractionLog([]);
+    await clearActiveSession();
+    onLogout();
+  };
+
   const user = appState.user;
   const goalMins = user?.dailyFocusGoalMins ?? 60;
   const goalLabel = goalMins >= 60
@@ -267,6 +293,11 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
           ))
         )}
 
+        <TouchableOpacity style={styles.logoutBtn} onPress={() => setLogoutConfirmOpen(true)} activeOpacity={0.75}>
+          <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
+          <Text style={styles.logoutText}>Log out</Text>
+        </TouchableOpacity>
+
         {__DEV__ && (
           <>
             <Text style={styles.sectionLabel}>Developer Tools</Text>
@@ -306,6 +337,23 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
           onComplete={handleGoalChange}
           onBack={() => setGoalModalOpen(false)}
         />
+      </Modal>
+
+      <Modal visible={logoutConfirmOpen} transparent animationType="fade" onRequestClose={() => setLogoutConfirmOpen(false)}>
+        <View style={styles.confirmBackdrop}>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>Log out?</Text>
+            <Text style={styles.confirmBody}>This clears your data on this device and signs you out.</Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity style={styles.confirmCancelBtn} onPress={() => setLogoutConfirmOpen(false)} activeOpacity={0.75}>
+                <Text style={styles.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.confirmLogoutBtn} onPress={performLogout} activeOpacity={0.85}>
+                <Text style={styles.confirmLogoutText}>Log out</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -348,6 +396,26 @@ const styles = StyleSheet.create({
 
   sectionLabel: { ...Typography.labelSmall, color: Colors.textSecondary, marginBottom: Spacing.sm, marginTop: Spacing.md },
   emptyText: { ...Typography.bodySmall, color: Colors.textMuted },
+
+  logoutBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md,
+    borderWidth: 1, borderColor: Colors.danger + '55', paddingVertical: 14, marginTop: Spacing.lg,
+  },
+  logoutText: { fontSize: 15, fontFamily: Fonts.semibold, color: Colors.danger },
+
+  confirmBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
+  confirmCard: {
+    backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.lg,
+    width: '84%', borderWidth: 1, borderColor: Colors.border, gap: Spacing.xs,
+  },
+  confirmTitle: { fontSize: 17, fontFamily: Fonts.bold, color: Colors.textPrimary },
+  confirmBody: { fontSize: 14, fontFamily: Fonts.regular, color: Colors.textSecondary, lineHeight: 20, marginBottom: Spacing.sm },
+  confirmActions: { flexDirection: 'row', gap: Spacing.sm },
+  confirmCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, alignItems: 'center' },
+  confirmCancelText: { fontSize: 15, fontFamily: Fonts.semibold, color: Colors.textSecondary },
+  confirmLogoutBtn: { flex: 1, paddingVertical: 13, borderRadius: BorderRadius.md, backgroundColor: Colors.danger, alignItems: 'center' },
+  confirmLogoutText: { fontSize: 15, fontFamily: Fonts.bold, color: '#000' },
 
   devRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   devBtn: {

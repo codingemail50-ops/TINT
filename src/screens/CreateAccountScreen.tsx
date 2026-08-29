@@ -95,7 +95,10 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
 
   const handleGoogle = () => {
     buttonPress();
-    Alert.alert('Coming soon', 'Sign in with Google isn’t wired up yet — use email for now.');
+    Alert.alert(
+      'Not available in this test build',
+      'Google Sign-In needs a full app build to work (Expo Go can’t handle it) — it’ll be enabled once that’s ready. Use email or Continue as guest for now.'
+    );
   };
 
   return (

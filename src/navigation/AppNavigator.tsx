@@ -179,6 +179,21 @@ const AppNavigatorInner: React.FC = () => {
     setScreen('avatarExam');
   };
 
+  // ProfileScreen already signed out of Supabase and wiped local device
+  // data before calling this — this just resets in-memory navigation state
+  // and kicks off a fresh anonymous session, the same state a brand-new
+  // install would boot into.
+  const handleLogout = () => {
+    userIdRef.current = null;
+    setShowTabs(false);
+    setLoginShortcut(false);
+    setPreviewFromHome(false);
+    setAppState({ user: null, streak: 0, longestStreak: 0, lastActiveDate: null, history: [], totalTasksCompleted: 0 });
+    tabFadeAnim.setValue(0);
+    setScreen('avatarExam');
+    void ensureSession().then(id => { userIdRef.current = id; });
+  };
+
   // Tail of onboarding — persists the full profile (avatar/exams from step 1
   // + name/email from step 2 + the goal just set here), then boots into the
   // app the same way a returning user does.
@@ -315,7 +330,11 @@ const AppNavigatorInner: React.FC = () => {
             />
           )}
           {screen === 'focusGoal' && (
-            <FocusGoalScreen onComplete={handleFocusGoalComplete} onBack={() => setScreen('createAccount')} />
+            <FocusGoalScreen
+              onComplete={handleFocusGoalComplete}
+              onBack={() => setScreen('createAccount')}
+              onLogin={handleLoginShortcut}
+            />
           )}
           {/* Today and Focus stay mounted (visibility toggled via
               display:none) instead of being swapped in and out of the tree —
@@ -364,6 +383,7 @@ const AppNavigatorInner: React.FC = () => {
               onStateChange={handleStateChange}
               onBack={() => navigateTo('todo')}
               onPreviewOnboarding={handleOpenOnboardingPreview}
+              onLogout={handleLogout}
             />
           )}
         </View>

@@ -28,6 +28,10 @@ interface Props {
   initialMins?: number;
   onComplete: (dailyFocusGoalMins: number) => void;
   onBack?: () => void;
+  /** Only set during onboarding (not when reused from Profile to change an
+   *  existing goal) — an escape hatch for someone who started a fresh
+   *  signup but actually already has an account. */
+  onLogin?: () => void;
 }
 
 // Screen 3 of onboarding (also reused from the Profile screen to change the
@@ -36,7 +40,7 @@ interface Props {
 // blocked during a focus session (the full toggle picker lives on the
 // Focus screen itself — this is just a glance + a way to grant the OS
 // permission early).
-export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, onComplete, onBack }) => {
+export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, onComplete, onBack, onLogin }) => {
   const [mins, setMins] = useState(initialMins);
   const [blockedApps, setBlockedApps] = useState<string[]>(DEFAULT_BLOCKED_APPS);
   const [locking, setLocking] = useState(false);
@@ -146,6 +150,11 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
             <Text style={styles.lockText}>Lock This In</Text>
           </View>
         </TouchableOpacity>
+        {onLogin && (
+          <TouchableOpacity onPress={onLogin} activeOpacity={0.7}>
+            <Text style={styles.loginLink}>Already have an account? <Text style={styles.loginLinkStrong}>Log in</Text></Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -177,8 +186,10 @@ const styles = StyleSheet.create({
   blockAppsText: { fontSize: 15, fontFamily: Fonts.bold, color: Colors.textPrimary },
   appIconsRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
   appChip: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  footer: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl, paddingTop: Spacing.sm },
+  footer: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl, paddingTop: Spacing.sm, gap: Spacing.sm },
   lockBtn: { borderRadius: BorderRadius.md, overflow: 'hidden' },
   lockGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.pop },
   lockText: { fontSize: 17, fontFamily: Fonts.bold, color: '#000', letterSpacing: 0.2 },
+  loginLink: { textAlign: 'center', fontSize: 13, color: Colors.textSecondary, fontFamily: Fonts.regular },
+  loginLinkStrong: { color: Colors.pop, fontFamily: Fonts.semibold },
 });

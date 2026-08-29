@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,6 +26,11 @@ interface Props {
 // of two separate steps.
 export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack }) => {
   const [avatar, setAvatar] = useState(AVATARS[0]);
+  // Wall is only shown while actively picking — once you tap one, it locks
+  // in and the wall stops animating/mounting entirely (both for a calmer
+  // "confirmed" feel and because it's the single biggest perf cost on this
+  // screen). "Change avatar" reopens the wall to pick again.
+  const [picking, setPicking] = useState(true);
   const [selectedExams, setSelectedExams] = useState<Set<ExamType>>(new Set());
   const [customExam, setCustomExam] = useState<CustomExam | null>(null);
   const [customExamModalOpen, setCustomExamModalOpen] = useState(false);
@@ -33,11 +38,19 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
 
   const { buttonPress, dialTick } = useHaptics();
 
-  const onPickAvatar = (icon: string) => {
-    if (icon === avatar) return;
+  // useHaptics() returns a fresh function object every render, so reading
+  // dialTick through a ref (instead of closing over it directly) is what
+  // lets this callback keep ONE stable identity across renders — required
+  // for AvatarWall's React.memo to actually skip re-rendering the wall
+  // when unrelated state on this screen changes (e.g. an exam toggle).
+  const dialTickRef = useRef(dialTick);
+  dialTickRef.current = dialTick;
+
+  const onPickAvatar = useCallback((icon: string) => {
     setAvatar(icon);
-    void dialTick();
-  };
+    setPicking(false);
+    void dialTickRef.current();
+  }, []);
 
   const toggleExam = (id: ExamType, index: number) => {
     buttonPress();
@@ -87,25 +100,30 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
           the heading never sits on top of the moving icons. */}
       <View style={styles.header}>
         <Text style={styles.pixelTitle}>Choose Your Avatar</Text>
-        <View style={styles.selectedRow}>
-          <View style={styles.selectedPreview}>
-            <PixelIcon name={avatar} size={26} />
-          </View>
-          <Text style={styles.sub}>
-            Selected: <Text style={styles.selectedName}>{avatarLabel}</Text> — tap the wall to change.
-          </Text>
-        </View>
+        {picking && <Text style={styles.sub}>Tap an avatar in the wall to pick it.</Text>}
       </View>
 
-      <View style={styles.wallSection}>
-        <AvatarWall icons={AVATARS} selected={avatar} onPick={onPickAvatar} rows={6} cellSize={56} angleDeg={-7} durationMs={26000} />
-        <LinearGradient
-          colors={['rgba(6,6,8,0.9)', 'rgba(6,6,8,0)', 'rgba(6,6,8,0.9)']}
-          locations={[0, 0.5, 1]}
-          style={StyleSheet.absoluteFillObject}
-          pointerEvents="none"
-        />
-      </View>
+      {picking ? (
+        <View style={styles.wallSection}>
+          <AvatarWall icons={AVATARS} selected={avatar} onPick={onPickAvatar} rows={6} cellSize={56} angleDeg={-7} durationMs={22000} />
+          <LinearGradient
+            colors={['rgba(6,6,8,0.9)', 'rgba(6,6,8,0)', 'rgba(6,6,8,0.9)']}
+            locations={[0, 0.5, 1]}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+        </View>
+      ) : (
+        <View style={styles.pickedSection}>
+          <View style={styles.pickedAvatarCircle}>
+            <PixelIcon name={avatar} size={72} />
+          </View>
+          <Text style={styles.pickedName}>{avatarLabel}</Text>
+          <TouchableOpacity style={styles.changeAvatarBtn} onPress={() => setPicking(true)} activeOpacity={0.75}>
+            <Text style={styles.changeAvatarText}>Change avatar</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={examS.sectionLabel}>What's Your Exam?</Text>
@@ -216,13 +234,18 @@ const styles = StyleSheet.create({
   pixelTitle: { fontFamily: Fonts.pixel, fontSize: 34, color: Colors.textPrimary, letterSpacing: 0.5, marginBottom: 4 },
   wallSection: { height: WALL_HEIGHT, overflow: 'hidden', backgroundColor: Colors.background },
   sub: { fontSize: 13, color: Colors.textSecondary, lineHeight: 20, fontFamily: Fonts.regular, flexShrink: 1 },
-  selectedRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  selectedPreview: {
-    width: 34, height: 34, borderRadius: BorderRadius.md,
+  pickedSection: { height: WALL_HEIGHT, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  pickedAvatarCircle: {
+    width: 110, height: 110, borderRadius: 55,
     backgroundColor: Colors.surfaceElevated, borderWidth: 2, borderColor: Colors.pop,
     alignItems: 'center', justifyContent: 'center',
   },
-  selectedName: { color: Colors.pop, fontFamily: Fonts.semibold },
+  pickedName: { fontFamily: Fonts.pixel, fontSize: 22, color: Colors.textPrimary, letterSpacing: 0.5 },
+  changeAvatarBtn: {
+    borderRadius: BorderRadius.full, borderWidth: 2, borderColor: Colors.border,
+    paddingVertical: 8, paddingHorizontal: 18, marginTop: 4,
+  },
+  changeAvatarText: { fontSize: 13, fontFamily: Fonts.semibold, color: Colors.pop },
   scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.lg, paddingBottom: Spacing.xl },
   footer: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl, paddingTop: Spacing.sm, gap: Spacing.sm },
   nextBtn: { borderRadius: BorderRadius.md, overflow: 'hidden' },

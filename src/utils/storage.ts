@@ -92,6 +92,14 @@ export const StorageService = {
     await this.saveAppState(state);
     return state;
   },
+
+  // Logging out should feel like a genuinely fresh device, not just a
+  // fresh backend session — without this, an old account's local numbers
+  // (streak, history, today's tasks) would keep showing under whichever
+  // account signs in next, since none of this is namespaced per-user.
+  async clearAllUserData(): Promise<void> {
+    await AsyncStorage.multiRemove([KEYS.USER, KEYS.APP_STATE, KEYS.TODAY_TASKS]);
+  },
 };
 
 // Streak = consecutive all-tasks-done days counting back from today, walking

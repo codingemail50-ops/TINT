@@ -58,7 +58,7 @@ interface Props {
 // sequence is repeated enough times to cover more than 2 screen-widths, then
 // duplicated once more so animating from 0 to -(one copy's width) loops
 // with no visible seam.
-export const AvatarWall: React.FC<Props> = ({
+const AvatarWallImpl: React.FC<Props> = ({
   icons, rows = 8, cellSize = 60, gap = 4, angleDeg = -7,
   alternateDirection = false, durationMs = 14000, selected, onPick,
 }) => {
@@ -122,6 +122,14 @@ export const AvatarWall: React.FC<Props> = ({
     </View>
   );
 };
+
+// Memoized so a parent screen's unrelated state changes (e.g. toggling an
+// exam checkbox elsewhere on the same screen) don't force-rerender the
+// whole wall — with hundreds of cells mounted, that re-render was what
+// made those unrelated buttons feel laggy, even though the wall itself
+// never actually changed. Only helps if callers pass a stable `onPick`
+// reference (e.g. via useCallback with a ref, not a fresh closure).
+export const AvatarWall = memo(AvatarWallImpl);
 
 const styles = StyleSheet.create({
   clip: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
