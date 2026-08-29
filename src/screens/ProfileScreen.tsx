@@ -8,7 +8,7 @@ import { AppState, DayRecord, computeStreak } from '../utils/storage';
 import {
   CloudLeaderboardRow, FriendRequestRow,
   loadFriendsLeaderboard, loadIncomingRequests, loadOutgoingRequests,
-  findUsersByName, sendFriendRequest, respondToFriendRequest, removeFriend,
+  findUserByEmail, sendFriendRequest, respondToFriendRequest, removeFriend,
 } from '../utils/supabaseStorage';
 import { loadFocusLog, saveFocusLog } from '../utils/focusLog';
 import { saveDistractionLog } from '../utils/distractionLog';
@@ -35,6 +35,9 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<CloudLeaderboardRow[]>([]);
   const [searching, setSearching] = useState(false);
+  // Only shown after an actual lookup attempt returns nothing — not while
+  // the field is simply empty or mid-typing.
+  const [notFound, setNotFound] = useState(false);
   const [goalModalOpen, setGoalModalOpen] = useState(false);
   const [devDayOffset, setDevDayOffset] = useState(getDevDayOffset());
   const { buttonPress } = useHaptics();
@@ -55,13 +58,21 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
 
   useEffect(() => { void refreshFriends(); }, [refreshFriends]);
 
-  const handleSearch = async (text: string) => {
-    setQuery(text);
-    if (text.trim().length < 2) { setResults([]); return; }
+  // Triggered on submit (not per-keystroke) — this is an exact-match email
+  // lookup, not a live fuzzy search, so there's nothing useful to query
+  // until the user has typed the whole address.
+  const handleSearch = async () => {
+    setNotFound(false);
+    if (!query.trim()) { setResults([]); return; }
     setSearching(true);
-    const found = await findUsersByName(text);
-    setResults(found.filter(r => r.id !== userId));
+    const found = await findUserByEmail(query);
     setSearching(false);
+    if (!found || found.id === userId) {
+      setResults([]);
+      setNotFound(true);
+      return;
+    }
+    setResults([found]);
   };
 
   const handleAddFriend = async (targetId: string) => {
@@ -192,13 +203,17 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
           <TextInput
             style={styles.searchInput}
             value={query}
-            onChangeText={handleSearch}
-            placeholder="Search by name..."
+            onChangeText={text => { setQuery(text); setNotFound(false); }}
+            onSubmitEditing={handleSearch}
+            placeholder="Add by exact email..."
             placeholderTextColor={Colors.textMuted}
             autoCapitalize="none"
+            keyboardType="email-address"
+            returnKeyType="search"
           />
           {searching && <ActivityIndicator size="small" color={Colors.textMuted} />}
         </View>
+        {notFound && <Text style={styles.emptyText}>No user found with that email.</Text>}
         {results.map(r => (
           <View key={r.id} style={styles.friendRow}>
             <View style={styles.friendAvatar}>

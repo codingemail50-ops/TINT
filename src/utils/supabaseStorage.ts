@@ -360,25 +360,24 @@ export async function loadFriendsLeaderboard(): Promise<CloudLeaderboardRow[]> {
   }
 }
 
-// Name search for "add a friend" — leaderboard_view is the same public-safe
-// column set already used for the global leaderboard, so this never touches
-// user_data directly (RLS there is locked to each user's own row).
-export async function findUsersByName(query: string): Promise<CloudLeaderboardRow[]> {
-  if (!query.trim()) return [];
+// Exact-match "add a friend" lookup by email — display names aren't
+// unique, so email is the only reliable way to find one specific person.
+// Backed by a security-definer RPC (find_user_by_email in schema.sql) that
+// never returns anyone's email back, including on a hit — only the same
+// public-safe fields the leaderboard already exposes.
+export async function findUserByEmail(email: string): Promise<CloudLeaderboardRow | null> {
+  const trimmed = email.trim();
+  if (!trimmed) return null;
   try {
-    const { data, error } = await supabase
-      .from('leaderboard_view')
-      .select('id, name, avatar, exams, streak, history, total_tasks_completed')
-      .ilike('name', `%${query.trim()}%`)
-      .limit(10);
-    if (error || !data) {
-      if (error) console.error('[supabaseStorage] findUsersByName error:', error.message);
-      return [];
+    const { data, error } = await supabase.rpc('find_user_by_email', { p_email: trimmed });
+    if (error || !data || data.length === 0) {
+      if (error) console.error('[supabaseStorage] findUserByEmail error:', error.message);
+      return null;
     }
-    return (data as UserDataRow[]).map(toLeaderboardRow);
+    return toLeaderboardRow(data[0] as UserDataRow);
   } catch (err) {
-    console.error('[supabaseStorage] findUsersByName exception:', err);
-    return [];
+    console.error('[supabaseStorage] findUserByEmail exception:', err);
+    return null;
   }
 }
 

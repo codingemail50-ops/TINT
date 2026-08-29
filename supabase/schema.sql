@@ -177,3 +177,28 @@ as $$
 $$;
 
 grant execute on function public.friends_leaderboard() to authenticated;
+
+-- ── find_user_by_email ───────────────────────────────────────────────────
+-- Exact-match, case-insensitive lookup by email for "add a friend" --
+-- display names aren't unique, so email is the only reliable way to find
+-- one specific person. security definer so it can read the email column
+-- despite user_data's owner-only RLS; the returned columns are the same
+-- public-safe set leaderboard_view already exposes -- the caller never
+-- gets anyone's email back, including the one they searched on a hit.
+create or replace function public.find_user_by_email(p_email text)
+returns table (
+  id uuid, name text, avatar text, exams text[], streak int, history jsonb, total_tasks_completed int,
+  focus_today_mins double precision, focus_week_mins double precision, focus_alltime_mins double precision
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select u.id, u.name, u.avatar, u.exams, u.streak, u.history, u.total_tasks_completed,
+         u.focus_today_mins, u.focus_week_mins, u.focus_alltime_mins
+  from public.user_data u
+  where lower(u.email) = lower(trim(p_email))
+  limit 1;
+$$;
+
+grant execute on function public.find_user_by_email(text) to authenticated;

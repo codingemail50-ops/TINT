@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
-import { LeaderboardEntry, LeaderboardPeriod, minsForPeriod, MOCK_LEADERBOARD_BOTS } from '../data/leaderboard';
+import { LeaderboardEntry, LeaderboardPeriod, minsForPeriod } from '../data/leaderboard';
 import { LeaderboardCard } from '../components/LeaderboardCard';
 import { LeaderboardPodium } from '../components/LeaderboardPodium';
 import { AppState, computeLifetimeConsistency } from '../utils/storage';
@@ -64,11 +64,8 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
       focusAllTimeMins: r.focusAllTimeMins,
       isCurrentUser: !!userId && r.id === userId,
     }));
-    // Placeholder bots only ever fill in for an empty real result — never
-    // blended in once the backend actually returns rows.
-    const base = cloud.length > 0 ? cloud : MOCK_LEADERBOARD_BOTS;
-    const hasUser = base.some(e => e.isCurrentUser);
-    const all = hasUser ? base : [...base, userEntry];
+    const hasUser = cloud.some(e => e.isCurrentUser);
+    const all = hasUser ? cloud : [...cloud, userEntry];
     return [...all].sort((a, b) => minsForPeriod(b, period) - minsForPeriod(a, period));
   }, [rows, period, userId, myFocus]);
 
