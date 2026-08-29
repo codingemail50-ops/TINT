@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
@@ -44,6 +44,12 @@ export const BlobDial: React.FC<Props> = ({
   const lastAngle = useSharedValue<number | null>(null);
   const accum = useSharedValue(0);
   const rotation = useSharedValue(0);
+  // Mirrors `value` on the UI thread so the worklet below can tell it's
+  // already at the cap — without this, dragging past min/max kept spinning
+  // the dot with your finger even though the number had stopped changing,
+  // leaving the dot's position meaning nothing once you reversed direction.
+  const currentValueSV = useSharedValue(value);
+  useEffect(() => { currentValueSV.value = value; }, [value, currentValueSV]);
 
   const angleOfTouch = (x: number, y: number): number => {
     'worklet';
@@ -74,7 +80,11 @@ export const BlobDial: React.FC<Props> = ({
         let delta = angle - lastAngle.value;
         if (delta > 180) delta -= 360;
         if (delta < -180) delta += 360;
-        rotation.value += delta;
+        const atMax = currentValueSV.value >= maxValue;
+        const atMin = currentValueSV.value <= minValue;
+        if (!((atMax && delta > 0) || (atMin && delta < 0))) {
+          rotation.value += delta;
+        }
         accum.value += delta * ROTATION_SENSITIVITY;
         while (accum.value >= DEGREES_PER_STEP) {
           accum.value -= DEGREES_PER_STEP;

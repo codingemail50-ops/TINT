@@ -1049,7 +1049,13 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  toggleThumbOn: { alignSelf: 'flex-end' },
+  // Repeat daily's "on" track color (Colors.primary) is a near-white grey,
+  // so a white thumb on it was nearly invisible -- toggling it correctly
+  // updated state and style (verified), it just didn't look like anything
+  // happened. Darkening the thumb on both toggles when "on" fixes that and
+  // matches the dark-thumb-on-bright-track pattern already used for the
+  // Focus screen's blocked-apps toggles.
+  toggleThumbOn: { alignSelf: 'flex-end', backgroundColor: Colors.background },
 
   // Modal buttons
   modalButtons: { flexDirection: 'row', gap: Spacing.sm },

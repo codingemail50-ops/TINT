@@ -39,6 +39,9 @@ function friendlyError(message: string): string {
   if (message.includes('Password should be at least')) {
     return 'Password needs at least 6 characters.';
   }
+  if (message.includes('Failed to fetch') || message.includes('Network request failed')) {
+    return 'No internet connection — check your network and try again.';
+  }
   return message;
 }
 

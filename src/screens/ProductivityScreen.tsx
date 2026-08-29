@@ -320,7 +320,7 @@ function formatCount(n: number): string {
 export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
   const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
   const [distractionLog, setDistractionLog] = useState<DistractionLogEntry[]>([]);
-  const [timeframe, setTimeframe] = useState<FocusTimeframe>('month');
+  const [timeframe, setTimeframe] = useState<FocusTimeframe>('day');
 
   useEffect(() => {
     loadFocusLog().then(setFocusLog);
