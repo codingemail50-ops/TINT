@@ -22,6 +22,7 @@ import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats, subscribe
 import { DistractionLogEntry, loadDistractionLog, computeDistractedToday, subscribeDistractionLog } from '../utils/distractionLog';
 import { loadActiveSession } from '../utils/activeFocusSession';
 import { now as devNow, subscribeDevClock } from '../utils/devClock';
+import { useFocusSessionStatus } from '../context/FocusSessionContext';
 
 const CATEGORIES = [
   'Study', 'Practice', 'Revision', 'Reading', 'Writing',
@@ -197,6 +198,18 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   // UI as the Focus tab) pre-loaded with that task and running — this just
   // tracks which task, if any, is currently running that way.
   const [timerTaskId, setTimerTaskId] = useState<string | null>(null);
+  // Whether that overlay's full UI is showing right now, vs minimized back
+  // to this task list while the session keeps running underneath (it stays
+  // mounted either way, just hidden — see the `visible` prop below).
+  const [taskOverlayVisible, setTaskOverlayVisible] = useState(true);
+  const { expandSignal } = useFocusSessionStatus();
+
+  // A brand-new task session always opens full-screen.
+  useEffect(() => { if (timerTaskId) setTaskOverlayVisible(true); }, [timerTaskId]);
+  // Tapping the mini-player while minimized re-expands it (navigating to
+  // 'todo' alone wouldn't signal anything, since it's already the screen
+  // that's on screen).
+  useEffect(() => { if (timerTaskId) setTaskOverlayVisible(true); }, [expandSignal]);
 
   // Add task modal
   const [showAddModal, setShowAddModal]     = useState(false);
@@ -640,7 +653,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
       {/* ── Task-linked Focus session — full-screen overlay, same UI as the
            Focus tab, just pre-loaded with a task and auto-started ────────── */}
       {timerTaskId && tasks.find(t => t.id === timerTaskId) && (
-        <View style={StyleSheet.absoluteFillObject}>
+        <View style={StyleSheet.absoluteFillObject} pointerEvents={taskOverlayVisible ? 'auto' : 'none'}>
           <FocusScreen
             userId={userId}
             externalTask={{
@@ -649,6 +662,8 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
               id: timerTaskId,
             }}
             sessionSource="task"
+            visible={taskOverlayVisible}
+            onMinimize={() => setTaskOverlayVisible(false)}
             onExternalFinish={handleTaskSessionFinish}
             onExternalExit={handleTaskSessionExit}
           />

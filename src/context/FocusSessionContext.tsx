@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useMemo, useState, useCallback } from 'react';
 
 // A tiny shared channel so the always-running focus timer (which lives
 // inside whichever FocusScreen instance started it — the Focus tab's, or
@@ -15,20 +15,34 @@ export interface FocusSessionStatus {
    *  can tell "the full UI for this is already on screen" from "the user
    *  navigated away and should see the mini-player instead." */
   source: 'tab' | 'task' | null;
+  /** Task-linked sessions can be minimized back to the Today task list
+   *  (via a chevron in FocusScreen's topBar) while staying mounted/ticking
+   *  underneath — this tells AppNavigator to show the mini-player even
+   *  while the 'todo' screen is what's technically on screen. Tab sessions
+   *  never set this (there's nothing to minimize away from). */
+  minimized: boolean;
 }
 
-const IDLE_STATUS: FocusSessionStatus = { active: false, paused: false, timeLeft: 0, title: '', source: null };
+const IDLE_STATUS: FocusSessionStatus = { active: false, paused: false, timeLeft: 0, title: '', source: null, minimized: false };
 
 interface Ctx {
   status: FocusSessionStatus;
   setStatus: (s: FocusSessionStatus) => void;
+  /** Bumped whenever the mini-player is tapped for a minimized task
+   *  session — TodoScreen watches this to re-expand its overlay, since
+   *  navigating to the (already-current) 'todo' screen alone wouldn't
+   *  otherwise signal anything. */
+  expandSignal: number;
+  requestExpand: () => void;
 }
 
 const FocusSessionContext = createContext<Ctx | null>(null);
 
 export const FocusSessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [status, setStatus] = useState<FocusSessionStatus>(IDLE_STATUS);
-  const value = useMemo(() => ({ status, setStatus }), [status]);
+  const [expandSignal, setExpandSignal] = useState(0);
+  const requestExpand = useCallback(() => setExpandSignal(n => n + 1), []);
+  const value = useMemo(() => ({ status, setStatus, expandSignal, requestExpand }), [status, expandSignal, requestExpand]);
   return <FocusSessionContext.Provider value={value}>{children}</FocusSessionContext.Provider>;
 };
 

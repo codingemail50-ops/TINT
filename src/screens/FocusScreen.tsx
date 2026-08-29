@@ -105,12 +105,16 @@ interface Props {
    *  can tell whether the full UI for the active session is already
    *  showing elsewhere. */
   sessionSource?: 'tab' | 'task';
+  /** Task-linked sessions only — renders a minimize chevron in the active
+   *  topBar next to the close button, so the Today task list stays
+   *  reachable while the session keeps running underneath. */
+  onMinimize?: () => void;
 }
 
 type Phase = 'setup' | 'active' | 'done';
 
 export const FocusScreen: React.FC<Props> = ({
-  userId, externalTask, onExternalFinish, onExternalExit, visible = true, sessionSource = 'tab',
+  userId, externalTask, onExternalFinish, onExternalExit, visible = true, sessionSource = 'tab', onMinimize,
 }) => {
   const [phase, setPhase] = useState<Phase>(externalTask ? 'active' : 'setup');
   const [duration, setDuration] = useState(externalTask?.durationMins ?? DEFAULT_DURATION);
@@ -260,15 +264,21 @@ export const FocusScreen: React.FC<Props> = ({
       timeLeft,
       title: externalTask?.title ?? 'Focus Session',
       source: phase === 'active' ? sessionSource : null,
+      // Reuses the same `visible` prop the tab instance already gets
+      // toggled with — task sessions minimize by the parent flipping this
+      // to false while keeping the instance mounted (still ticking), so
+      // the mini-player's "is the full UI already on screen" check has an
+      // accurate answer instead of assuming task+todo always means yes.
+      minimized: !visible,
     });
-  }, [phase, paused, timeLeft, externalTask?.title, sessionSource, setStatus]);
+  }, [phase, paused, timeLeft, externalTask?.title, sessionSource, visible, setStatus]);
 
   // Separate effect, empty deps, so this only fires on true unmount — not on
   // every tick alongside the effect above. This instance can now actually
   // unmount mid-session (AppNavigator unmounts rather than hides it while
   // the onboarding preview is open), so without this the mini-player could
   // keep showing a frozen, stale "active" status for a screen that's gone.
-  useEffect(() => () => setStatus({ active: false, paused: false, timeLeft: 0, title: '', source: null }), [setStatus]);
+  useEffect(() => () => setStatus({ active: false, paused: false, timeLeft: 0, title: '', source: null, minimized: false }), [setStatus]);
 
   useEffect(() => {
     const onChange = (state: AppStateStatus) => {
@@ -484,7 +494,7 @@ export const FocusScreen: React.FC<Props> = ({
                 <BlobDial
                   size={BLOB_WRAP}
                   minValue={5}
-                  maxValue={240}
+                  maxValue={1080}
                   step={5}
                   value={duration}
                   onChange={d => { setDuration(d); setTimeLeft(d * 60); }}
@@ -589,9 +599,16 @@ export const FocusScreen: React.FC<Props> = ({
         <View style={styles.activeScreen}>
           <View style={styles.topBar}>
             <Text style={styles.wordmark}>There is no tomorrow</Text>
-            <TouchableOpacity style={styles.closeBtn} onPress={openConfirm} activeOpacity={0.7}>
-              <Ionicons name="close" size={16} color={Colors.textSecondary} />
-            </TouchableOpacity>
+            <View style={styles.topBarActions}>
+              {onMinimize && (
+                <TouchableOpacity style={styles.closeBtn} onPress={onMinimize} activeOpacity={0.7}>
+                  <Ionicons name="chevron-down" size={16} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.closeBtn} onPress={openConfirm} activeOpacity={0.7}>
+                <Ionicons name="close" size={16} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Subtle on purpose — the timer itself is what this screen is
@@ -705,6 +722,7 @@ const styles = StyleSheet.create({
   // ── Active phase ──────────────────────────────────────────────────────────
   activeScreen: { flex: 1, paddingTop: 56, paddingHorizontal: Spacing.lg },
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  topBarActions: { flexDirection: 'row', gap: Spacing.sm },
   wordmark: {
     fontFamily: Fonts.pixel, fontSize: 19, color: Colors.gray[400],
     letterSpacing: 0.5, textTransform: 'uppercase',

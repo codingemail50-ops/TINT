@@ -107,7 +107,7 @@ const AppNavigatorInner: React.FC = () => {
   const [previewFromHome, setPreviewFromHome] = useState(false);
   const tabFadeAnim = useRef(new Animated.Value(0)).current;
   const userIdRef = useRef<string | null>(null);
-  const { status: focusStatus } = useFocusSessionStatus();
+  const { status: focusStatus, requestExpand } = useFocusSessionStatus();
   const draftRef = useRef<OnboardingDraft>({ avatar: 'star', examTypes: [], dailyFocusGoalMins: 60, name: '', email: '' });
 
   // No splash animation — resolve session/local state directly on mount.
@@ -299,13 +299,22 @@ const AppNavigatorInner: React.FC = () => {
 
   // Mini-player shows whenever a session is actively running and its own
   // full-screen UI isn't the thing currently on screen (Focus tab for a
-  // standalone session, Today's task-linked overlay for a task session).
-  const focusUIOnScreen = (focusStatus.source === 'tab' && screen === 'focus')
-    || (focusStatus.source === 'task' && screen === 'todo');
+  // standalone session, Today's task-linked overlay for a task session) —
+  // or the task session's overlay has been explicitly minimized back to
+  // the task list while still running underneath.
+  const focusUIOnScreen = !focusStatus.minimized && (
+    (focusStatus.source === 'tab' && screen === 'focus')
+    || (focusStatus.source === 'task' && screen === 'todo')
+  );
   const miniPlayerVisible = focusStatus.active && !focusUIOnScreen;
 
   const handleMiniPlayerPress = () => {
-    navigateTo(focusStatus.source === 'task' ? 'todo' : 'focus');
+    if (focusStatus.source === 'task') {
+      navigateTo('todo');
+      requestExpand();
+    } else {
+      navigateTo('focus');
+    }
   };
 
   return (
