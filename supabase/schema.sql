@@ -46,9 +46,25 @@ alter table public.user_data add column if not exists focus_week_mins double pre
 alter table public.user_data add column if not exists focus_alltime_mins double precision not null default 0;
 -- In case this file was previously run with the old `int` column type —
 -- widen in place so existing rows keep their data instead of needing a drop.
-alter table public.user_data alter column focus_today_mins type double precision;
-alter table public.user_data alter column focus_week_mins type double precision;
-alter table public.user_data alter column focus_alltime_mins type double precision;
+-- Guarded on the column's current type: once leaderboard_view exists (i.e.
+-- after this file has run once), Postgres refuses ALTER COLUMN TYPE on a
+-- column a view depends on even when the type isn't actually changing, so
+-- this must be skipped entirely on every re-run, not just made idempotent.
+do $$
+begin
+  if (select data_type from information_schema.columns
+      where table_schema = 'public' and table_name = 'user_data' and column_name = 'focus_today_mins') <> 'double precision' then
+    alter table public.user_data alter column focus_today_mins type double precision;
+  end if;
+  if (select data_type from information_schema.columns
+      where table_schema = 'public' and table_name = 'user_data' and column_name = 'focus_week_mins') <> 'double precision' then
+    alter table public.user_data alter column focus_week_mins type double precision;
+  end if;
+  if (select data_type from information_schema.columns
+      where table_schema = 'public' and table_name = 'user_data' and column_name = 'focus_alltime_mins') <> 'double precision' then
+    alter table public.user_data alter column focus_alltime_mins type double precision;
+  end if;
+end $$;
 
 alter table public.user_data enable row level security;
 
