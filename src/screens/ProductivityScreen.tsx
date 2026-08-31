@@ -7,7 +7,7 @@ import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/t
 import { AppState } from '../utils/storage';
 import { FocusLogEntry, loadFocusLog, FocusTimeframe, FocusBucket, getFocusSummary, getFocusHeatmap } from '../utils/focusLog';
 import { DistractionLogEntry, loadDistractionLog } from '../utils/distractionLog';
-import { subscribeDevClock } from '../utils/devClock';
+import { subscribeDevClock, now as devNow } from '../utils/devClock';
 import { REALITY_CHECK_MESSAGES } from '../data/examPresets';
 
 interface Props { appState: AppState }
@@ -34,7 +34,7 @@ const TOOLTIP_W = 132;
 // than fit on screen just scroll instead.
 const BAR_COL_WIDTH = 68;
 
-const DualBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
+const DualBarChart: React.FC<{ buckets: FocusBucket[]; initialScrollIndex?: number }> = ({ buckets, initialScrollIndex }) => {
   const [touchIdx, setTouchIdx] = useState<number | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   // The tooltip's left position was being clamped against the full
@@ -59,11 +59,23 @@ const DualBarChart: React.FC<{ buckets: FocusBucket[] }> = ({ buckets }) => {
   const frontW = Math.max(2, barW * 0.55);
   const contentWidth = buckets.length * BAR_COL_WIDTH;
 
-  // Most recent bucket (today / this month / this hour) is what people
-  // check by default — land there instead of at the start of history.
+  // Most recent bucket (today / this month) is what people check by
+  // default — land there instead of at the start of history. Day view is
+  // the one exception: its buckets run through the *whole* day (00:00 to
+  // 23:00), so scrolling to the end lands on the last hour of the day —
+  // almost always empty future hours — instead of anywhere near the
+  // current hour where today's actual data is. Landing on the current
+  // hour there instead (centered where possible) fixes that.
   useEffect(() => {
-    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: false }));
-  }, [buckets.length]);
+    requestAnimationFrame(() => {
+      if (initialScrollIndex == null) {
+        scrollRef.current?.scrollToEnd({ animated: false });
+        return;
+      }
+      const targetX = Math.max(0, initialScrollIndex * BAR_COL_WIDTH - BAR_COL_WIDTH * 1.5);
+      scrollRef.current?.scrollTo({ x: targetX, animated: false });
+    });
+  }, [buckets.length, initialScrollIndex]);
 
   const touched = touchIdx !== null ? buckets[touchIdx] : null;
   const viewMin = scrollX;
@@ -411,7 +423,7 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
 
         <Text style={styles.sectionLabel}>Time Spent</Text>
         <View style={styles.sectionCard}>
-          <DualBarChart buckets={summary.buckets} />
+          <DualBarChart buckets={summary.buckets} initialScrollIndex={timeframe === 'day' ? devNow().getHours() : undefined} />
         </View>
 
         <Text style={styles.sectionLabel}>Current Streak</Text>
