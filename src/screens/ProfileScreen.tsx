@@ -110,12 +110,19 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
   // one's streak/focus history, since none of it is namespaced per-user.
   const performLogout = async () => {
     setLogoutConfirmOpen(false);
-    await buttonPress();
+    void buttonPress();
+    // signOut is the one call that has to finish first (onLogout below
+    // immediately starts a fresh anonymous session, which would race with
+    // an in-flight signOut) -- the four local clears after it are fully
+    // independent of each other and were only ever sequential by accident,
+    // not because any of them depend on the last one finishing.
     await supabase.auth.signOut();
-    await StorageService.clearAllUserData();
-    await saveFocusLog([]);
-    await saveDistractionLog([]);
-    await clearActiveSession();
+    await Promise.all([
+      StorageService.clearAllUserData(),
+      saveFocusLog([]),
+      saveDistractionLog([]),
+      clearActiveSession(),
+    ]);
     onLogout();
   };
 

@@ -224,9 +224,16 @@ const AppNavigatorInner: React.FC = () => {
     setScreen('focusGoal');
   };
 
-  const handleLoggedIn = async (hasProfile: boolean) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    userIdRef.current = user?.id ?? userIdRef.current;
+  const handleLoggedIn = async (hasProfile: boolean, userId?: string) => {
+    // signInWithPassword's own response already carries the user id — a
+    // separate getUser() call here was a fully redundant network round
+    // trip on every login, adding to the perceived delay for no reason.
+    if (userId) {
+      userIdRef.current = userId;
+    } else {
+      const { data: { user } } = await supabase.auth.getUser();
+      userIdRef.current = user?.id ?? userIdRef.current;
+    }
 
     if (hasProfile && userIdRef.current) {
       const loaded = await loadUserFromSupabase(userIdRef.current);

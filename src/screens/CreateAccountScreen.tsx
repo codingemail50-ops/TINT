@@ -20,7 +20,7 @@ interface Props {
   onGuest: (data: { name: string }) => void;
   /** Logged into an existing account — hasProfile tells the caller whether
    *  to skip the rest of onboarding (avatar/goal already set) or not. */
-  onLoggedIn: (hasProfile: boolean) => void;
+  onLoggedIn: (hasProfile: boolean, userId?: string) => void;
   onBack?: () => void;
   initialMode?: Mode;
   /** The avatar picked on step 1 — tiled as a scrolling brick-pattern
@@ -79,9 +79,9 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
         }
         onSignedUp({ name: username.trim(), email: email.trim() });
       } else {
-        const { error: loginErr } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        const { data: loginData, error: loginErr } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (loginErr) throw loginErr;
-        onLoggedIn(true);
+        onLoggedIn(true, loginData.user?.id);
       }
     } catch (err: any) {
       setError(friendlyError(err?.message ?? 'Something went wrong.'));
