@@ -1,10 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Alert } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Modal, Alert,
+  KeyboardAvoidingView, Platform,
+} from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts, Typography } from '../constants/theme';
 import { PixelIcon } from '../components/PixelIcon';
+import { AVATARS, EXAM_TYPES, ExamType, CustomExam } from '../data/examPresets';
 import { AppState, StorageService } from '../utils/storage';
 import {
   CloudLeaderboardRow, FriendRequestRow,
@@ -16,6 +20,7 @@ import { saveDistractionLog } from '../utils/distractionLog';
 import { clearActiveSession } from '../utils/activeFocusSession';
 import { supabase } from '../lib/supabase';
 import { FocusGoalScreen } from './FocusGoalScreen';
+import { CustomExamModal } from '../components/CustomExamModal';
 import { useHaptics } from '../hooks/useHaptics';
 
 interface Props {
@@ -40,6 +45,13 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
   // the field is simply empty or mid-typing.
   const [notFound, setNotFound] = useState(false);
   const [goalModalOpen, setGoalModalOpen] = useState(false);
+  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editAvatar, setEditAvatar] = useState('star');
+  const [editExamOpen, setEditExamOpen] = useState(false);
+  const [editExamTypes, setEditExamTypes] = useState<Set<ExamType>>(new Set());
+  const [editCustomExam, setEditCustomExam] = useState<CustomExam | null>(null);
+  const [customExamModalOpen, setCustomExamModalOpen] = useState(false);
   const { buttonPress } = useHaptics();
 
   const refreshFriends = useCallback(async () => {
@@ -99,6 +111,51 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
     onStateChange({ ...appState, user: { ...appState.user, dailyFocusGoalMins: mins } });
   };
 
+  const openEditProfile = () => {
+    setEditName(appState.user?.name ?? '');
+    setEditAvatar(appState.user?.avatar ?? 'star');
+    setEditProfileOpen(true);
+  };
+
+  const handleSaveProfile = () => {
+    if (!appState.user || !editName.trim()) return;
+    onStateChange({ ...appState, user: { ...appState.user, name: editName.trim(), avatar: editAvatar } });
+    setEditProfileOpen(false);
+  };
+
+  const openEditExam = () => {
+    setEditExamTypes(new Set((appState.user?.examTypes ?? []) as ExamType[]));
+    setEditCustomExam(appState.user?.customExam ?? null);
+    setEditExamOpen(true);
+  };
+
+  const toggleEditExamType = (id: ExamType) => {
+    buttonPress();
+    setEditExamTypes(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  // Only touches this profile's own exam fields — the day's already-
+  // generated task list (see TodoScreen's refreshDay) only regenerates
+  // from these on the next new day, so changing your exam here never
+  // rewrites tasks you already have in progress.
+  const handleSaveExam = () => {
+    if (!appState.user) return;
+    if (editExamTypes.size === 0 && !editCustomExam) return;
+    onStateChange({
+      ...appState,
+      user: {
+        ...appState.user,
+        examTypes: Array.from(editExamTypes),
+        customExam: editCustomExam ?? undefined,
+      },
+    });
+    setEditExamOpen(false);
+  };
+
   // A custom modal instead of a multi-button Alert.alert — React Native
   // Web doesn't actually implement Alert's button callbacks (it's a no-op
   // there), so a native-only Alert here would silently do nothing when
@@ -132,21 +189,33 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
     ? `${Math.floor(goalMins / 60)}h${goalMins % 60 ? ` ${goalMins % 60}m` : ''}`
     : `${goalMins}m`;
 
+  const examLabel = user?.customExam
+    ? user.customExam.name
+    : (user?.examTypes ?? []).length > 0
+      ? (user!.examTypes as ExamType[]).join(', ')
+      : 'Not set';
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         <TouchableOpacity style={styles.closeBtn} onPress={onBack} activeOpacity={0.7}>
           <Ionicons name="close" size={20} color={Colors.textPrimary} />
         </TouchableOpacity>
 
-        <View style={styles.avatarWrap}>
+        <TouchableOpacity style={styles.avatarWrap} onPress={openEditProfile} activeOpacity={0.75}>
           <View style={styles.avatarCircle}>
             <PixelIcon name={user?.avatar ?? 'star'} size={64} />
           </View>
           <Text style={styles.name}>{user?.name || 'Anonymous'}</Text>
           {!!user?.email && <Text style={styles.email}>{user.email}</Text>}
-        </View>
+          <Text style={styles.editProfileHint}>Edit name / avatar</Text>
+        </TouchableOpacity>
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
@@ -172,7 +241,16 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
           <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
         </TouchableOpacity>
 
-        <Text style={styles.sectionLabel}>Add a friend</Text>
+        <TouchableOpacity style={styles.goalRow} onPress={openEditExam} activeOpacity={0.75}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.goalLabel}>Studying for</Text>
+            <Text style={styles.goalValue} numberOfLines={1}>{examLabel}</Text>
+          </View>
+          <Text style={styles.goalChange}>Change</Text>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+        </TouchableOpacity>
+
+        <Text style={[styles.sectionLabel, styles.sectionLabelPop]}>Add a friend</Text>
         <View style={styles.searchBox}>
           <Ionicons name="search" size={16} color={Colors.textMuted} />
           <TextInput
@@ -254,7 +332,8 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
         </TouchableOpacity>
 
         <View style={{ height: 60 }} />
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <Modal visible={goalModalOpen} animationType="slide" onRequestClose={() => setGoalModalOpen(false)}>
         {/* React Native's Modal renders in its own native view hierarchy,
@@ -286,6 +365,106 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
           </View>
         </View>
       </Modal>
+
+      <Modal visible={editProfileOpen} transparent animationType="fade" onRequestClose={() => setEditProfileOpen(false)}>
+        <KeyboardAvoidingView
+          style={styles.editBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.editCard}>
+            <Text style={styles.editTitle}>Edit Profile</Text>
+            <TextInput
+              style={styles.editNameInput}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Your name"
+              placeholderTextColor={Colors.textMuted}
+            />
+            <ScrollView style={styles.avatarGridScroll} keyboardShouldPersistTaps="handled">
+              <View style={styles.avatarGrid}>
+                {AVATARS.map(a => (
+                  <TouchableOpacity
+                    key={a}
+                    style={[styles.avatarGridItem, editAvatar === a && styles.avatarGridItemSelected]}
+                    onPress={() => { buttonPress(); setEditAvatar(a); }}
+                    activeOpacity={0.75}
+                  >
+                    <PixelIcon name={a} size={30} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+            <View style={styles.editActions}>
+              <TouchableOpacity style={styles.editCancelBtn} onPress={() => setEditProfileOpen(false)} activeOpacity={0.75}>
+                <Text style={styles.editCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.editSaveBtn, !editName.trim() && styles.editSaveBtnDisabled]}
+                onPress={handleSaveProfile}
+                disabled={!editName.trim()}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.editSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={editExamOpen} transparent animationType="fade" onRequestClose={() => setEditExamOpen(false)}>
+        <View style={styles.editBackdrop}>
+          <View style={styles.editCard}>
+            <Text style={styles.editTitle}>Studying For</Text>
+            <TouchableOpacity
+              style={[styles.examOtherBtn, !!editCustomExam && styles.examOtherBtnActive]}
+              onPress={() => { buttonPress(); setCustomExamModalOpen(true); }}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.examOtherText, !!editCustomExam && styles.examOtherTextActive]} numberOfLines={1}>
+                {editCustomExam ? `✓ ${editCustomExam.name}` : 'Other'}
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.examGrid}>
+              {EXAM_TYPES.map(exam => {
+                const checked = editExamTypes.has(exam.id);
+                return (
+                  <TouchableOpacity
+                    key={exam.id}
+                    style={[styles.examCard, checked && styles.examCardActive]}
+                    onPress={() => toggleEditExamType(exam.id)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.examCardText, checked && styles.examCardTextActive]}>{exam.label}</Text>
+                    <View style={[styles.examCheckbox, checked && styles.examCheckboxActive]}>
+                      {checked && <Text style={styles.examCheckmark}>✓</Text>}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.editActions}>
+              <TouchableOpacity style={styles.editCancelBtn} onPress={() => setEditExamOpen(false)} activeOpacity={0.75}>
+                <Text style={styles.editCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.editSaveBtn, editExamTypes.size === 0 && !editCustomExam && styles.editSaveBtnDisabled]}
+                onPress={handleSaveExam}
+                disabled={editExamTypes.size === 0 && !editCustomExam}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.editSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <CustomExamModal
+        visible={customExamModalOpen}
+        initial={editCustomExam}
+        onClose={() => setCustomExamModalOpen(false)}
+        onSave={exam => { setEditCustomExam(exam); setCustomExamModalOpen(false); }}
+      />
     </View>
   );
 };
@@ -390,4 +569,52 @@ const styles = StyleSheet.create({
   requestSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
   requestAcceptBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.pop, alignItems: 'center', justifyContent: 'center' },
   requestDeclineBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
+
+  editProfileHint: { fontSize: 11, color: Colors.pop, fontFamily: Fonts.semibold, marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionLabelPop: { color: Colors.pop, fontFamily: Fonts.semibold },
+
+  editBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
+  editCard: {
+    backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, padding: Spacing.lg,
+    width: '86%', maxHeight: '80%', borderWidth: 1, borderColor: Colors.border, gap: Spacing.sm,
+  },
+  editTitle: { fontSize: 18, fontFamily: Fonts.bold, color: Colors.textPrimary, marginBottom: 4 },
+  editNameInput: {
+    backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md, paddingVertical: 12, color: Colors.textPrimary,
+    fontSize: 15, fontFamily: Fonts.regular, borderWidth: 1, borderColor: Colors.border,
+  },
+  avatarGridScroll: { maxHeight: 220 },
+  avatarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: Spacing.xs },
+  avatarGridItem: {
+    width: 52, height: 52, borderRadius: BorderRadius.md, backgroundColor: Colors.surfaceElevated,
+    borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center',
+  },
+  avatarGridItemSelected: { borderColor: Colors.pop, backgroundColor: Colors.pop + '22' },
+  editActions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
+  editCancelBtn: { flex: 1, paddingVertical: 13, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border, alignItems: 'center' },
+  editCancelText: { fontSize: 15, fontFamily: Fonts.semibold, color: Colors.textSecondary },
+  editSaveBtn: { flex: 1, paddingVertical: 13, borderRadius: BorderRadius.md, backgroundColor: Colors.pop, alignItems: 'center' },
+  editSaveBtnDisabled: { backgroundColor: Colors.surfaceElevated },
+  editSaveText: { fontSize: 15, fontFamily: Fonts.bold, color: '#000' },
+
+  examOtherBtn: {
+    backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.full,
+    borderWidth: 2, borderColor: Colors.border, paddingVertical: 12, alignItems: 'center',
+  },
+  examOtherBtnActive: { backgroundColor: Colors.pop, borderColor: Colors.pop },
+  examOtherText: { fontSize: 14, fontFamily: Fonts.bold, color: Colors.textSecondary },
+  examOtherTextActive: { color: '#000' },
+  examGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  examCard: {
+    width: '47%', backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md,
+    padding: Spacing.sm, borderWidth: 2, borderColor: Colors.border,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  examCardActive: { borderColor: Colors.pop, backgroundColor: Colors.pop },
+  examCardText: { fontSize: 14, fontFamily: Fonts.bold, color: Colors.textPrimary },
+  examCardTextActive: { color: '#000' },
+  examCheckbox: { width: 18, height: 18, borderRadius: 5, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
+  examCheckboxActive: { backgroundColor: '#000', borderColor: '#000' },
+  examCheckmark: { color: Colors.pop, fontSize: 11, fontFamily: Fonts.bold },
 });
