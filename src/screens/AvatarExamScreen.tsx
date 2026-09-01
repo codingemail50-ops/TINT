@@ -15,16 +15,13 @@ const WALL_HEIGHT = 260;
 interface Props {
   onComplete: (data: { avatar: string; examTypes: ExamType[]; customExam?: CustomExam }) => void;
   onLogin: () => void;
-  /** Only set when this step was opened as a replay (e.g. the Home wordmark
-   *  shortcut) — a real first launch has nowhere to go back to. */
-  onBack?: () => void;
 }
 
 // Screen 1 of onboarding — a continuously-scrolling wall of pixel-icon
 // avatars at a slight angle (tap one to pick it, same procedural icon set as
 // the rest of the app) and which exam(s) to prep for, in one screen instead
 // of two separate steps.
-export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack }) => {
+export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin }) => {
   const [avatar, setAvatar] = useState(AVATARS[0]);
   // Wall is only shown while actively picking — once you tap one, it locks
   // in and the wall stops animating/mounting entirely (both for a calmer
@@ -90,11 +87,6 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onBack 
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      {onBack && (
-        <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.7}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-      )}
 
       {/* Solid header, entirely above the wall — kept separate on purpose so
           the heading never sits on top of the moving icons. */}
@@ -228,8 +220,6 @@ const examS = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  backBtn: { position: 'absolute', top: 58, left: Spacing.xl, zIndex: 2 },
-  backText: { fontSize: 15, color: Colors.textPrimary, fontFamily: Fonts.medium },
   header: { paddingTop: 100, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.md, backgroundColor: Colors.background },
   pixelTitle: { fontFamily: Fonts.pixel, fontSize: 34, color: Colors.textPrimary, letterSpacing: 0.5, marginBottom: 4 },
   wallSection: { height: WALL_HEIGHT, overflow: 'hidden', backgroundColor: Colors.background },

@@ -12,9 +12,12 @@ interface Props {
   /** The user's chosen avatar (from onboarding) — shown instead of the
    *  generic flame when known. */
   avatar?: string;
+  /** Small red dot in the corner — flags a pending incoming friend request
+   *  so it's noticeable from Today without opening Profile to check. */
+  showNotificationDot?: boolean;
 }
 
-export const FlameBadge: React.FC<Props> = ({ streak, size = 38, style, onPress, avatar }) => {
+export const FlameBadge: React.FC<Props> = ({ streak, size = 38, style, onPress, avatar, showNotificationDot }) => {
   const content = (
     <View style={[styles.badge, { width: size, height: size, borderRadius: size / 2 }, style]}>
       {avatar ? (
@@ -23,6 +26,7 @@ export const FlameBadge: React.FC<Props> = ({ streak, size = 38, style, onPress,
         <PixelFlame size={size * 0.42} state="static" />
       )}
       <Text style={[styles.n, { fontSize: size * 0.32 }]}>{streak}</Text>
+      {showNotificationDot && <View style={styles.notificationDot} />}
     </View>
   );
 
@@ -45,4 +49,11 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   n: { fontFamily: Fonts.retro, color: Colors.gray[400] },
+  notificationDot: {
+    position: 'absolute',
+    top: -1, right: -1,
+    width: 12, height: 12, borderRadius: 6,
+    backgroundColor: Colors.danger,
+    borderWidth: 1.5, borderColor: Colors.background,
+  },
 });

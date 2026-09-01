@@ -64,9 +64,9 @@ const TAB_CONFIG = [
 ];
 
 // showTabs stays true for the rest of the session once a profile exists, but
-// the bottom tab bar must not paint over onboarding screens reached via the
-// Home wordmark's replay shortcut — it used to swallow taps meant for those
-// screens' own buttons.
+// the bottom tab bar must not paint over onboarding screens — every launch
+// goes through onboarding now (see FORCE_ONBOARDING_ON_LAUNCH below), so
+// this fires on ordinary use, not just first installs.
 const ONBOARDING_SCREENS = new Set<Screen>(['avatarExam', 'focusGoal', 'createAccount']);
 
 interface OnboardingDraft {
@@ -99,12 +99,6 @@ const AppNavigatorInner: React.FC = () => {
   // to createAccount in login mode, without collecting avatar/exam/goal —
   // this flag is what tells createAccount which mode to open in.
   const [loginShortcut, setLoginShortcut] = useState(false);
-  // Tapping the wordmark on Home replays the full onboarding flow from step
-  // 1, exactly as a first-time user would see it (temporary dev shortcut,
-  // to be removed later) — this flag is what gives step 1 a working back
-  // button (real first launches have nowhere to go back to, so it's absent
-  // there) that returns to Today instead of leaving them stranded.
-  const [previewFromHome, setPreviewFromHome] = useState(false);
   const tabFadeAnim = useRef(new Animated.Value(0)).current;
   const userIdRef = useRef<string | null>(null);
   const { status: focusStatus, requestExpand } = useFocusSessionStatus();
@@ -174,11 +168,6 @@ const AppNavigatorInner: React.FC = () => {
     setScreen('createAccount');
   };
 
-  const handleOpenOnboardingPreview = () => {
-    setPreviewFromHome(true);
-    setScreen('avatarExam');
-  };
-
   // ProfileScreen already signed out of Supabase and wiped local device
   // data before calling this — this just resets in-memory navigation state
   // and kicks off a fresh anonymous session, the same state a brand-new
@@ -187,7 +176,6 @@ const AppNavigatorInner: React.FC = () => {
     userIdRef.current = null;
     setShowTabs(false);
     setLoginShortcut(false);
-    setPreviewFromHome(false);
     setAppState({ user: null, streak: 0, longestStreak: 0, lastActiveDate: null, history: [], totalTasksCompleted: 0 });
     tabFadeAnim.setValue(0);
     setScreen('avatarExam');
@@ -325,7 +313,6 @@ const AppNavigatorInner: React.FC = () => {
             <AvatarExamScreen
               onComplete={handleAvatarExamComplete}
               onLogin={handleLoginShortcut}
-              onBack={previewFromHome ? () => { setPreviewFromHome(false); setScreen('todo'); } : undefined}
             />
           )}
           {screen === 'createAccount' && (
@@ -391,7 +378,6 @@ const AppNavigatorInner: React.FC = () => {
               userId={userIdRef.current ?? undefined}
               onStateChange={handleStateChange}
               onBack={() => navigateTo('todo')}
-              onPreviewOnboarding={handleOpenOnboardingPreview}
               onLogout={handleLogout}
             />
           )}

@@ -5,16 +5,15 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts, Typography } from '../constants/theme';
 import { PixelIcon } from '../components/PixelIcon';
-import { AppState, DayRecord, computeStreak, StorageService } from '../utils/storage';
+import { AppState, StorageService } from '../utils/storage';
 import {
   CloudLeaderboardRow, FriendRequestRow,
   loadFriendsLeaderboard, loadIncomingRequests, loadOutgoingRequests,
   findUserByEmail, sendFriendRequest, respondToFriendRequest, removeFriend,
 } from '../utils/supabaseStorage';
-import { loadFocusLog, saveFocusLog } from '../utils/focusLog';
+import { saveFocusLog } from '../utils/focusLog';
 import { saveDistractionLog } from '../utils/distractionLog';
 import { clearActiveSession } from '../utils/activeFocusSession';
-import { now as devNow, advanceDevDay, resetDevOffset, getDevDayOffset, subscribeDevClock } from '../utils/devClock';
 import { supabase } from '../lib/supabase';
 import { FocusGoalScreen } from './FocusGoalScreen';
 import { useHaptics } from '../hooks/useHaptics';
@@ -24,18 +23,13 @@ interface Props {
   userId?: string;
   onStateChange: (state: AppState) => void;
   onBack: () => void;
-  /** Dev-only: replays onboarding from step 1, for testing that flow
-   *  without the risk the "tap the wordmark" shortcut turned out to carry
-   *  on-device (Today and Focus stay mounted underneath it, and layering a
-   *  third heavy animated screen on top was crashing on some phones). */
-  onPreviewOnboarding?: () => void;
   /** Signs out of Supabase and clears local device data, then sends the
    *  user back to onboarding — owned by AppNavigator since it needs to
    *  reset navigation/screen state too, not just this screen's own. */
   onLogout: () => void;
 }
 
-export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange, onBack, onPreviewOnboarding, onLogout }) => {
+export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange, onBack, onLogout }) => {
   const [friends, setFriends] = useState<CloudLeaderboardRow[]>([]);
   const [incoming, setIncoming] = useState<FriendRequestRow[]>([]);
   const [outgoingIds, setOutgoingIds] = useState<Set<string>>(new Set());
@@ -46,10 +40,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
   // the field is simply empty or mid-typing.
   const [notFound, setNotFound] = useState(false);
   const [goalModalOpen, setGoalModalOpen] = useState(false);
-  const [devDayOffset, setDevDayOffset] = useState(getDevDayOffset());
   const { buttonPress } = useHaptics();
-
-  useEffect(() => subscribeDevClock(() => setDevDayOffset(getDevDayOffset())), []);
 
   const refreshFriends = useCallback(async () => {
     if (!userId) return;
@@ -106,56 +97,6 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
     setGoalModalOpen(false);
     if (!appState.user) return;
     onStateChange({ ...appState, user: { ...appState.user, dailyFocusGoalMins: mins } });
-  };
-
-  // Dev-only shortcuts for testing streak/progress logic without waiting on
-  // real time — gated by __DEV__ so this is simply absent from a production
-  // build, no manual removal needed before shipping.
-  const handleAddFocusMinutes = async () => {
-    await buttonPress();
-    const log = await loadFocusLog();
-    log.push({ date: devNow().toDateString(), mins: 30, timestamp: devNow().toISOString() });
-    await saveFocusLog(log);
-    Alert.alert('Dev', '+30 min added to today’s focus log. Reopen Today to see it.');
-  };
-
-  // Advances the app's notion of "today" by a day (see devClock.ts) and
-  // notifies every screen that stayed mounted through the jump so Insights,
-  // the heatmap, and streak logic can all be tested ahead of the real clock.
-  const handleSkipDay = async () => {
-    await buttonPress();
-    await advanceDevDay(1);
-    Alert.alert('Dev', `Now ${getDevDayOffset()} day(s) ahead of real time.`);
-  };
-
-  const handleResetDayOffset = async () => {
-    await buttonPress();
-    await resetDevOffset();
-    Alert.alert('Dev', 'Back to real time.');
-  };
-
-  const handleAddStreakDay = () => {
-    buttonPress();
-    const nextOffset = appState.streak + 1;
-    const d = devNow();
-    d.setDate(d.getDate() - nextOffset);
-    const record: DayRecord = { date: d.toDateString(), tasks: [], completedCount: 1, totalCount: 1, consistency: 100 };
-    const history = [...appState.history.filter(h => h.date !== record.date), record].slice(-60);
-    const streak = computeStreak(history);
-    onStateChange({
-      ...appState,
-      history,
-      streak,
-      longestStreak: Math.max(appState.longestStreak, streak),
-    });
-  };
-
-  const handleResetTestData = async () => {
-    buttonPress();
-    await saveFocusLog([]);
-    await saveDistractionLog([]);
-    onStateChange({ ...appState, history: [], streak: 0, longestStreak: 0, totalTasksCompleted: 0 });
-    Alert.alert('Dev', 'Streak, history, focus log, and distraction log reset.');
   };
 
   // A custom modal instead of a multi-button Alert.alert — React Native
@@ -259,15 +200,21 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
 
         {incoming.length > 0 && (
           <>
-            <Text style={styles.sectionLabel}>Friend requests</Text>
+            <Text style={styles.sectionLabel}>Friend requests ({incoming.length})</Text>
             {incoming.map(req => (
-              <View key={req.id} style={styles.friendRow}>
-                <Text style={[styles.friendName, { flex: 1 }]}>Request from a user</Text>
-                <TouchableOpacity style={styles.acceptBtn} onPress={() => handleRespond(req, true)}>
-                  <Ionicons name="checkmark" size={16} color={Colors.background} />
+              <View key={req.id} style={styles.requestCard}>
+                <View style={styles.requestAvatar}>
+                  <PixelIcon name={req.fromAvatar || 'star'} size={30} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.requestName}>{req.fromName || 'Someone'}</Text>
+                  <Text style={styles.requestSub}>wants to be your friend</Text>
+                </View>
+                <TouchableOpacity style={styles.requestAcceptBtn} onPress={() => handleRespond(req, true)} activeOpacity={0.8}>
+                  <Ionicons name="checkmark" size={20} color={Colors.background} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.declineBtn} onPress={() => handleRespond(req, false)}>
-                  <Ionicons name="close" size={16} color={Colors.textPrimary} />
+                <TouchableOpacity style={styles.requestDeclineBtn} onPress={() => handleRespond(req, false)} activeOpacity={0.8}>
+                  <Ionicons name="close" size={20} color={Colors.textPrimary} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -298,36 +245,6 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
           <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
           <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>
-
-        {__DEV__ && (
-          <>
-            <Text style={styles.sectionLabel}>Developer Tools</Text>
-            <View style={styles.devRow}>
-              <TouchableOpacity style={styles.devBtn} onPress={handleAddFocusMinutes}>
-                <Text style={styles.devBtnText}>+30 min today</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.devBtn} onPress={handleAddStreakDay}>
-                <Text style={styles.devBtnText}>+1 day streak</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.devBtn} onPress={handleSkipDay}>
-                <Text style={styles.devBtnText}>Skip to next day</Text>
-              </TouchableOpacity>
-              {devDayOffset !== 0 && (
-                <TouchableOpacity style={styles.devBtn} onPress={handleResetDayOffset}>
-                  <Text style={styles.devBtnText}>Back to real time ({devDayOffset}d)</Text>
-                </TouchableOpacity>
-              )}
-              {onPreviewOnboarding && (
-                <TouchableOpacity style={styles.devBtn} onPress={onPreviewOnboarding}>
-                  <Text style={styles.devBtnText}>Preview onboarding / sign-in</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity style={[styles.devBtn, styles.devBtnDanger]} onPress={handleResetTestData}>
-                <Text style={[styles.devBtnText, styles.devBtnDangerText]}>Reset test data</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
 
         <View style={{ height: 60 }} />
       </ScrollView>
@@ -424,15 +341,6 @@ const styles = StyleSheet.create({
   confirmLogoutBtn: { flex: 1, paddingVertical: 13, borderRadius: BorderRadius.md, backgroundColor: Colors.danger, alignItems: 'center' },
   confirmLogoutText: { fontSize: 15, fontFamily: Fonts.bold, color: '#000' },
 
-  devRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  devBtn: {
-    backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md,
-    borderWidth: 1, borderColor: Colors.border, paddingVertical: 10, paddingHorizontal: 14,
-  },
-  devBtnText: { fontSize: 13, fontFamily: Fonts.semibold, color: Colors.textSecondary },
-  devBtnDanger: { borderColor: Colors.danger + '55' },
-  devBtnDangerText: { color: Colors.danger },
-
   searchBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md,
@@ -455,4 +363,24 @@ const styles = StyleSheet.create({
   addBtnText: { fontSize: 12, fontFamily: Fonts.semibold, color: Colors.background },
   acceptBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   declineBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.surfaceElevated, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
+
+  // Deliberately bigger and more visually distinct than a plain friend row —
+  // an incoming request needs a decision, not just a glance, so it gets a
+  // full card with the sender's identity front and center instead of a
+  // cramped one-liner.
+  requestCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.lg,
+    borderWidth: 1, borderColor: Colors.pop + '55',
+    padding: Spacing.md, marginBottom: Spacing.sm,
+  },
+  requestAvatar: {
+    width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.surface,
+    borderWidth: 2, borderColor: Colors.pop,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  requestName: { fontSize: 16, fontFamily: Fonts.bold, color: Colors.textPrimary },
+  requestSub: { fontSize: 12, color: Colors.textMuted, marginTop: 2 },
+  requestAcceptBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.pop, alignItems: 'center', justifyContent: 'center' },
+  requestDeclineBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
 });

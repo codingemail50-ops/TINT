@@ -24,10 +24,18 @@ interface UserDataRow {
 }
 
 // ── Save a brand-new user to Supabase (upsert) ───────────────────────────────
+// Called fire-and-forget right after onboarding completes, so a transient
+// network blip at that exact moment used to leave the row permanently
+// missing — every later sync (syncAppStateToSupabase) only UPDATEs an
+// existing row, it never creates one, so the account would silently never
+// appear on the leaderboard or be findable by email, with no obvious cause.
+// A few retries with a short backoff covers the common transient case
+// without blocking onboarding on a slow/flaky connection.
 export async function saveNewUserToSupabase(
   userId: string,
   email: string,
-  profile: Omit<UserProfile, 'email'>
+  profile: Omit<UserProfile, 'email'>,
+  attempt = 1
 ): Promise<void> {
   try {
     const row: Partial<UserDataRow> = {
@@ -52,9 +60,17 @@ export async function saveNewUserToSupabase(
 
     if (error) {
       console.error('[supabaseStorage] saveNewUserToSupabase error:', error.message);
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1500 * attempt));
+        return saveNewUserToSupabase(userId, email, profile, attempt + 1);
+      }
     }
   } catch (err) {
     console.error('[supabaseStorage] saveNewUserToSupabase exception:', err);
+    if (attempt < 3) {
+      await new Promise(r => setTimeout(r, 1500 * attempt));
+      return saveNewUserToSupabase(userId, email, profile, attempt + 1);
+    }
   }
 }
 
@@ -254,6 +270,11 @@ export interface FriendRequestRow {
   toUser: string;
   status: 'pending' | 'accepted' | 'declined';
   createdAt: string;
+  /** Only populated by loadIncomingRequests (needs a second lookup against
+   *  leaderboard_view for the sender's public-safe info) — never set on
+   *  outgoing requests, which don't need it. */
+  fromName?: string;
+  fromAvatar?: string;
 }
 
 interface RawFriendRequestRow {
@@ -305,7 +326,11 @@ export async function cancelFriendRequest(requestId: string): Promise<void> {
   }
 }
 
-// Pending requests sent TO this user (need a response).
+// Pending requests sent TO this user (need a response) — enriched with the
+// sender's name/avatar via a second lookup against leaderboard_view (the
+// same public-safe columns already exposed there), since friend_requests
+// itself only stores the sender's id and RLS on user_data blocks reading
+// anyone else's row directly.
 export async function loadIncomingRequests(userId: string): Promise<FriendRequestRow[]> {
   try {
     const { data, error } = await supabase
@@ -317,10 +342,42 @@ export async function loadIncomingRequests(userId: string): Promise<FriendReques
       if (error) console.error('[supabaseStorage] loadIncomingRequests error:', error.message);
       return [];
     }
-    return (data as RawFriendRequestRow[]).map(toFriendRequest);
+    const rows = (data as RawFriendRequestRow[]).map(toFriendRequest);
+    if (rows.length === 0) return rows;
+
+    const { data: senders } = await supabase
+      .from('leaderboard_view')
+      .select('id, name, avatar')
+      .in('id', rows.map(r => r.fromUser));
+    const senderMap = new Map((senders ?? []).map((s: any) => [s.id, s]));
+    return rows.map(r => {
+      const sender = senderMap.get(r.fromUser);
+      return { ...r, fromName: sender?.name || 'Someone', fromAvatar: sender?.avatar || 'star' };
+    });
   } catch (err) {
     console.error('[supabaseStorage] loadIncomingRequests exception:', err);
     return [];
+  }
+}
+
+// Cheap count-only version (no sender-name join) for a lightweight
+// notification badge — polled periodically from Today, so it shouldn't
+// carry the extra leaderboard_view lookup loadIncomingRequests needs.
+export async function countIncomingRequests(userId: string): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from('friend_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('to_user', userId)
+      .eq('status', 'pending');
+    if (error) {
+      console.error('[supabaseStorage] countIncomingRequests error:', error.message);
+      return 0;
+    }
+    return count ?? 0;
+  } catch (err) {
+    console.error('[supabaseStorage] countIncomingRequests exception:', err);
+    return 0;
   }
 }
 

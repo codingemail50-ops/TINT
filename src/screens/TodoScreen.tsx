@@ -17,7 +17,7 @@ import { Confetti } from '../components/Confetti';
 import { FocusScreen } from './FocusScreen';
 import { UCEEDCountdown, NIDCountdown, NIFTCountdown } from '../components/ExamCountdowns';
 import { useHaptics } from '../hooks/useHaptics';
-import { syncFocusLog } from '../utils/supabaseStorage';
+import { syncFocusLog, countIncomingRequests } from '../utils/supabaseStorage';
 import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats, subscribeFocusLog } from '../utils/focusLog';
 import { DistractionLogEntry, loadDistractionLog, computeDistractedToday, subscribeDistractionLog } from '../utils/distractionLog';
 import { loadActiveSession } from '../utils/activeFocusSession';
@@ -193,6 +193,20 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   const [selectedDate, setSelectedDate] = useState(() => devNow().toDateString());
   const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
   const [distractionLog, setDistractionLog] = useState<DistractionLogEntry[]>([]);
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
+
+  // Polled rather than pushed — there's no realtime subscription for
+  // friend_requests, so this is what makes a request sent from another
+  // device show up as a badge on the avatar without having to already be
+  // on the Profile screen to notice it.
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    const poll = () => { void countIncomingRequests(userId).then(n => { if (!cancelled) setPendingRequestCount(n); }); };
+    poll();
+    const interval = setInterval(poll, 45000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [userId]);
 
   // Tapping an incomplete task pops up the Focus screen (same squiggly-circle
   // UI as the Focus tab) pre-loaded with that task and running — this just
@@ -469,7 +483,13 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
             <Text style={styles.tagline}>THERE IS</Text>
             <Text style={styles.tagline}>NO TOMORROW</Text>
           </View>
-          <FlameBadge streak={appState.streak} size={46} onPress={onNavigateProfile} avatar={appState.user?.avatar} />
+          <FlameBadge
+            streak={appState.streak}
+            size={46}
+            onPress={onNavigateProfile}
+            avatar={appState.user?.avatar}
+            showNotificationDot={pendingRequestCount > 0}
+          />
         </View>
 
         {viewingPast && (
