@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
@@ -10,6 +10,13 @@ import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { supabase } from '../lib/supabase';
 import { useHaptics } from '../hooks/useHaptics';
 import { AvatarWall } from '../components/AvatarWall';
+import { GoogleSignin, isSuccessResponse, isErrorWithCode, statusCodes } from '../utils/googleAuth';
+
+// Public (non-secret) Web OAuth client id from Google Cloud Console — see
+// PRIORITY 2 in the EAS audit for the full Google Cloud/Supabase setup this
+// depends on. Only the client *secret* is sensitive, and that lives in
+// Supabase's dashboard, never here.
+const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
 type Mode = 'signup' | 'login';
 
@@ -45,8 +52,9 @@ function friendlyError(message: string): string {
   return message;
 }
 
-// Screen 3 of onboarding — username + email/password (or stay anonymous),
-// plus a placeholder for Google sign-in until that's wired up for real.
+// Screen 3 of onboarding — username + email/password, Google Sign-In, or
+// stay anonymous. Google Sign-In only functions on a native Android build
+// (see ../utils/googleAuth.ts) — Expo Go/web show a clear "not available" alert instead.
 export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLoggedIn, onBack, initialMode = 'signup', avatar }) => {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [username, setUsername] = useState('');
@@ -55,6 +63,19 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { buttonPress } = useHaptics();
+
+  useEffect(() => {
+    if (GoogleSignin && GOOGLE_WEB_CLIENT_ID) {
+      // Safe to call repeatedly / on every mount — configure() just sets
+      // options for later calls, it doesn't itself touch the network.
+      try {
+        GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
+      } catch {
+        // Shouldn't happen given the guard above, but fail quiet either way —
+        // handleGoogle below hits the same wall and reports it there.
+      }
+    }
+  }, []);
 
   const usernameOk = username.trim().length >= 2;
   const canSubmit = !loading && (mode === 'login'
@@ -96,12 +117,52 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
     onGuest({ name: username.trim() });
   };
 
-  const handleGoogle = () => {
-    buttonPress();
-    Alert.alert(
-      'Not available in this test build',
-      'Google Sign-In needs a full app build to work (Expo Go can’t handle it) — it’ll be enabled once that’s ready. Use email or Continue as guest for now.'
-    );
+  const handleGoogle = async () => {
+    await buttonPress();
+
+    if (!GoogleSignin || !GOOGLE_WEB_CLIENT_ID) {
+      Alert.alert(
+        'Not available in this build',
+        !GoogleSignin
+          ? 'Google Sign-In needs a full Android build (not Expo Go or the web preview) to work.'
+          : 'Google Sign-In isn’t configured yet — it needs a Google Cloud OAuth client id for this build.'
+      );
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const response = await GoogleSignin.signIn();
+      if (!isSuccessResponse?.(response)) {
+        // User backed out of the Google account picker — not an error.
+        return;
+      }
+      const idToken = response.data.idToken;
+      if (!idToken) throw new Error('Google did not return an ID token.');
+
+      const { data, error: supaError } = await supabase.auth.signInWithIdToken({ provider: 'google', token: idToken });
+      if (supaError) throw supaError;
+
+      // Same convention as the email/password login path: hasProfile=true,
+      // and AppNavigator's existing fallback already routes a brand-new
+      // user (no cloud profile row yet) into onboarding instead of crashing.
+      onLoggedIn(true, data.user?.id);
+    } catch (err: any) {
+      const code = isErrorWithCode?.(err) ? err.code : null;
+      if (code && statusCodes && code === statusCodes.SIGN_IN_CANCELLED) {
+        // User cancelled — no error banner needed.
+      } else if (code && statusCodes && code === statusCodes.IN_PROGRESS) {
+        setError('A sign-in is already in progress.');
+      } else if (code && statusCodes && code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        setError('Google Play Services isn’t available on this device.');
+      } else {
+        setError(friendlyError(err?.message ?? 'Google sign-in failed.'));
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

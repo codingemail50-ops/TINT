@@ -19,8 +19,12 @@ import { now as devNow } from '../utils/devClock';
 import { PixelFlame } from '../components/PixelFlame';
 import { BlobDial } from '../components/BlobDial';
 import { scallopPath } from '../utils/scallopPath';
-import { openPermissionSettings, getSelfReportedGrants, setSelfReportedGrant, BlockingPermission } from '../utils/appBlocking';
-import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY } from '../data/blockableApps';
+import {
+  openPermissionSettings, getSelfReportedGrants, setSelfReportedGrant, checkPermission,
+  isNativeBlockingAvailable, startAppBlocking, stopAppBlocking, BlockingPermission,
+} from '../utils/appBlocking';
+import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY, packageNamesFor } from '../data/blockableApps';
+import { ensureNotificationPermission, notifySessionComplete } from '../utils/sessionNotifications';
 
 const DEFAULT_DURATION = 25;
 const HOLD_MS = 2000;
@@ -37,7 +41,6 @@ const FOCUS_APPS = BLOCKABLE_APPS;
 
 const PERMISSIONS: { id: BlockingPermission; label: string; description: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: 'usageAccess', label: 'Usage Access', description: 'Lets TINT see which app is open right now.', icon: 'bar-chart-outline' },
-  { id: 'accessibility', label: 'Accessibility', description: 'Lets TINT close a blocked app the moment it opens.', icon: 'shield-checkmark-outline' },
   { id: 'overlay', label: 'Display over other apps', description: 'Lets TINT show a block screen over the app.', icon: 'layers-outline' },
 ];
 
@@ -150,8 +153,21 @@ export const FocusScreen: React.FC<Props> = ({
   const [holdLabel, setHoldLabel] = useState('Hold to end session');
 
   const [grants, setGrants] = useState<Record<BlockingPermission, boolean>>({
-    usageAccess: false, accessibility: false, overlay: false,
+    usageAccess: false, overlay: false,
   });
+
+  // Prefers the real OS-reported grant state (native Android builds); falls
+  // back to the self-reported flag only where the native module isn't
+  // linked (web preview, Expo Go, iOS) so that path keeps working unchanged.
+  const refreshGrants = useCallback(async () => {
+    const selfReported = await getSelfReportedGrants();
+    const next = { ...selfReported };
+    (['usageAccess', 'overlay'] as BlockingPermission[]).forEach(id => {
+      const real = checkPermission(id);
+      if (real !== null) next[id] = real;
+    });
+    setGrants(next);
+  }, []);
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
@@ -163,9 +179,9 @@ export const FocusScreen: React.FC<Props> = ({
         else await AsyncStorage.setItem(KEYS.BLOCKED_APPS, JSON.stringify(DEFAULT_BLOCKED_APPS));
       } catch {}
       setFocusLog(await loadFocusLog());
-      setGrants(await getSelfReportedGrants());
+      await refreshGrants();
     })();
-  }, []);
+  }, [refreshGrants]);
 
   // Today stays mounted alongside this tab now — a task-linked session
   // completed there should update this screen's Today/Week/All-Time stat
@@ -184,11 +200,18 @@ export const FocusScreen: React.FC<Props> = ({
     setDuration(completedDurationMins);
     setPhase('done');
     await clearActiveSession();
+    stopAppBlocking();
 
     const entry: FocusLogEntry = { date: devNow().toDateString(), mins: completedDurationMins, timestamp: devNow().toISOString() };
     const updatedLog = [...(await loadFocusLog()), entry];
     await saveFocusLog(updatedLog);
     setFocusLog(updatedLog);
+
+    // Only worth a notification if the user isn't already looking at the
+    // in-app "Session Complete" screen this same call is about to show.
+    if (RNAppState.currentState !== 'active') {
+      void notifySessionComplete(completedDurationMins);
+    }
 
     const distractedMins = distractedSecondsRef.current / 60;
     distractedSecondsRef.current = 0;
@@ -224,6 +247,15 @@ export const FocusScreen: React.FC<Props> = ({
     if (bootstrappedRef.current) return;
     bootstrappedRef.current = true;
     (async () => {
+      // Read directly from storage rather than the `blockedApps` state,
+      // which loads in a separate effect and may not have committed yet —
+      // this runs on the same mount tick.
+      let blockedIds: string[] = DEFAULT_BLOCKED_APPS;
+      try {
+        const raw = await AsyncStorage.getItem(KEYS.BLOCKED_APPS);
+        if (raw) blockedIds = JSON.parse(raw);
+      } catch {}
+
       const saved = await loadActiveSession();
       const matches = !!saved && saved.source === sessionSource
         && (sessionSource === 'tab' || saved.taskId === externalTask?.id);
@@ -240,6 +272,10 @@ export const FocusScreen: React.FC<Props> = ({
           setTimeLeft(remaining);
           setPaused(false);
           setPhase('active');
+          // The native blocker doesn't survive a process kill — re-arm it
+          // for whatever's left of this session (e.g. app was force-closed
+          // and reopened mid-session).
+          startAppBlocking(packageNamesFor(blockedIds));
         }
         return;
       }
@@ -252,6 +288,8 @@ export const FocusScreen: React.FC<Props> = ({
           source: sessionSource, startedAtMs: Date.now(), durationMins: externalTask.durationMins,
           title: externalTask.title, taskId: externalTask.id,
         });
+        startAppBlocking(packageNamesFor(blockedIds));
+        void ensureNotificationPermission();
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -288,13 +326,17 @@ export const FocusScreen: React.FC<Props> = ({
           backgroundedAtRef.current = null;
         }
         if (endTimeRef.current > 0 && !paused) tick();
+        // Coming back from Settings (e.g. after granting Usage Access) —
+        // refresh the real permission pills rather than leaving them stale
+        // until the next full remount.
+        if (phaseRef.current === 'setup') void refreshGrants();
       } else if (phaseRef.current === 'active' && !pausedRef.current && backgroundedAtRef.current === null) {
         backgroundedAtRef.current = Date.now();
       }
     };
     const sub = RNAppState.addEventListener('change', onChange);
     return () => sub.remove();
-  }, [tick, paused]);
+  }, [tick, paused, refreshGrants]);
 
   useEffect(() => {
     if (phase === 'active' && !paused) {
@@ -317,6 +359,7 @@ export const FocusScreen: React.FC<Props> = ({
     setPaused(false);
     setConfirmOpen(false);
     await clearActiveSession();
+    stopAppBlocking();
 
     if (mode === 'early') {
       const distractedMins = distractedSecondsRef.current / 60;
@@ -365,6 +408,8 @@ export const FocusScreen: React.FC<Props> = ({
       setPaused(false);
       setPhase('active');
       void saveActiveSession({ source: sessionSource, startedAtMs: Date.now(), durationMins: duration, title: 'Focus Session' });
+      startAppBlocking(packageNamesFor(blockedApps));
+      void ensureNotificationPermission();
       blobEnterAnim.setValue(0);
       Animated.timing(blobEnterAnim, { toValue: 1, duration: 320, useNativeDriver: true }).start();
     });
@@ -464,6 +509,13 @@ export const FocusScreen: React.FC<Props> = ({
 
   const handleToggleGrant = async (permission: BlockingPermission) => {
     await buttonPress();
+    // On a real Android build this reflects the OS's actual answer, not
+    // something the user can fake by tapping — route the tap to the same
+    // "open Settings" action as Grant instead of leaving it a dead tap.
+    if (isNativeBlockingAvailable()) {
+      await handleGrantPermission(permission);
+      return;
+    }
     const next = !grants[permission];
     setGrants(prev => ({ ...prev, [permission]: next }));
     await setSelfReportedGrant(permission, next);

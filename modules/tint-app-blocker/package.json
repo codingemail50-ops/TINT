@@ -1,0 +1,8 @@
+{
+  "name": "tint-app-blocker",
+  "version": "1.0.0",
+  "description": "Local native module: Android foreground-service + UsageStatsManager app blocking for TINT focus sessions. Android only, not published — used via file: reference from the app's package.json.",
+  "main": "index.ts",
+  "types": "index.ts",
+  "license": "UNLICENSED"
+}

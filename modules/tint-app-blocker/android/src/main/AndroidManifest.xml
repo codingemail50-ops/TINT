@@ -1,0 +1,23 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Base foreground-service permission (needed on API 28+) and the
+         specialUse type permission (needed on API 34+) — this blocking
+         service doesn't fit a predefined type like mediaPlayback/location,
+         so it declares specialUse with the required justification property
+         below, per Android 14's foreground-service-type requirements. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <application>
+        <service
+            android:name="expo.modules.tintappblocker.BlockingForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:stopWithTask="true">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Blocks a small set of user-selected distracting apps while a focus session the user explicitly started in TINT is active. Runs only for the session's duration and stops automatically when the session ends or the user closes TINT." />
+        </service>
+    </application>
+
+</manifest>

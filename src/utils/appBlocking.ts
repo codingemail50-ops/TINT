@@ -1,25 +1,17 @@
-// Permission-request/redirect plumbing for real app blocking.
+// Permission-request/redirect plumbing, plus the bridge into the native
+// Android module (modules/tint-app-blocker) that runs the real blocker:
+// a foreground service polling UsageStatsManager, showing a block overlay
+// over selected apps while a focus session is active.
 //
-// IMPORTANT — what this file does NOT do: actually intercept app launches
-// or draw a block screen over another app. That requires a custom native
-// Android module (an AccessibilityService, or a foreground service paired
-// with UsageStatsManager polling) that does not exist in Expo Go and can't
-// be built or tested without ejecting to a custom EAS dev client. This
-// file only handles the permission-grant redirect + a self-reported
-// "did you grant it" flag, so the UI has something real to do today.
-//
-// Play Store policy risk, worth knowing before building the native module:
-// Google scrutinizes AccessibilityService usage heavily and has removed
-// "focus"/app-blocking apps for using it without a narrow, well-justified
-// accessibility purpose. UsageStatsManager (Usage Access) + a foreground
-// service that polls the current foreground app every few seconds is the
-// safer, more commonly-accepted path for this kind of feature, at the
-// cost of blocking being "checked every few seconds" rather than instant.
-// Decide which tradeoff to take before writing the native module.
+// V1 architecture (approved): UsageStatsManager + foreground service +
+// WindowManager overlay. Deliberately NOT AccessibilityService, Device
+// Admin, or a VPN — see modules/tint-app-blocker's own comments for why
+// (Play policy risk for the former, UX mismatch for the latter two).
 
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as IntentLauncher from 'expo-intent-launcher';
+import * as TintAppBlocker from 'tint-app-blocker';
 
 // Matches app.json's android.package — used for the overlay-permission
 // intent, which needs a package-specific URI to jump straight to this
@@ -28,7 +20,7 @@ const ANDROID_PACKAGE_NAME = 'com.tint.app';
 
 const GRANTED_KEY = 'tint_permission_self_reported';
 
-export type BlockingPermission = 'usageAccess' | 'accessibility' | 'overlay';
+export type BlockingPermission = 'usageAccess' | 'overlay';
 
 export async function openPermissionSettings(permission: BlockingPermission): Promise<void> {
   if (Platform.OS !== 'android') {
@@ -38,9 +30,6 @@ export async function openPermissionSettings(permission: BlockingPermission): Pr
     case 'usageAccess':
       await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.USAGE_ACCESS_SETTINGS);
       break;
-    case 'accessibility':
-      await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.ACCESSIBILITY_SETTINGS);
-      break;
     case 'overlay':
       await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.MANAGE_OVERLAY_PERMISSION, {
         data: `package:${ANDROID_PACKAGE_NAME}`,
@@ -49,15 +38,15 @@ export async function openPermissionSettings(permission: BlockingPermission): Pr
   }
 }
 
-// Self-reported only — there is no JS-reachable API to actually verify
-// these without the native module mentioned above. Treat this as "the
-// user says they did it," not a real permission check.
+// Self-reported fallback — only meaningful where the native module isn't
+// linked (web preview, Expo Go, iOS). On a real Android build, checkPermission()
+// below reports the OS's actual answer instead and this is never consulted.
 export async function getSelfReportedGrants(): Promise<Record<BlockingPermission, boolean>> {
   try {
     const raw = await AsyncStorage.getItem(GRANTED_KEY);
-    return raw ? JSON.parse(raw) : { usageAccess: false, accessibility: false, overlay: false };
+    return raw ? JSON.parse(raw) : { usageAccess: false, overlay: false };
   } catch {
-    return { usageAccess: false, accessibility: false, overlay: false };
+    return { usageAccess: false, overlay: false };
   }
 }
 
@@ -65,4 +54,31 @@ export async function setSelfReportedGrant(permission: BlockingPermission, grant
   const current = await getSelfReportedGrants();
   current[permission] = granted;
   await AsyncStorage.setItem(GRANTED_KEY, JSON.stringify(current));
+}
+
+export function isNativeBlockingAvailable(): boolean {
+  return Platform.OS === 'android' && TintAppBlocker.isAvailable();
+}
+
+/** Real, OS-reported grant state. Returns null when the native module isn't
+ *  linked, so callers know to fall back to the self-reported flag instead
+ *  of just reporting "not granted" for a permission that doesn't apply here. */
+export function checkPermission(permission: BlockingPermission): boolean | null {
+  if (!isNativeBlockingAvailable()) return null;
+  return permission === 'usageAccess' ? TintAppBlocker.hasUsageAccess() : TintAppBlocker.hasOverlayPermission();
+}
+
+/** Starts (or re-arms, e.g. after an app-kill mid-session) the native
+ *  blocker for the given Android package names. No-op off Android or when
+ *  the native module isn't linked (Expo Go/web) or when there's nothing to block. */
+export function startAppBlocking(packageNames: string[]): void {
+  if (!isNativeBlockingAvailable() || packageNames.length === 0) return;
+  TintAppBlocker.startBlocking(packageNames);
+}
+
+/** Stops polling, removes any visible block overlay, and stops the
+ *  foreground service. Safe to call even if blocking was never started. */
+export function stopAppBlocking(): void {
+  if (!isNativeBlockingAvailable()) return;
+  TintAppBlocker.stopBlocking();
 }

@@ -28,12 +28,17 @@
       "package": "com.tint.app",
       "permissions": [
         "SYSTEM_ALERT_WINDOW",
-        "PACKAGE_USAGE_STATS"
+        "PACKAGE_USAGE_STATS",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_SPECIAL_USE"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": []
+    "plugins": [
+      "@react-native-google-signin/google-signin",
+      "expo-notifications"
+    ]
   }
 }
