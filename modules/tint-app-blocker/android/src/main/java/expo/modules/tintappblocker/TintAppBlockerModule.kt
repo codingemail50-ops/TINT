@@ -30,6 +30,11 @@ class TintAppBlockerModule : Module() {
       } else {
         context.startService(intent)
       }
+      // Explicit trailing Unit for the same reason as stopBlocking below —
+      // both startForegroundService/startService return ComponentName?, so
+      // without this the block's inferred type isn't Unit and the bare
+      // `return@Function` above would be invalid.
+      Unit
     }
 
     Function("stopBlocking") {
@@ -46,6 +51,12 @@ class TintAppBlockerModule : Module() {
       } catch (e: Exception) {
         // Service already gone (process killed, task swiped) — nothing to stop.
       }
+      // Explicit trailing Unit — without it, the try/catch above (whose try
+      // branch returns ComponentName? from startService) makes Kotlin infer
+      // this block's type as Any?, which then rejects the bare
+      // `return@Function` above (needs an explicit value once the block
+      // isn't Unit-typed).
+      Unit
     }
 
     // Real, OS-reported grant state — replaces the old self-reported flag
