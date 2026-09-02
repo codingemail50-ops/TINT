@@ -8,6 +8,11 @@ def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.ab
 apply from: expoModulesCorePlugin
 applyKotlinExpoModulesCorePlugin()
 useCoreDependencies()
+// Without this call, `android.compileSdkVersion` is never set at all — AGP
+// then fails this module (and cascades into failing the whole shared
+// react-native/expo autolinking configuration step for every other native
+// module in the project, since it applies to all of them in one pass).
+useDefaultAndroidSdkVersions()
 
 android {
   namespace "expo.modules.tintappblocker"
@@ -15,9 +20,6 @@ android {
   defaultConfig {
     versionCode 1
     versionName "1.0.0"
-  }
-  lintOptions {
-    abortOnError false
   }
 }
 
