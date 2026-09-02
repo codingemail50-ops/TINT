@@ -20,7 +20,11 @@ class TintAppBlockerModule : Module() {
     // Fire-and-forget: starts (or updates the block list of) the foreground
     // service. Safe to call repeatedly — e.g. on every focus-session resume.
     Function("startBlocking") { packageNames: List<String> ->
-      val context = appContext.reactContext ?: return@Function
+      // Expo Modules' Function {} blocks are typed to return Any? regardless
+      // of body — a bare `return@Function` (no value) is only legal when the
+      // enclosing function type is Unit, so every early exit here needs an
+      // explicit value.
+      val context = appContext.reactContext ?: return@Function Unit
       val intent = Intent(context, BlockingForegroundService::class.java).apply {
         action = BlockingForegroundService.ACTION_START
         putStringArrayListExtra(BlockingForegroundService.EXTRA_PACKAGES, ArrayList(packageNames))
@@ -30,15 +34,11 @@ class TintAppBlockerModule : Module() {
       } else {
         context.startService(intent)
       }
-      // Explicit trailing Unit for the same reason as stopBlocking below —
-      // both startForegroundService/startService return ComponentName?, so
-      // without this the block's inferred type isn't Unit and the bare
-      // `return@Function` above would be invalid.
       Unit
     }
 
     Function("stopBlocking") {
-      val context = appContext.reactContext ?: return@Function
+      val context = appContext.reactContext ?: return@Function Unit
       val intent = Intent(context, BlockingForegroundService::class.java).apply {
         action = BlockingForegroundService.ACTION_STOP
       }
@@ -51,11 +51,6 @@ class TintAppBlockerModule : Module() {
       } catch (e: Exception) {
         // Service already gone (process killed, task swiped) — nothing to stop.
       }
-      // Explicit trailing Unit — without it, the try/catch above (whose try
-      // branch returns ComponentName? from startService) makes Kotlin infer
-      // this block's type as Any?, which then rejects the bare
-      // `return@Function` above (needs an explicit value once the block
-      // isn't Unit-typed).
       Unit
     }
 
