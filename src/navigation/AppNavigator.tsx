@@ -18,6 +18,9 @@ import { supabase } from '../lib/supabase';
 import { FocusSessionProvider, useFocusSessionStatus } from '../context/FocusSessionContext';
 import { FocusMiniPlayer } from '../components/FocusMiniPlayer';
 import { loadDevOffset, subscribeDevClock } from '../utils/devClock';
+import { saveFocusLog } from '../utils/focusLog';
+import { saveDistractionLog } from '../utils/distractionLog';
+import { clearActiveSession } from '../utils/activeFocusSession';
 import {
   loadUserFromSupabase,
   syncAppStateToSupabase,
@@ -191,6 +194,15 @@ const AppNavigatorInner: React.FC = () => {
   };
 
   const finishOnboarding = (user: UserProfile) => {
+    // Defensive, same as logout's clearing — local storage isn't namespaced
+    // per-account, so without this a brand-new signup on a device someone
+    // else (or a previous test account) used could silently inherit a
+    // leftover in-progress focus session and have it "auto-complete" the
+    // moment the app opens, logging time the new account never spent focusing.
+    void clearActiveSession();
+    void saveFocusLog([]);
+    void saveDistractionLog([]);
+
     StorageService.saveUser(user)
       .then(() => StorageService.getAppState())
       .then(state => StorageService.saveAppState({ ...state, user }))

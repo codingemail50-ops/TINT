@@ -24,6 +24,17 @@ interface Props {
 const DEGREES_PER_STEP = 9;
 const ROTATION_SENSITIVITY = 0.45;
 
+// A static curved arrow near the top of the dial, hinting which way to drag
+// to increase the value — the spinning blob alone gives no visual cue for
+// that, and testing found people don't intuit it's a rotary control at all.
+const HINT_START_DEG = -34;
+const HINT_END_DEG = 34;
+
+function pointOnCircle(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = (angleDeg * Math.PI) / 180;
+  return { x: cx + r * Math.sin(rad), y: cy - r * Math.cos(rad) };
+}
+
 // The Focus timer's squiggly-circle shape, repurposed as a rotary drag
 // control — the whole shape spins under your finger 1:1 with the real
 // angle dragged (an orange dot marks the current position on the rim so
@@ -106,6 +117,16 @@ export const BlobDial: React.FC<Props> = ({
     transform: [{ rotate: `${rotation.value}deg` }],
   }));
 
+  // Fixed (non-rotating) hint arc + arrowhead, just outside the blob's rim.
+  const center = size / 2;
+  const hintRadius = dotRadius + size * 0.05;
+  const hintStart = pointOnCircle(center, center, hintRadius, HINT_START_DEG);
+  const hintEnd = pointOnCircle(center, center, hintRadius, HINT_END_DEG);
+  const hintArcPath = `M ${hintStart.x} ${hintStart.y} A ${hintRadius} ${hintRadius} 0 0 1 ${hintEnd.x} ${hintEnd.y}`;
+  const arrowSize = size * 0.028;
+  const arrowTangentDeg = HINT_END_DEG + 90;
+  const arrowPath = `M ${-arrowSize} ${-arrowSize * 0.65} L ${arrowSize} 0 L ${-arrowSize} ${arrowSize * 0.65} Z`;
+
   return (
     <GestureDetector gesture={pan}>
       <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
@@ -115,6 +136,10 @@ export const BlobDial: React.FC<Props> = ({
             <Circle cx={size / 2} cy={size / 2 - dotRadius} r={size * 0.035} fill={Colors.pop} />
           </Svg>
         </Animated.View>
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          <Path d={hintArcPath} stroke={Colors.textSecondary} strokeWidth={2} fill="none" strokeLinecap="round" opacity={0.6} />
+          <Path d={arrowPath} fill={Colors.textSecondary} opacity={0.6} transform={`translate(${hintEnd.x}, ${hintEnd.y}) rotate(${arrowTangentDeg})`} />
+        </Svg>
         <Text style={[styles.value, { fontSize: size * 0.16 }]}>{formatValue ? formatValue(value) : String(value)}</Text>
         {!!unitLabel && <Text style={styles.label}>{unitLabel}</Text>}
       </View>

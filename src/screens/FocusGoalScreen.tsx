@@ -11,7 +11,7 @@ import { openPermissionSettings } from '../utils/appBlocking';
 import { useHaptics } from '../hooks/useHaptics';
 
 const MIN_MINS = 15;
-const MAX_MINS = 180;
+const MAX_MINS = 1080;
 const STEP_MINS = 5;
 const DEFAULT_MINS = 60;
 const LOCK_IN_MS = 2000;
