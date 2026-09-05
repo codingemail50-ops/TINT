@@ -9,6 +9,10 @@ export interface LeaderboardEntry {
   focusWeekMins: number;
   focusAllTimeMins: number;
   isCurrentUser?: boolean;
+  /** Which exam(s) this person is prepping for — used for the per-exam
+   *  leaderboard toggle, since raw focus time isn't a fair comparison
+   *  across different exams. */
+  exams?: string[];
 }
 
 export type LeaderboardPeriod = 'today' | 'week' | 'overall';
