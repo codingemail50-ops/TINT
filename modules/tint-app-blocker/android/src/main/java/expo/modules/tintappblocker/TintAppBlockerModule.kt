@@ -17,17 +17,17 @@ class TintAppBlockerModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("TintAppBlocker")
 
-    // Fire-and-forget: starts (or updates the block list of) the foreground
-    // service. Safe to call repeatedly — e.g. on every focus-session resume.
-    Function("startBlocking") { packageNames: List<String> ->
-      // Expo Modules' Function {} blocks are typed to return Any? regardless
-      // of body — a bare `return@Function` (no value) is only legal when the
-      // enclosing function type is Unit, so every early exit here needs an
-      // explicit value.
+    // Fire-and-forget: starts (or updates) the foreground service, which
+    // always shows a persistent, live-counting-down notification for the
+    // session (endAtMs drives it) and additionally polls+blocks anything in
+    // packageNames when that list isn't empty. Safe to call repeatedly —
+    // e.g. on every focus-session resume.
+    Function("startBlocking") { packageNames: List<String>, endAtMs: Double ->
       val context = appContext.reactContext ?: return@Function Unit
       val intent = Intent(context, BlockingForegroundService::class.java).apply {
         action = BlockingForegroundService.ACTION_START
         putStringArrayListExtra(BlockingForegroundService.EXTRA_PACKAGES, ArrayList(packageNames))
+        putExtra(BlockingForegroundService.EXTRA_END_AT_MS, endAtMs.toLong())
       }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         context.startForegroundService(intent)

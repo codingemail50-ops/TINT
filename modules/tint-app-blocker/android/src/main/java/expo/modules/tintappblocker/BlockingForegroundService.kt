@@ -47,6 +47,7 @@ class BlockingForegroundService : Service() {
     const val ACTION_START = "expo.modules.tintappblocker.action.START"
     const val ACTION_STOP = "expo.modules.tintappblocker.action.STOP"
     const val EXTRA_PACKAGES = "expo.modules.tintappblocker.extra.PACKAGES"
+    const val EXTRA_END_AT_MS = "expo.modules.tintappblocker.extra.END_AT_MS"
     private const val CHANNEL_ID = "tint_focus_blocking"
     private const val NOTIFICATION_ID = 8421
     private const val POLL_INTERVAL_MS = 1500L
@@ -55,6 +56,9 @@ class BlockingForegroundService : Service() {
 
   private val handler = Handler(Looper.getMainLooper())
   private var blockedPackages: Set<String> = emptySet()
+  // Drives the notification's chronometer — 0 means "unknown," in which
+  // case the notification falls back to a plain (non-counting) message.
+  private var endAtMs: Long = 0L
   private var overlayView: View? = null
   private var windowManager: WindowManager? = null
   private var ownPackageName: String = ""
@@ -86,6 +90,7 @@ class BlockingForegroundService : Service() {
 
     val packages = intent?.getStringArrayListExtra(EXTRA_PACKAGES) ?: arrayListOf()
     blockedPackages = packages.toSet()
+    endAtMs = intent?.getLongExtra(EXTRA_END_AT_MS, 0L) ?: 0L
     try {
       startForeground(NOTIFICATION_ID, buildNotification())
     } catch (e: Exception) {
@@ -135,14 +140,27 @@ class BlockingForegroundService : Service() {
       )
     }
 
-    return NotificationCompat.Builder(this, CHANNEL_ID)
+    val builder = NotificationCompat.Builder(this, CHANNEL_ID)
       .setContentTitle("Focus session active")
-      .setContentText("TINT is blocking distracting apps until your session ends.")
+      .setContentText(
+        if (blockedPackages.isNotEmpty()) "TINT is blocking distracting apps until your session ends."
+        else "Your TINT focus session is running."
+      )
       .setSmallIcon(applicationInfo.icon)
       .setOngoing(true)
       .setContentIntent(contentIntent)
       .setPriority(NotificationCompat.PRIORITY_LOW)
-      .build()
+
+    // A live-counting-down chronometer, driven by the OS itself — no need
+    // for the app to keep re-posting this every second. Falls back to the
+    // plain content text above if the caller didn't supply a real end time.
+    if (endAtMs > 0L) {
+      builder.setUsesChronometer(true)
+        .setChronometerCountDown(true)
+        .setWhen(endAtMs)
+    }
+
+    return builder.build()
   }
 
   private fun startPolling() {

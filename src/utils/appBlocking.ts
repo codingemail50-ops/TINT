@@ -75,12 +75,15 @@ export function checkPermission(permission: BlockingPermission): boolean | null 
   return permission === 'usageAccess' ? TintAppBlocker.hasUsageAccess() : TintAppBlocker.hasOverlayPermission();
 }
 
-/** Starts (or re-arms, e.g. after an app-kill mid-session) the native
- *  blocker for the given Android package names. No-op off Android or when
- *  the native module isn't linked (Expo Go/web) or when there's nothing to block. */
-export function startAppBlocking(packageNames: string[]): void {
-  if (!isNativeBlockingAvailable() || packageNames.length === 0) return;
-  TintAppBlocker.startBlocking(packageNames);
+/** Starts (or re-arms, e.g. after an app-kill mid-session) the foreground
+ *  service for the given Android package names — always shows the
+ *  persistent, live-counting-down "focus session active" notification
+ *  (using `endAtMs`), even when `packageNames` is empty (no apps to block,
+ *  but the timer notification is still useful on its own). No-op off
+ *  Android or when the native module isn't linked (Expo Go/web). */
+export function startAppBlocking(packageNames: string[], endAtMs: number): void {
+  if (!isNativeBlockingAvailable()) return;
+  TintAppBlocker.startBlocking(packageNames, endAtMs);
 }
 
 /** Stops polling, removes any visible block overlay, and stops the

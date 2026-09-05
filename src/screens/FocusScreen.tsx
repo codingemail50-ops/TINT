@@ -275,7 +275,7 @@ export const FocusScreen: React.FC<Props> = ({
           // The native blocker doesn't survive a process kill — re-arm it
           // for whatever's left of this session (e.g. app was force-closed
           // and reopened mid-session).
-          startAppBlocking(packageNamesFor(blockedIds));
+          startAppBlocking(packageNamesFor(blockedIds), plannedEnd);
         }
         return;
       }
@@ -288,7 +288,7 @@ export const FocusScreen: React.FC<Props> = ({
           source: sessionSource, startedAtMs: Date.now(), durationMins: externalTask.durationMins,
           title: externalTask.title, taskId: externalTask.id,
         });
-        startAppBlocking(packageNamesFor(blockedIds));
+        startAppBlocking(packageNamesFor(blockedIds), endTimeRef.current);
         void ensureNotificationPermission();
       }
     })();
@@ -408,7 +408,7 @@ export const FocusScreen: React.FC<Props> = ({
       setPaused(false);
       setPhase('active');
       void saveActiveSession({ source: sessionSource, startedAtMs: Date.now(), durationMins: duration, title: 'Focus Session' });
-      startAppBlocking(packageNamesFor(blockedApps));
+      startAppBlocking(packageNamesFor(blockedApps), endTimeRef.current);
       void ensureNotificationPermission();
       blobEnterAnim.setValue(0);
       Animated.timing(blobEnterAnim, { toValue: 1, duration: 320, useNativeDriver: true }).start();
