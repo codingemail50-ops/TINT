@@ -95,27 +95,31 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin }) => {
         {picking && <Text style={styles.sub}>Tap an avatar in the wall to pick it.</Text>}
       </View>
 
-      {picking ? (
-        <View style={styles.wallSection}>
-          <AvatarWall icons={AVATARS} selected={avatar} onPick={onPickAvatar} rows={6} cellSize={56} angleDeg={-7} durationMs={22000} />
+      {/* Always mounted (never conditionally rendered) — toggling `active`
+          just pauses the scroll loop instead of tearing down and re-creating
+          every cell, which is what made reopening the wall feel laggy. The
+          "picked" state overlays on top rather than replacing this section. */}
+      <View style={styles.wallSection}>
+        <AvatarWall icons={AVATARS} selected={avatar} onPick={onPickAvatar} rows={6} cellSize={56} angleDeg={-7} durationMs={22000} active={picking} />
+        {picking ? (
           <LinearGradient
             colors={['rgba(6,6,8,0.9)', 'rgba(6,6,8,0)', 'rgba(6,6,8,0.9)']}
             locations={[0, 0.5, 1]}
             style={StyleSheet.absoluteFillObject}
             pointerEvents="none"
           />
-        </View>
-      ) : (
-        <View style={styles.pickedSection}>
-          <View style={styles.pickedAvatarCircle}>
-            <PixelIcon name={avatar} size={72} />
+        ) : (
+          <View style={[StyleSheet.absoluteFillObject, styles.pickedSection, { backgroundColor: Colors.background }]}>
+            <View style={styles.pickedAvatarCircle}>
+              <PixelIcon name={avatar} size={72} />
+            </View>
+            <Text style={styles.pickedName}>{avatarLabel}</Text>
+            <TouchableOpacity style={styles.changeAvatarBtn} onPress={() => setPicking(true)} activeOpacity={0.75}>
+              <Text style={styles.changeAvatarText}>Change avatar</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.pickedName}>{avatarLabel}</Text>
-          <TouchableOpacity style={styles.changeAvatarBtn} onPress={() => setPicking(true)} activeOpacity={0.75}>
-            <Text style={styles.changeAvatarText}>Change avatar</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        )}
+      </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={examS.sectionLabel}>What's Your Exam?</Text>

@@ -50,6 +50,11 @@ interface Props {
   durationMs?: number;
   selected?: string;
   onPick?: (icon: string) => void;
+  /** Pauses the scroll loop without unmounting the wall — toggling this
+   *  (rather than conditionally rendering the whole component) avoids the
+   *  remount cost of re-creating every cell and restarting every row's
+   *  animation, which is what made reopening the wall feel laggy. */
+  active?: boolean;
 }
 
 // A tiled, continuously-scrolling wall of pixel-icon "bricks" at a slight
@@ -60,7 +65,7 @@ interface Props {
 // with no visible seam.
 const AvatarWallImpl: React.FC<Props> = ({
   icons, rows = 8, cellSize = 60, gap = 4, angleDeg = -7,
-  alternateDirection = false, durationMs = 14000, selected, onPick,
+  alternateDirection = false, durationMs = 14000, selected, onPick, active = true,
 }) => {
   const cell = cellSize + gap;
   // 1.3 screen-widths per copy (was 1.7) — still comfortably covers the
@@ -76,6 +81,7 @@ const AvatarWallImpl: React.FC<Props> = ({
   const anims = useRef(Array.from({ length: rows }, () => new Animated.Value(0))).current;
 
   useEffect(() => {
+    if (!active) return;
     const loops = anims.map((anim, i) => {
       anim.setValue(0);
       const dir = alternateDirection && i % 2 === 1 ? 1 : -1;
@@ -91,7 +97,7 @@ const AvatarWallImpl: React.FC<Props> = ({
     });
     loops.forEach(l => l.start());
     return () => loops.forEach(l => l.stop());
-  }, [unitWidth, durationMs, alternateDirection]);
+  }, [unitWidth, durationMs, alternateDirection, active]);
 
   return (
     <View style={styles.clip} pointerEvents={onPick ? 'box-none' : 'none'}>
