@@ -145,6 +145,15 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
       const { data, error: supaError } = await supabase.auth.signInWithIdToken({ provider: 'google', token: idToken });
       if (supaError) throw supaError;
 
+      // Whatever's sitting in the TINT-account fields above (even
+      // half-typed) is irrelevant to a Google sign-in that just completed —
+      // clearing it before navigating away stops Android's autofill save
+      // prompt from offering to save those stale, unrelated values as if
+      // they were the credential just used.
+      setUsername('');
+      setEmail('');
+      setPassword('');
+
       // Same convention as the email/password login path: hasProfile=true,
       // and AppNavigator's existing fallback already routes a brand-new
       // user (no cloud profile row yet) into onboarding instead of crashing.
@@ -196,6 +205,12 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
         </View>
 
         <View style={styles.form}>
+          {/* A TINT username/password is a separate credential from
+              Google's — several testers assumed these fields were somehow
+              tied to their Gmail password. Labeling this group explicitly
+              and visually separating it from the Google option below (a
+              divider + its own caption) is meant to head that off. */}
+          <Text style={styles.groupLabel}>{mode === 'signup' ? 'Create a TINT account' : 'Log in with your TINT account'}</Text>
           {mode === 'signup' && (
             <TextInput
               style={styles.input}
@@ -204,6 +219,8 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
               placeholder="Username"
               placeholderTextColor={Colors.textMuted}
               autoCapitalize="words"
+              autoComplete="username"
+              textContentType="username"
               returnKeyType="next"
             />
           )}
@@ -215,6 +232,7 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
             placeholderTextColor={Colors.textMuted}
             autoCapitalize="none"
             autoComplete="email"
+            textContentType="emailAddress"
             keyboardType="email-address"
           />
           <TextInput
@@ -226,6 +244,7 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
             secureTextEntry
             autoCapitalize="none"
             autoComplete={mode === 'signup' ? 'new-password' : 'password'}
+            textContentType={mode === 'signup' ? 'newPassword' : 'password'}
             returnKeyType="done"
             onSubmitEditing={handleSubmit}
           />
@@ -244,10 +263,17 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
             )}
           </TouchableOpacity>
 
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
           <TouchableOpacity style={styles.googleBtn} onPress={handleGoogle} activeOpacity={0.85}>
             <Ionicons name="logo-google" size={18} color={Colors.textPrimary} />
             <Text style={styles.googleText}>Sign in with Google</Text>
           </TouchableOpacity>
+          <Text style={styles.googleCaption}>Uses your Google account directly — no separate username or password needed.</Text>
         </View>
 
         <TouchableOpacity
@@ -283,6 +309,10 @@ const styles = StyleSheet.create({
   sub: { fontSize: 14, color: Colors.textSecondary, lineHeight: 20, fontFamily: Fonts.regular },
 
   form: { gap: Spacing.sm },
+  groupLabel: {
+    fontSize: 12, fontFamily: Fonts.semibold, color: Colors.textMuted,
+    textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 2,
+  },
   input: {
     backgroundColor: Colors.surfaceElevated,
     borderRadius: BorderRadius.md,
@@ -306,6 +336,10 @@ const styles = StyleSheet.create({
   submitBtnDisabled: { opacity: 0.4 },
   submitText: { fontSize: 16, fontFamily: Fonts.bold, color: Colors.background },
 
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: Spacing.sm, marginBottom: 2 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  dividerText: { fontSize: 12, fontFamily: Fonts.medium, color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 },
+
   googleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: Colors.surfaceElevated,
@@ -314,6 +348,10 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border,
   },
   googleText: { fontSize: 15, fontFamily: Fonts.semibold, color: Colors.textPrimary },
+  googleCaption: {
+    fontSize: 11.5, color: Colors.textMuted, fontFamily: Fonts.regular,
+    textAlign: 'center', marginTop: 4,
+  },
 
   switchRow: { alignItems: 'center' },
   switchText: { fontSize: 14, color: Colors.textSecondary, fontFamily: Fonts.regular },
