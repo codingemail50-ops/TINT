@@ -28,7 +28,14 @@ export async function openPermissionSettings(permission: BlockingPermission): Pr
   }
   switch (permission) {
     case 'usageAccess':
-      await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.USAGE_ACCESS_SETTINGS);
+      // Unlike overlay, Android doesn't officially guarantee this deep-links
+      // straight to TINT's row — but passing the package URI does scope it
+      // correctly on stock Android and most OEMs (Pixel, Samsung, etc.),
+      // instead of dropping the user on the generic "all apps" list to hunt
+      // through themselves, which reads as suspicious for an unfamiliar app.
+      await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.USAGE_ACCESS_SETTINGS, {
+        data: `package:${ANDROID_PACKAGE_NAME}`,
+      });
       break;
     case 'overlay':
       await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.MANAGE_OVERLAY_PERMISSION, {

@@ -10,12 +10,16 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
@@ -56,10 +60,18 @@ class BlockingForegroundService : Service() {
   private var ownPackageName: String = ""
   private var pollRunnable: Runnable? = null
 
+  private var audioManager: AudioManager? = null
+  private var audioFocusRequest: AudioFocusRequest? = null
+  // No-op — TINT never plays anything itself. Holding audio focus is the
+  // whole point: it's the sanctioned way to make a well-behaved app like
+  // YouTube pause its own playback without needing any special permission.
+  private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { }
+
   override fun onCreate() {
     super.onCreate()
     ownPackageName = packageName
     windowManager = getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+    audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -202,6 +214,51 @@ class BlockingForegroundService : Service() {
     return lastPackage
   }
 
+  // Plain LinearLayout doesn't consume the back button — unhandled, it falls
+  // through to whatever's behind our window (the blocked app), letting the
+  // user navigate it despite the overlay visually covering the screen. This
+  // swallows BACK so the overlay is actually modal, not just a picture on top.
+  private inner class BlockOverlayLayout(context: Context) : LinearLayout(context) {
+    init {
+      isFocusable = true
+      isFocusableInTouchMode = true
+    }
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+      if (event.keyCode == KeyEvent.KEYCODE_BACK) return true
+      return super.dispatchKeyEvent(event)
+    }
+  }
+
+  private fun requestAudioFocus() {
+    val am = audioManager ?: return
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      val attrs = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+        .setContentType(AudioAttributes.CONTENT_TYPE_UNKNOWN)
+        .build()
+      val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+        .setAudioAttributes(attrs)
+        .setOnAudioFocusChangeListener(audioFocusChangeListener)
+        .build()
+      audioFocusRequest = request
+      am.requestAudioFocus(request)
+    } else {
+      @Suppress("DEPRECATION")
+      am.requestAudioFocus(audioFocusChangeListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+    }
+  }
+
+  private fun abandonAudioFocus() {
+    val am = audioManager ?: return
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
+      audioFocusRequest = null
+    } else {
+      @Suppress("DEPRECATION")
+      am.abandonAudioFocus(audioFocusChangeListener)
+    }
+  }
+
   private fun showOverlay() {
     if (overlayView != null) return
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(this)) {
@@ -211,7 +268,7 @@ class BlockingForegroundService : Service() {
     }
     val wm = windowManager ?: return
 
-    val layout = LinearLayout(this).apply {
+    val layout = BlockOverlayLayout(this).apply {
       orientation = LinearLayout.VERTICAL
       gravity = Gravity.CENTER
       setBackgroundColor(0xFF080810.toInt())
@@ -256,6 +313,8 @@ class BlockingForegroundService : Service() {
     try {
       wm.addView(layout, params)
       overlayView = layout
+      layout.requestFocus()
+      requestAudioFocus()
     } catch (e: Exception) {
       // Some OEMs revoke the overlay permission silently or restrict this
       // window type — fail safe, skip this cycle rather than crash.
@@ -270,5 +329,6 @@ class BlockingForegroundService : Service() {
       // Already removed / window gone — nothing to do.
     }
     overlayView = null
+    abandonAudioFocus()
   }
 }
