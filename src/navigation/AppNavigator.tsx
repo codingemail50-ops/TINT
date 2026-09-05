@@ -25,11 +25,10 @@ import {
   checkUserExists,
 } from '../utils/supabaseStorage';
 
-// No real backend/database yet — every launch should drop straight into
-// onboarding so testing the sign-in flow doesn't require clearing storage
-// by hand each time. Flip this off once Supabase/auth is actually wired up
-// and returning users should skip straight back into the app.
-const FORCE_ONBOARDING_ON_LAUNCH = true;
+// Supabase auth is fully wired up — returning users go straight back into
+// the app instead of onboarding. (This used to force onboarding on every
+// launch during early development, before real accounts existed.)
+const FORCE_ONBOARDING_ON_LAUNCH = false;
 
 // Every device still gets an anonymous Supabase session created behind the
 // scenes on first launch — signing up upgrades that same session to a real
