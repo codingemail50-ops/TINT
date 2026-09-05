@@ -348,6 +348,9 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
   }), []);
 
   const summary = useMemo(() => getFocusSummary(focusLog, timeframe, distractionLog), [focusLog, distractionLog, timeframe]);
+  // Independent of whichever timeframe tab is selected — this card is
+  // always about *today* specifically, the daily plan-vs-actual check-in.
+  const todaySummary = useMemo(() => getFocusSummary(focusLog, 'day', distractionLog), [focusLog, distractionLog]);
 
   const consistencyLast7 = useMemo(() => {
     let sum = 0, count = 0;
@@ -364,6 +367,20 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
     ?? REALITY_CHECK_MESSAGES[REALITY_CHECK_MESSAGES.length - 1];
 
   const todayRecord = appState.history.find(h => h.date === new Date().toDateString());
+
+  // The daily plan-vs-actual recap — the emotional core of the app per the
+  // brief: did today go according to plan or not, stated plainly enough to
+  // land as either quiet pride or a constructive nudge, never as shaming.
+  const dailyGoalMins = appState.user?.dailyFocusGoalMins ?? 60;
+  const tasksToday = todayRecord?.tasks ?? [];
+  const tasksDoneToday = tasksToday.filter(t => t.completed).length;
+  const percentOfGoal = dailyGoalMins > 0 ? Math.min(100, Math.round((todaySummary.totalMins / dailyGoalMins) * 100)) : 0;
+  const onTrackToday = percentOfGoal >= 80;
+  const taskClause = tasksToday.length > 0 ? `, ${tasksDoneToday}/${tasksToday.length} tasks done` : '';
+  const recapMessage = onTrackToday
+    ? `${formatMinsShort(todaySummary.totalMins)} of your ${formatMinsShort(dailyGoalMins)} goal${taskClause} — you showed up today. Every session like this is the plan actually becoming real.`
+    : `${formatMinsShort(todaySummary.totalMins)} of your ${formatMinsShort(dailyGoalMins)} goal so far${taskClause} — today's behind pace. There is no tomorrow: the next session is the fastest way to close the gap.`;
+
   const categoryTime = useMemo(() => {
     if (!todayRecord) return [];
     const byCategory = new Map<string, number>();
@@ -383,6 +400,19 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
 
         <Text style={styles.title}>Insights</Text>
         <Text style={styles.subtitle}>{summary.periodLabel}</Text>
+
+        <View style={[styles.recapCard, onTrackToday ? styles.recapCardOnTrack : styles.recapCardBehind]}>
+          <View style={styles.recapHeader}>
+            <Ionicons
+              name={onTrackToday ? 'flame' : 'time-outline'}
+              size={18}
+              color={onTrackToday ? Colors.pop : Colors.textSecondary}
+            />
+            <Text style={styles.recapLabel}>{onTrackToday ? "Today's on track" : 'Today so far'}</Text>
+            <Text style={[styles.recapPercent, onTrackToday && { color: Colors.pop }]}>{percentOfGoal}%</Text>
+          </View>
+          <Text style={styles.recapMessage}>{recapMessage}</Text>
+        </View>
 
         <View style={styles.tabRow}>
           {TIMEFRAMES.map(tf => (
@@ -462,6 +492,17 @@ const styles = StyleSheet.create({
 
   title: { ...Typography.displayMedium, color: Colors.pop },
   subtitle: { ...Typography.bodyMedium, color: Colors.textSecondary, marginTop: 4, marginBottom: Spacing.lg },
+
+  recapCard: {
+    borderRadius: BorderRadius.lg, padding: Spacing.md, marginBottom: Spacing.lg,
+    borderWidth: 1, gap: 6,
+  },
+  recapCardOnTrack: { backgroundColor: Colors.popGlow, borderColor: Colors.pop + '55' },
+  recapCardBehind: { backgroundColor: Colors.surfaceElevated, borderColor: Colors.border },
+  recapHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  recapLabel: { flex: 1, ...Typography.labelSmall, color: Colors.textSecondary, textTransform: 'uppercase' },
+  recapPercent: { fontSize: 15, fontFamily: Fonts.bold, color: Colors.textPrimary },
+  recapMessage: { ...Typography.bodyMedium, color: Colors.textPrimary, lineHeight: 20 },
 
   tabRow: {
     flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: BorderRadius.full,
