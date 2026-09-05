@@ -741,7 +741,11 @@ export const FocusScreen: React.FC<Props> = ({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   hidden: { display: 'none' },
-  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 56, paddingBottom: Spacing.xxxl },
+  // Bottom padding needs to clear the persistent tab bar (see
+  // TAB_BAR_CLEARANCE) — the blocked-apps list sits at the very bottom of
+  // this scroll content, and Spacing.xxxl alone left its last rows and the
+  // "Add app to block" row hidden behind the tab bar on a real device.
+  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 56, paddingBottom: Spacing.xxxl + TAB_BAR_CLEARANCE },
 
   title: { ...Typography.displayMedium, color: Colors.textPrimary },
   subtitle: { ...Typography.bodyMedium, color: Colors.textSecondary, marginTop: 4, marginBottom: Spacing.xl },

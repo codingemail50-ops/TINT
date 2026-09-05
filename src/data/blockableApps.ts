@@ -18,7 +18,11 @@ export interface BlockableApp {
 export const BLOCKABLE_APPS: BlockableApp[] = [
   { id: 'instagram', label: 'Instagram', icon: 'logo-instagram', color: '#E1306C', packageName: 'com.instagram.android' },
   { id: 'youtube', label: 'YouTube', icon: 'logo-youtube', color: '#FF0000', packageName: 'com.google.android.youtube' },
+  { id: 'whatsapp', label: 'WhatsApp', icon: 'logo-whatsapp', color: '#25D366', packageName: 'com.whatsapp' },
+  { id: 'tiktok', label: 'TikTok', icon: 'logo-tiktok', color: '#FE2C55', packageName: 'com.zhiliaoapp.musically' },
   { id: 'twitter', label: 'Twitter / X', icon: 'logo-twitter', color: '#1DA1F2', packageName: 'com.twitter.android' },
+  { id: 'facebook', label: 'Facebook', icon: 'logo-facebook', color: '#1877F2', packageName: 'com.facebook.katana' },
+  { id: 'discord', label: 'Discord', icon: 'logo-discord', color: '#5865F2', packageName: 'com.discord' },
   { id: 'reddit', label: 'Reddit', icon: 'logo-reddit', color: '#FF4500', packageName: 'com.reddit.frontpage' },
   { id: 'snapchat', label: 'Snapchat', icon: 'logo-snapchat', color: '#FFFC00', packageName: 'com.snapchat.android' },
 ];
