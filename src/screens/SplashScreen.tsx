@@ -1,351 +1,162 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { Colors, Spacing, Fonts } from '../constants/theme';
-import { StorageService } from '../utils/storage';
-import { MOTIVATIONAL_QUOTES } from '../data/examPresets';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import Svg, { Rect } from 'react-native-svg';
+import { Colors, Fonts } from '../constants/theme';
+import { FLAME_FRAMES, FLAME_COLS, FLAME_ROWS, FLAME_PALETTES } from '../components/flameShapes';
 
-const { width: W, height: H } = Dimensions.get('window');
+// Boot-time brand moment: "TINT" appears dim/unlit, a pixel flame climbs it
+// from the bottom, igniting the letters as it passes (a stepped, blocky
+// reveal — not a particle effect, on purpose), then a smooth crossfade into
+// the "There is no tomorrow" wordmark, which holds until the real app is
+// ready underneath. Strictly black/white/grey/orange, matching the rest of
+// the app — no borrowed neon palette from the moodboard, just its pixel
+// typography/layout ideas (the dotted top/bottom borders).
 
-// The 4 letters of TINT and the words they expand into
-const EXPANSIONS = [
-  { letter: 'T', word: 'HERE' },
-  { letter: 'I', word: 'S'    },
-  { letter: 'N', word: 'O'    },
-  { letter: 'T', word: 'OMORROW' },
-];
+const TITLE_SIZE = 84;
+const TITLE_HEIGHT = 96;
+const FLAME_SIZE = 46;
+const BURN_STEPS = 12;
+const STEP_MS = 150;
+const HOLD_AFTER_BURN_MS = 400;
+const CROSSFADE_MS = 550;
+const DOT_COUNT = 16;
 
-// 8 ray directions (outward to corners + edges)
-const RAY_ANGLES = [-135, -90, -45, 180, 0, 135, 90, 45];
+const PALETTE = FLAME_PALETTES.pop;
 
-interface Props { onFinish: (hasUser: boolean) => void }
+// A bespoke, minimal flame renderer — deliberately not the shared
+// PixelFlame component, which layers drifting ember sparks on top of the
+// pixel grid. This is exactly the raw grid, cycling frames on a fixed
+// interval: pixel-by-pixel, no particles.
+const MiniFlame: React.FC<{ frameIndex: number; size: number }> = ({ frameIndex, size }) => {
+  const frame = FLAME_FRAMES[frameIndex % FLAME_FRAMES.length];
+  const height = (size / FLAME_COLS) * FLAME_ROWS;
+  return (
+    <Svg width={size} height={height} viewBox={`0 0 ${FLAME_COLS} ${FLAME_ROWS}`}>
+      {frame.outline.map((c, i) => (
+        <Rect key={`o${i}`} x={c.x} y={c.y} width={1} height={1} fill={PALETTE.outline} />
+      ))}
+      {frame.cells.map((c, i) => (
+        <Rect key={i} x={c.x} y={c.y} width={1} height={1} fill={PALETTE.shades[c.shade - 1]} />
+      ))}
+    </Svg>
+  );
+};
 
-export const SplashScreen: React.FC<Props> = ({ onFinish }) => {
-  const [quote] = useState(() => MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)]);
+const DotRow: React.FC<{ position: 'top' | 'bottom' }> = ({ position }) => (
+  <View style={[dotStyles.row, position === 'top' ? { top: 32 } : { bottom: 32 }]}>
+    {Array.from({ length: DOT_COUNT }).map((_, i) => (
+      <View key={i} style={[dotStyles.dot, i % 4 === 0 && dotStyles.dotPop]} />
+    ))}
+  </View>
+);
 
-  // ── Phase 1: "TINT" horizontal ──────────────────────
-  const tintOpacity  = useRef(new Animated.Value(0)).current;
-  const tintY        = useRef(new Animated.Value(-40)).current;
-  const letterScales = useRef(EXPANSIONS.map(() => new Animated.Value(1))).current;
+type Phase = 'burning' | 'burned' | 'transitioning' | 'done';
 
-  // ── Phase 2: Rays burst from center ─────────────────
-  const rayLen = useRef(RAY_ANGLES.map(() => new Animated.Value(0))).current;
-  const rayOp  = useRef(RAY_ANGLES.map(() => new Animated.Value(0))).current;
-
-  // ── Phase 3: TINT crossfades to THERE IS NO TOMORROW
-  const tintGroupOp = useRef(new Animated.Value(1)).current; // multiplied with tintOpacity
-  // Each expanded row slides in from left
-  const rowOp = useRef(EXPANSIONS.map(() => new Animated.Value(0))).current;
-  const rowX  = useRef(EXPANSIONS.map(() => new Animated.Value(-28))).current;
-
-  // ── Quote + loading ──────────────────────────────────
-  const quoteOp    = useRef(new Animated.Value(0)).current;
-  const quoteY     = useRef(new Animated.Value(16)).current;
-  const loadWidth  = useRef(new Animated.Value(0)).current;
-
-  // ── Background ───────────────────────────────────────
-  const orbOp    = useRef(new Animated.Value(0)).current;
-  const orb1Sc   = useRef(new Animated.Value(0.7)).current;
-  const orb2Sc   = useRef(new Animated.Value(0.9)).current;
-
-  const particles = useRef(
-    [...Array(20)].map((_, i) => ({
-      x:   new Animated.Value((i * 71 + 15) % (W - 10)),
-      y:   new Animated.Value(H + 20),
-      op:  new Animated.Value(0),
-      sz:  2 + (i % 4),
-      col: Colors.textSecondary,
-    }))
-  ).current;
+export const SplashScreen: React.FC = () => {
+  const [burnStep, setBurnStep] = useState(0);
+  const [flameFrame, setFlameFrame] = useState(0);
+  const [phase, setPhase] = useState<Phase>('burning');
+  const titleOpacity = useRef(new Animated.Value(1)).current;
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Particles rise loop
-    particles.forEach((p, i) => {
-      const rise = () => {
-        p.y.setValue(H + 20 + Math.random() * 60);
-        p.op.setValue(0);
-        Animated.sequence([
-          Animated.delay(i * 180 + Math.random() * 300),
+    let cancelled = false;
+    let step = 0;
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const tick = () => {
+      if (cancelled) return;
+      step += 1;
+      setBurnStep(Math.min(step, BURN_STEPS));
+      setFlameFrame(f => f + 1);
+
+      if (step >= BURN_STEPS) {
+        setPhase('burned');
+        timeoutId = setTimeout(() => {
+          if (cancelled) return;
+          setPhase('transitioning');
           Animated.parallel([
-            Animated.timing(p.op, { toValue: 0.6, duration: 700, useNativeDriver: true }),
-            Animated.timing(p.y,  { toValue: -40, duration: 3200 + Math.random() * 2000, useNativeDriver: true }),
-          ]),
-          Animated.timing(p.op, { toValue: 0, duration: 400, useNativeDriver: true }),
-        ]).start(({ finished }) => { if (finished) rise(); });
-      };
-      rise();
-    });
+            Animated.timing(titleOpacity, { toValue: 0, duration: CROSSFADE_MS, useNativeDriver: true }),
+            Animated.timing(taglineOpacity, { toValue: 1, duration: CROSSFADE_MS, useNativeDriver: true }),
+          ]).start(({ finished }) => { if (finished && !cancelled) setPhase('done'); });
+        }, HOLD_AFTER_BURN_MS);
+        return;
+      }
+      timeoutId = setTimeout(tick, STEP_MS);
+    };
 
-    // Orbs
-    Animated.timing(orbOp, { toValue: 1, duration: 1200, useNativeDriver: true }).start();
-    Animated.loop(Animated.sequence([
-      Animated.timing(orb1Sc, { toValue: 1.18, duration: 3200, useNativeDriver: true }),
-      Animated.timing(orb1Sc, { toValue: 0.7,  duration: 3200, useNativeDriver: true }),
-    ])).start();
-    Animated.loop(Animated.sequence([
-      Animated.timing(orb2Sc, { toValue: 1.25, duration: 3800, useNativeDriver: true }),
-      Animated.timing(orb2Sc, { toValue: 0.9,  duration: 3800, useNativeDriver: true }),
-    ])).start();
-
-    // Loading bar runs across total duration ~5.5s
-    Animated.timing(loadWidth, { toValue: 1, duration: 5500, useNativeDriver: false }).start();
-
-    // ── Main animation sequence ──────────────────────────
-    Animated.sequence([
-
-      // 1. TINT slides up into view
-      Animated.delay(300),
-      Animated.parallel([
-        Animated.timing(tintOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.timing(tintY,       { toValue: 0, duration: 400, useNativeDriver: true }),
-      ]),
-
-      // 2. Each letter pulses outward in sequence
-      Animated.delay(200),
-      Animated.stagger(80, letterScales.map(s =>
-        Animated.sequence([
-          Animated.timing(s, { toValue: 1.22, duration: 130, useNativeDriver: true }),
-          Animated.timing(s, { toValue: 1.0,  duration: 130, useNativeDriver: true }),
-        ])
-      )),
-
-      // 3. Rays burst to all corners
-      Animated.parallel([
-        ...RAY_ANGLES.map((_, i) =>
-          Animated.sequence([
-            Animated.delay(i * 22),
-            Animated.timing(rayLen[i], { toValue: 1, duration: 320, useNativeDriver: false }),
-          ])
-        ),
-        ...RAY_ANGLES.map((_, i) =>
-          Animated.sequence([
-            Animated.delay(i * 22),
-            Animated.timing(rayOp[i], { toValue: 0.65, duration: 120, useNativeDriver: true }),
-            Animated.timing(rayOp[i], { toValue: 0,    duration: 280, useNativeDriver: true }),
-          ])
-        ),
-      ]),
-
-      // 4. TINT fades out, expanded rows slide in staggered
-      Animated.parallel([
-        Animated.timing(tintGroupOp, { toValue: 0, duration: 300, useNativeDriver: true }),
-        Animated.sequence([
-          Animated.delay(80),
-          Animated.stagger(100, EXPANSIONS.map((_, i) =>
-            Animated.parallel([
-              Animated.timing(rowOp[i], { toValue: 1, duration: 320, useNativeDriver: true }),
-              Animated.timing(rowX[i],  { toValue: 0, duration: 320, useNativeDriver: true }),
-            ])
-          )),
-        ]),
-      ]),
-
-      // 5. Quote appears
-      Animated.delay(250),
-      Animated.parallel([
-        Animated.timing(quoteOp, { toValue: 1, duration: 500, useNativeDriver: true }),
-        Animated.timing(quoteY,  { toValue: 0, duration: 500, useNativeDriver: true }),
-      ]),
-
-      Animated.delay(1600),
-
-    ]).start(async () => {
-      const user = await StorageService.getUser();
-      onFinish(!!user);
-    });
+    timeoutId = setTimeout(tick, STEP_MS);
+    return () => { cancelled = true; clearTimeout(timeoutId); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const litHeight = (burnStep / BURN_STEPS) * TITLE_HEIGHT;
+  const flameBottom = Math.max(0, litHeight - FLAME_SIZE * 0.35);
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <DotRow position="top" />
 
-      {/* Orbs */}
-      <Animated.View style={[styles.orb, { top: -120, left: -100, backgroundColor: Colors.surfaceElevated, opacity: orbOp, transform: [{ scale: orb1Sc }] }]} />
-      <Animated.View style={[styles.orb, { bottom: -90, right: -90, backgroundColor: Colors.surfaceElevated, opacity: orbOp, transform: [{ scale: orb2Sc }] }]} />
-
-      {/* Particles */}
-      {particles.map((p, i) => (
-        <Animated.View key={i} style={{
-          position: 'absolute', bottom: 0,
-          left: p.x as any, width: p.sz, height: p.sz,
-          borderRadius: p.sz / 2, backgroundColor: p.col,
-          opacity: p.op, transform: [{ translateY: p.y }],
-        }} />
-      ))}
-
-      <View style={styles.content}>
-
-        {/* ── PHASE 1: TINT horizontal ── */}
-        <Animated.View style={[styles.tintRow, {
-          opacity:   Animated.multiply(tintOpacity, tintGroupOp),
-          transform: [{ translateY: tintY }],
-        }]}>
-          {EXPANSIONS.map(({ letter }, i) => (
-            <Animated.Text key={i} style={[styles.tintLetter, {
-              transform: [{ scale: letterScales[i] }],
-            }]}>
-              {letter}
-            </Animated.Text>
-          ))}
-        </Animated.View>
-
-        {/* Rays from center */}
-        <View style={styles.rayOrigin} pointerEvents="none">
-          {RAY_ANGLES.map((angle, i) => (
-            <Animated.View key={i} style={[styles.ray, {
-              opacity: rayOp[i],
-              width: rayLen[i].interpolate({ inputRange: [0, 1], outputRange: [0, 110] }),
-              transform: [{ rotate: `${angle}deg` }],
-            }]} />
-          ))}
-        </View>
-
-        {/* ── PHASE 2: Expanded rows ── */}
-        <View style={styles.expandedBlock}>
-          {EXPANSIONS.map(({ letter, word }, i) => (
-            <Animated.View key={i} style={[styles.expandedRow, {
-              opacity:   rowOp[i],
-              transform: [{ translateX: rowX[i] }],
-            }]}>
-              {/* First letter — big gold */}
-              <Text style={styles.expandedLetter}>{letter}</Text>
-              {/* Rest of word */}
-              <View style={styles.expandedWordCol}>
-                <Text style={styles.expandedWord}>{word}</Text>
-                <View style={styles.underline} />
+      <View style={styles.stack}>
+        <Animated.View style={[styles.stackLayer, { opacity: titleOpacity }]}>
+          <View style={styles.titleBox}>
+            <Text style={styles.title}>TINT</Text>
+            <View style={[styles.litClip, { height: litHeight }]}>
+              <View style={styles.litInner}>
+                <Text style={[styles.title, styles.titleLit]}>TINT</Text>
               </View>
-            </Animated.View>
-          ))}
-        </View>
-
-        {/* Quote */}
-        <Animated.View style={[styles.quoteBox, {
-          opacity:   quoteOp,
-          transform: [{ translateY: quoteY }],
-        }]}>
-          <View style={styles.quoteLine} />
-          <Text style={styles.quoteText}>"{quote.text}"</Text>
-          <Text style={styles.quoteAuthor}>— {quote.author}</Text>
-          <View style={styles.quoteLine} />
+            </View>
+            {phase === 'burning' && (
+              <View style={[styles.flameWrap, { bottom: flameBottom }]}>
+                <MiniFlame frameIndex={flameFrame} size={FLAME_SIZE} />
+              </View>
+            )}
+          </View>
         </Animated.View>
 
+        <Animated.View style={[styles.stackLayer, { opacity: taglineOpacity }]}>
+          <Text style={styles.tagline}>There is no tomorrow</Text>
+        </Animated.View>
       </View>
 
-      {/* Loading bar */}
-      <View style={styles.loadTrack}>
-        <Animated.View style={[styles.loadFill, {
-          width: loadWidth.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-        }]} />
-      </View>
+      <DotRow position="bottom" />
     </View>
   );
 };
 
+const dotStyles = StyleSheet.create({
+  row: {
+    position: 'absolute', left: 0, right: 0,
+    flexDirection: 'row', justifyContent: 'space-evenly', paddingHorizontal: 24,
+  },
+  dot: { width: 4, height: 4, backgroundColor: Colors.gray[700] },
+  dotPop: { backgroundColor: Colors.popDeep },
+});
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center' },
+  stack: { width: '100%', height: 140, alignItems: 'center', justifyContent: 'center' },
+  stackLayer: { position: 'absolute', alignItems: 'center', justifyContent: 'center', width: '100%' },
 
-  orb: {
-    position: 'absolute',
-    width: 380, height: 380,
-    borderRadius: 190,
-    opacity: 0.12,
+  titleBox: { height: TITLE_HEIGHT, justifyContent: 'flex-end', alignItems: 'center' },
+  title: {
+    fontFamily: Fonts.pixel, fontSize: TITLE_SIZE, color: Colors.gray[700],
+    letterSpacing: 4, textTransform: 'uppercase',
   },
+  titleLit: { color: Colors.textPrimary },
 
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 32,
-    paddingHorizontal: Spacing.xl,
+  litClip: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, overflow: 'hidden',
   },
-
-  // Phase 1 — TINT horizontal
-  tintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    position: 'absolute',
-  },
-  tintLetter: {
-    fontSize: 100,
-    fontFamily: Fonts.pixel,
-    color: Colors.textPrimary,
-    letterSpacing: 0,
+  litInner: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: TITLE_HEIGHT,
+    alignItems: 'center', justifyContent: 'flex-end',
   },
 
-  // Rays
-  rayOrigin: {
-    position: 'absolute',
-    width: 2, height: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ray: {
-    position: 'absolute',
-    height: 2,
-    left: 0, top: 0,
-    backgroundColor: Colors.textSecondary,
-    borderRadius: 2,
-    transformOrigin: '0% 50%',
-  },
+  flameWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
 
-  // Phase 2 — expanded rows
-  expandedBlock: {
-    alignItems: 'flex-start',
-    gap: 2,
-  },
-  expandedRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 2,
-  },
-  expandedLetter: {
-    fontSize: 84,
-    fontFamily: Fonts.pixel,
-    color: Colors.textPrimary,
-    letterSpacing: 0,
-    lineHeight: 82,
-    width: 52,
-    textAlign: 'center',
-  },
-  expandedWordCol: {
-    paddingBottom: 8,
-    marginLeft: 2,
-  },
-  expandedWord: {
-    fontSize: 48,
-    fontFamily: Fonts.pixel,
-    color: Colors.textPrimary,
-    letterSpacing: 1,
-    lineHeight: 48,
-  },
-  underline: {
-    height: 3,
-    backgroundColor: Colors.textPrimary,
-    borderRadius: 2,
-    marginTop: 1,
-  },
-
-  // Quote
-  quoteBox: { alignItems: 'center', gap: 10, paddingHorizontal: Spacing.xl },
-  quoteLine: { width: 44, height: 1, backgroundColor: Colors.primary + '66' },
-  quoteText: {
-    fontSize: 14, color: Colors.textSecondary, fontFamily: Fonts.regular,
-    textAlign: 'center', lineHeight: 22, fontStyle: 'italic',
-  },
-  quoteAuthor: {
-    fontSize: 11, fontFamily: Fonts.semibold,
-    color: Colors.textMuted, letterSpacing: 1.5, textTransform: 'uppercase',
-  },
-
-  // Loading bar
-  loadTrack: {
-    position: 'absolute', bottom: 48,
-    left: Spacing.xl, right: Spacing.xl,
-    height: 3, backgroundColor: Colors.border,
-    borderRadius: 2, overflow: 'hidden',
-  },
-  loadFill: {
-    height: '100%', backgroundColor: Colors.primary, borderRadius: 2,
+  tagline: {
+    fontFamily: Fonts.pixel, fontSize: 20, color: Colors.gray[400],
+    letterSpacing: 1, textTransform: 'uppercase',
   },
 });

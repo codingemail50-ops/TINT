@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, BorderRadius } from '../constants/theme';
+import { SplashScreen } from '../screens/SplashScreen';
 import { AvatarExamScreen } from '../screens/AvatarExamScreen';
 import { FocusGoalScreen } from '../screens/FocusGoalScreen';
 import { CreateAccountScreen } from '../screens/CreateAccountScreen';
@@ -327,6 +328,7 @@ const AppNavigatorInner: React.FC = () => {
     <View style={styles.root}>
       <GestureDetector gesture={swipeGesture}>
         <View style={styles.swipeArea}>
+          {screen === 'boot' && <SplashScreen />}
           {screen === 'avatarExam' && (
             <AvatarExamScreen
               onComplete={handleAvatarExamComplete}
