@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Rect } from 'react-native-svg';
 import { Colors, Fonts } from '../constants/theme';
-import { FLAME_PALETTES } from '../components/flameShapes';
+import { FLAME_PALETTES, outlineCells } from '../components/flameShapes';
 
 // Boot-time brand moment: "TINT" sits dim/unlit, then a wide blocky pixel
 // flame — anchored at the bottom of the letters, not moving — grows taller
@@ -19,66 +19,67 @@ const DOT_COUNT = 18;
 
 const PALETTE = FLAME_PALETTES.pop; // outer->core: deep orange, orange, light orange, pale gold
 
-// ── Wide flame, built from overlapping tapered tongues ──────────────────
-// Each column is a real flame silhouette (curved sides, pointed tip), not a
-// flat-topped bar — stacking bars by height read as a bar chart rather than
-// fire. Neighboring tongues overlap at the base so the wildfire reads as one
-// continuous blaze that splits into individual licks near the tips, and each
-// tongue is itself a nested stack of 4 smaller tongues (outer deep-orange
-// down to a pale core), giving every lick its own base-to-tip gradient
-// instead of one hard color band shared across the whole row.
-const FLAME_WIDTH = 264;
-const MAX_FLAME_HEIGHT = 156;
-const FLAME_COLS = 22;
-const COL_WIDTH = FLAME_WIDTH / FLAME_COLS;
-const TONGUE_WIDTH = COL_WIDTH * 1.55; // > COL_WIDTH so bases merge, tips stay separate
+// ── Wide flame, as an actual pixel grid ──────────────────────────────────
+// Same technique as the app's other pixel-flame sprites (flameShapes.ts's
+// boolean-grid silhouette + outline pass + distance-shaded core, rendered as
+// crisp square cells) — reshaped into a wide, short, multi-peaked mountain
+// silhouette instead of one tall torch, so it spans "TINT" and reads as
+// genuinely pixelated fire rather than a smooth vector shape or flat bars.
+const FLAME_CELL = 11;
+const FLAME_COLS = 24;
+const FLAME_ROWS = 14;
+const FLAME_WIDTH = FLAME_CELL * FLAME_COLS;
+const MAX_FLAME_HEIGHT = FLAME_CELL * FLAME_ROWS;
 
 // A jagged, multi-peaked silhouette (relative height per column, 0..1) —
 // hand-authored rather than a smooth curve, for the blocky wildfire look
 // from the reference rather than a single torch-shaped flame.
 const FLAME_PROFILE = [
-  0.5, 0.72, 0.58, 0.88, 0.62, 1.0, 0.68, 0.82, 0.58, 0.94,
-  0.7, 0.78, 0.56, 1.0, 0.74, 0.6, 0.9, 0.66, 0.84, 0.58, 0.92, 0.64,
+  0.42, 0.6, 0.48, 0.74, 0.52, 0.86, 1.0, 0.7, 0.9, 0.6,
+  0.8, 0.5, 0.68, 0.96, 0.72, 0.58, 0.84, 0.62, 0.76, 0.46, 0.66, 0.4, 0.3, 0.2,
 ];
 
-// Nested-layer sizing (outer -> core) and their matching palette shades.
-const LAYER_SCALES = [1, 0.76, 0.53, 0.3];
+// Distance-from-core shading, same idea as flameShapes.ts's shadeGrid but
+// tuned for a wide/short grid — core sits low-center (the reference's
+// palest patch sits near the base of the tallest peaks, not at the top).
+const CORE_X = (FLAME_COLS - 1) * 0.5;
+const CORE_Y = FLAME_ROWS * 0.85;
+const MAX_DIST = Math.hypot(FLAME_COLS * 0.5, FLAME_ROWS * 0.8);
 
-// A teardrop tapering to a point at the tip, bulging outward through the
-// middle, flat across the base — the classic flame-lick silhouette. `lean`
-// skews the tip sideways for a hand-flickered, non-symmetric look.
-function tonguePath(cx: number, baseY: number, w: number, h: number, lean: number): string {
-  const halfW = w / 2;
-  const tipX = cx + lean;
-  const tipY = baseY - h;
-  const bulgeY = baseY - h * 0.62;
-  const midY = baseY - h * 0.3;
-  return `M ${cx - halfW} ${baseY} `
-    + `C ${cx - halfW * 1.05} ${midY}, ${cx - halfW * 0.35 + lean * 0.4} ${bulgeY}, ${tipX} ${tipY} `
-    + `C ${cx + halfW * 0.35 + lean * 0.4} ${bulgeY}, ${cx + halfW * 1.05} ${midY}, ${cx + halfW} ${baseY} Z`;
+function shadeOf(col: number, row: number): number {
+  const d = Math.hypot(col - CORE_X, row - CORE_Y) / MAX_DIST;
+  return d < 0.32 ? 3 : d < 0.55 ? 2 : d < 0.8 ? 1 : 0;
 }
 
-const WideFlame: React.FC<{ growth: number; jitter: number[] }> = ({ growth, jitter }) => (
-  <Svg width={FLAME_WIDTH} height={MAX_FLAME_HEIGHT} viewBox={`0 0 ${FLAME_WIDTH} ${MAX_FLAME_HEIGHT}`} style={styles.flameRow} pointerEvents="none">
-    {FLAME_PROFILE.map((p, col) => {
-      const height = MAX_FLAME_HEIGHT * growth * p * jitter[col];
-      if (height < 2) return null;
-      const cx = COL_WIDTH * (col + 0.5);
-      const lean = (jitter[col] - 1) * height * 0.35;
-      return (
-        <React.Fragment key={col}>
-          {LAYER_SCALES.map((scale, layer) => (
-            <Path
-              key={layer}
-              d={tonguePath(cx, MAX_FLAME_HEIGHT, TONGUE_WIDTH * scale, height * scale, lean)}
-              fill={PALETTE.shades[layer]}
-            />
-          ))}
-        </React.Fragment>
-      );
-    })}
-  </Svg>
-);
+function buildFlameGrid(growth: number, jitter: number[]): boolean[][] {
+  const grid: boolean[][] = Array.from({ length: FLAME_ROWS }, () => Array(FLAME_COLS).fill(false));
+  FLAME_PROFILE.forEach((p, col) => {
+    const activeRows = Math.max(0, Math.min(FLAME_ROWS, Math.round(FLAME_ROWS * growth * p * jitter[col])));
+    for (let i = 0; i < activeRows; i++) grid[FLAME_ROWS - 1 - i][col] = true;
+  });
+  return grid;
+}
+
+const WideFlame: React.FC<{ growth: number; jitter: number[] }> = ({ growth, jitter }) => {
+  const grid = buildFlameGrid(growth, jitter);
+  const outline = outlineCells(grid, FLAME_COLS, FLAME_ROWS);
+  const cells: { x: number; y: number; shade: number }[] = [];
+  for (let row = 0; row < FLAME_ROWS; row++) {
+    for (let col = 0; col < FLAME_COLS; col++) {
+      if (grid[row][col]) cells.push({ x: col, y: row, shade: shadeOf(col, row) });
+    }
+  }
+  return (
+    <Svg width={FLAME_WIDTH} height={MAX_FLAME_HEIGHT} viewBox={`0 0 ${FLAME_WIDTH} ${MAX_FLAME_HEIGHT}`} style={styles.flameRow} pointerEvents="none">
+      {outline.map((c, i) => (
+        <Rect key={`o${i}`} x={c.x * FLAME_CELL} y={c.y * FLAME_CELL} width={FLAME_CELL} height={FLAME_CELL} fill={PALETTE.outline} />
+      ))}
+      {cells.map((c, i) => (
+        <Rect key={i} x={c.x * FLAME_CELL} y={c.y * FLAME_CELL} width={FLAME_CELL} height={FLAME_CELL} fill={PALETTE.shades[c.shade]} />
+      ))}
+    </Svg>
+  );
+};
 
 // ── Dotted top/bottom borders ────────────────────────────────────────────
 const DotRow: React.FC<{ position: 'top' | 'bottom' }> = ({ position }) => (

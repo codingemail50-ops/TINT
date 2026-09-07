@@ -86,7 +86,10 @@ function shadeGrid(grid: boolean[][], cols: number, rows: number): FlameCell[] {
   return cells;
 }
 
-function outlineCells(grid: boolean[][], cols: number, rows: number): { x: number; y: number }[] {
+// Exported for reuse by other pixel-flame silhouettes (e.g. the splash
+// screen's wide multi-peak flame) that build their own boolean grid but
+// want the same "ring of cells just outside the silhouette" outline pass.
+export function outlineCells(grid: boolean[][], cols: number, rows: number): { x: number; y: number }[] {
   const out: { x: number; y: number }[] = [];
   const seen = new Set<string>();
   const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
