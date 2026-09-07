@@ -27,8 +27,10 @@ const ROTATION_SENSITIVITY = 0.45;
 // A static curved arrow near the top of the dial, hinting which way to drag
 // to increase the value — the spinning blob alone gives no visual cue for
 // that, and testing found people don't intuit it's a rotary control at all.
-const HINT_START_DEG = -34;
-const HINT_END_DEG = 34;
+// Deliberately bold/thick/solid (not a faint decoration) — a thin low-opacity
+// hint read as "half-baked" and got missed entirely in testing.
+const HINT_START_DEG = -42;
+const HINT_END_DEG = 42;
 
 function pointOnCircle(cx: number, cy: number, r: number, angleDeg: number) {
   const rad = (angleDeg * Math.PI) / 180;
@@ -123,9 +125,12 @@ export const BlobDial: React.FC<Props> = ({
   const hintStart = pointOnCircle(center, center, hintRadius, HINT_START_DEG);
   const hintEnd = pointOnCircle(center, center, hintRadius, HINT_END_DEG);
   const hintArcPath = `M ${hintStart.x} ${hintStart.y} A ${hintRadius} ${hintRadius} 0 0 1 ${hintEnd.x} ${hintEnd.y}`;
-  const arrowSize = size * 0.028;
+  const hintStrokeWidth = Math.max(4, size * 0.022);
+  const arrowSize = size * 0.05;
   const arrowTangentDeg = HINT_END_DEG + 90;
-  const arrowPath = `M ${-arrowSize} ${-arrowSize * 0.65} L ${arrowSize} 0 L ${-arrowSize} ${arrowSize * 0.65} Z`;
+  // A chunkier, more solid triangle than a thin caret — wider at the back
+  // so it reads as a filled arrowhead even at small dial sizes.
+  const arrowPath = `M ${-arrowSize} ${-arrowSize * 0.8} L ${arrowSize * 0.9} 0 L ${-arrowSize} ${arrowSize * 0.8} L ${-arrowSize * 0.55} 0 Z`;
 
   return (
     <GestureDetector gesture={pan}>
@@ -137,8 +142,8 @@ export const BlobDial: React.FC<Props> = ({
           </Svg>
         </Animated.View>
         <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFillObject} pointerEvents="none">
-          <Path d={hintArcPath} stroke={Colors.textSecondary} strokeWidth={2} fill="none" strokeLinecap="round" opacity={0.6} />
-          <Path d={arrowPath} fill={Colors.textSecondary} opacity={0.6} transform={`translate(${hintEnd.x}, ${hintEnd.y}) rotate(${arrowTangentDeg})`} />
+          <Path d={hintArcPath} stroke={Colors.pop} strokeWidth={hintStrokeWidth} fill="none" strokeLinecap="round" />
+          <Path d={arrowPath} fill={Colors.pop} transform={`translate(${hintEnd.x}, ${hintEnd.y}) rotate(${arrowTangentDeg})`} />
         </Svg>
         <Text style={[styles.value, { fontSize: size * 0.16 }]}>{formatValue ? formatValue(value) : String(value)}</Text>
         {!!unitLabel && <Text style={styles.label}>{unitLabel}</Text>}

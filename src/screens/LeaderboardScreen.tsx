@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   scopeText: { fontSize: 13, fontFamily: Fonts.semibold, color: Colors.textSecondary },
   scopeTextActive: { color: Colors.background },
 
-  examRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.xl, flexWrap: 'wrap' },
+  examRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.xl, flexWrap: 'wrap', gap: Spacing.sm },
   examTab: {
     fontSize: 12, fontFamily: Fonts.semibold, color: Colors.textMuted,
     textTransform: 'uppercase', letterSpacing: 0.4,

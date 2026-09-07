@@ -226,17 +226,6 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
           )}
           <TextInput
             style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            placeholderTextColor={Colors.textMuted}
-            autoCapitalize="none"
-            autoComplete="email"
-            textContentType="emailAddress"
-            keyboardType="email-address"
-          />
-          <TextInput
-            style={styles.input}
             value={password}
             onChangeText={setPassword}
             placeholder="Password"
@@ -245,6 +234,18 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
             autoCapitalize="none"
             autoComplete={mode === 'signup' ? 'new-password' : 'password'}
             textContentType={mode === 'signup' ? 'newPassword' : 'password'}
+            returnKeyType="next"
+          />
+          <TextInput
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Email"
+            placeholderTextColor={Colors.textMuted}
+            autoCapitalize="none"
+            autoComplete="email"
+            textContentType="emailAddress"
+            keyboardType="email-address"
             returnKeyType="done"
             onSubmitEditing={handleSubmit}
           />
