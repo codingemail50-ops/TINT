@@ -53,10 +53,17 @@ function shadeOf(col: number, row: number): number {
   return d < 0.14 ? 3 : d < 0.3 ? 2 : d < 0.62 ? 1 : 0;
 }
 
+// Once the flame has fully grown, every column must cover at least this many
+// rows — otherwise the jagged low points between peaks (fine mid-growth, it
+// reads as the fire still climbing) let "TINT" keep peeking through during
+// the hold/burn beat, even after the flame has supposedly finished growing.
+const MIN_COVER_ROWS = Math.ceil(TITLE_HEIGHT / FLAME_CELL);
+
 function buildFlameGrid(growth: number, jitter: number[]): boolean[][] {
   const grid: boolean[][] = Array.from({ length: FLAME_ROWS }, () => Array(FLAME_COLS).fill(false));
   FLAME_PROFILE.forEach((p, col) => {
-    const activeRows = Math.max(0, Math.min(FLAME_ROWS, Math.round(FLAME_ROWS * growth * p * jitter[col])));
+    let activeRows = Math.max(0, Math.min(FLAME_ROWS, Math.round(FLAME_ROWS * growth * p * jitter[col])));
+    if (growth >= 1) activeRows = Math.max(activeRows, MIN_COVER_ROWS);
     for (let i = 0; i < activeRows; i++) grid[FLAME_ROWS - 1 - i][col] = true;
   });
   return grid;
@@ -94,13 +101,19 @@ const DotRow: React.FC<{ position: 'top' | 'bottom' }> = ({ position }) => (
 
 type Phase = 'growing' | 'transitioning' | 'done';
 
-const GROWTH_STEPS = 10;
-const HOLD_FLICKER_STEPS = 5;
-const STEP_MS = 140;
-const CROSSFADE_MS = 600;
+// Finer, more frequent steps than a first pass at this (10 steps @ 140ms)
+// read as choppy — same rough growth duration, but ~4x the steps makes each
+// row-count jump small enough to look like continuous motion instead of a
+// stepped climb. Hold is timed to ~1s of visible full-height burn before the
+// crossfade, per how long the flame should sit at the top before yielding to
+// the tagline.
+const STEP_MS = 40;
+const GROWTH_STEPS = 24; // ~960ms to climb
+const HOLD_FLICKER_STEPS = 25; // ~1000ms burning at full height
+const CROSSFADE_MS = 500;
 
 function randomJitter(): number[] {
-  return FLAME_PROFILE.map(() => 0.82 + Math.random() * 0.34);
+  return FLAME_PROFILE.map(() => 0.88 + Math.random() * 0.24);
 }
 
 export const SplashScreen: React.FC = () => {
@@ -147,12 +160,17 @@ export const SplashScreen: React.FC = () => {
         <Animated.View style={[styles.stackLayer, { opacity: titleOpacity }]}>
           <View style={styles.titleBox}>
             <Text style={styles.title}>TINT</Text>
-            {phase === 'growing' && <WideFlame growth={growth} jitter={jitter} />}
+            {/* Stays mounted through the crossfade (not just while growing) so
+                it fades out together with the title it's covering — dropping
+                it the instant the fade starts let bare "TINT" flash back into
+                view for that whole 500ms before the tagline took over. */}
+            {phase !== 'done' && <WideFlame growth={growth} jitter={jitter} />}
           </View>
         </Animated.View>
 
         <Animated.View style={[styles.stackLayer, { opacity: taglineOpacity }]}>
-          <Text style={styles.tagline}>There is no tomorrow</Text>
+          <Text style={styles.tagline}>THERE IS</Text>
+          <Text style={styles.tagline}>NO TOMORROW</Text>
         </Animated.View>
       </View>
 
@@ -186,8 +204,12 @@ const styles = StyleSheet.create({
 
   flameRow: { position: 'absolute', left: 0, bottom: 0 },
 
+  // Matches TodoScreen's header tagline exactly (same text, split the same
+  // way) — the splash's version previously used a dimmer grey, a single
+  // line, and different sizing, which read as a different typographic
+  // treatment from the one the rest of the app actually uses for this line.
   tagline: {
-    fontFamily: Fonts.pixel, fontSize: 20, color: Colors.gray[400],
-    letterSpacing: 1, textTransform: 'uppercase',
+    fontFamily: Fonts.pixel, fontSize: 22, color: Colors.pop,
+    letterSpacing: 0.5, textTransform: 'uppercase', lineHeight: 22, textAlign: 'center',
   },
 });
