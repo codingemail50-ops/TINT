@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path, Circle, G } from 'react-native-svg';
 import { scallopPath } from '../utils/scallopPath';
 import { Colors, Fonts } from '../constants/theme';
 import { useHaptics } from '../hooks/useHaptics';
@@ -24,16 +24,19 @@ interface Props {
 const DEGREES_PER_STEP = 9;
 const ROTATION_SENSITIVITY = 0.45;
 
-// A static, hand-drawn-style swoop arrow floating above the dial, hinting
-// which way to drag to increase the value — the spinning blob alone gives
-// no visual cue for that, and testing found people don't intuit it's a
-// rotary control at all. Deliberately bold/thick/solid (not a faint
-// decoration) — a thin low-opacity hint read as "half-baked" and got missed
-// entirely in testing. Drawn as a freeform sketch-style curve rather than an
-// arc that hugs the dial's rim, so it reads as an annotation pointing at the
-// dial rather than another ring on it.
-const HINT_BOX_HEIGHT_RATIO = 0.45;
-const HINT_GAP_ABOVE_DIAL = 0.05;
+// A static curved hint arc hugging the dial's rim, showing which way to
+// drag to increase the value — the spinning blob alone gives no visual cue
+// for that, and testing found people don't intuit it's a rotary control at
+// all. Kept short and dimmed (not full-strength pop orange) so it reads as
+// a quiet affordance rather than a competing focal point next to the value.
+const HINT_START_DEG = -26;
+const HINT_END_DEG = 26;
+const HINT_OPACITY = 0.55;
+
+function pointOnCircle(cx: number, cy: number, r: number, angleDeg: number) {
+  const rad = (angleDeg * Math.PI) / 180;
+  return { x: cx + r * Math.sin(rad), y: cy - r * Math.cos(rad) };
+}
 
 // The Focus timer's squiggly-circle shape, repurposed as a rotary drag
 // control — the whole shape spins under your finger 1:1 with the real
@@ -117,49 +120,41 @@ export const BlobDial: React.FC<Props> = ({
     transform: [{ rotate: `${rotation.value}deg` }],
   }));
 
-  // Fixed (non-rotating) hint sketch: a freeform swoop that rises over the
-  // dial then hooks down into it, floating entirely above the blob's rim —
-  // not an arc sharing its curvature — so it never competes with the
-  // rotating value dot for the same ring of space. Stacked above the dial
-  // as part of this component's own layout box (rather than absolutely
-  // overflowing past it) so any screen embedding BlobDial automatically
-  // reserves room for it instead of it colliding with whatever sits above.
-  const hintBoxHeight = size * HINT_BOX_HEIGHT_RATIO;
-  const hintGapPx = size * HINT_GAP_ABOVE_DIAL;
-  const dialBoxTop = hintBoxHeight + hintGapPx;
-  const hintStart = { x: size * 0.16, y: hintBoxHeight * 0.75 };
-  const hintControl1 = { x: size * 0.32, y: hintBoxHeight * 0.05 };
-  const hintControl2 = { x: size * 0.6, y: 0 };
-  const hintEnd = { x: size * 0.8, y: hintBoxHeight * 0.85 };
-  const hintSwoopPath = `M ${hintStart.x} ${hintStart.y} C ${hintControl1.x} ${hintControl1.y}, ${hintControl2.x} ${hintControl2.y}, ${hintEnd.x} ${hintEnd.y}`;
-  const hintStrokeWidth = Math.max(5, size * 0.028);
-  const arrowSize = size * 0.06;
-  const arrowAngleDeg = (Math.atan2(hintEnd.y - hintControl2.y, hintEnd.x - hintControl2.x) * 180) / Math.PI;
+  // Fixed (non-rotating) hint arc, following the dial's own curvature just
+  // outside its rim — pushed out far enough that its stroke clears the
+  // rotating orange value dot, but otherwise reading as a short segment of
+  // the same circle rather than a separate shape floating above it.
+  const center = size / 2;
+  const hintRadius = dotRadius + size * 0.08;
+  const hintStart = pointOnCircle(center, center, hintRadius, HINT_START_DEG);
+  const hintEnd = pointOnCircle(center, center, hintRadius, HINT_END_DEG);
+  const hintArcPath = `M ${hintStart.x} ${hintStart.y} A ${hintRadius} ${hintRadius} 0 0 1 ${hintEnd.x} ${hintEnd.y}`;
+  const hintStrokeWidth = Math.max(4, size * 0.022);
+  const arrowSize = size * 0.05;
+  const arrowTangentDeg = HINT_END_DEG + 90;
   // A chunkier, more solid triangle than a thin caret — wider at the back
   // so it reads as a filled arrowhead even at small dial sizes.
   const arrowPath = `M ${-arrowSize} ${-arrowSize * 0.8} L ${arrowSize * 0.9} 0 L ${-arrowSize} ${arrowSize * 0.8} L ${-arrowSize * 0.55} 0 Z`;
 
   return (
-    <View style={{ width: size, height: dialBoxTop + size }}>
-      <View style={{ position: 'absolute', left: 0, top: 0, width: size, height: hintBoxHeight }} pointerEvents="none">
-        <Svg width={size} height={hintBoxHeight} viewBox={`0 0 ${size} ${hintBoxHeight}`}>
-          <Path d={hintSwoopPath} stroke={Colors.pop} strokeWidth={hintStrokeWidth} fill="none" strokeLinecap="round" />
-          <Path d={arrowPath} fill={Colors.pop} transform={`translate(${hintEnd.x}, ${hintEnd.y}) rotate(${arrowAngleDeg})`} />
+    <GestureDetector gesture={pan}>
+      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+        <Animated.View style={[StyleSheet.absoluteFillObject, rotatingStyle]}>
+          <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <Path d={blobPath} fill={Colors.gray[800]} stroke={Colors.gray[600]} strokeWidth={2} />
+            <Circle cx={size / 2} cy={size / 2 - dotRadius} r={size * 0.035} fill={Colors.pop} />
+          </Svg>
+        </Animated.View>
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFillObject} pointerEvents="none">
+          <G opacity={HINT_OPACITY}>
+            <Path d={hintArcPath} stroke={Colors.pop} strokeWidth={hintStrokeWidth} fill="none" strokeLinecap="round" />
+            <Path d={arrowPath} fill={Colors.pop} transform={`translate(${hintEnd.x}, ${hintEnd.y}) rotate(${arrowTangentDeg})`} />
+          </G>
         </Svg>
+        <Text style={[styles.value, { fontSize: size * 0.16 }]}>{formatValue ? formatValue(value) : String(value)}</Text>
+        {!!unitLabel && <Text style={styles.label}>{unitLabel}</Text>}
       </View>
-      <GestureDetector gesture={pan}>
-        <View style={{ position: 'absolute', left: 0, top: dialBoxTop, width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-          <Animated.View style={[StyleSheet.absoluteFillObject, rotatingStyle]}>
-            <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-              <Path d={blobPath} fill={Colors.gray[800]} stroke={Colors.gray[600]} strokeWidth={2} />
-              <Circle cx={size / 2} cy={size / 2 - dotRadius} r={size * 0.035} fill={Colors.pop} />
-            </Svg>
-          </Animated.View>
-          <Text style={[styles.value, { fontSize: size * 0.16 }]}>{formatValue ? formatValue(value) : String(value)}</Text>
-          {!!unitLabel && <Text style={styles.label}>{unitLabel}</Text>}
-        </View>
-      </GestureDetector>
-    </View>
+    </GestureDetector>
   );
 };
 
