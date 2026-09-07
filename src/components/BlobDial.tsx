@@ -119,9 +119,12 @@ export const BlobDial: React.FC<Props> = ({
     transform: [{ rotate: `${rotation.value}deg` }],
   }));
 
-  // Fixed (non-rotating) hint arc + arrowhead, just outside the blob's rim.
+  // Fixed (non-rotating) hint arc + arrowhead, pushed well clear of the
+  // blob's rim so it never overlaps the orange value dot riding on that rim
+  // (a smaller offset here previously let the arc's stroke touch the dot,
+  // reading as a stray bump fused into the arrow).
   const center = size / 2;
-  const hintRadius = dotRadius + size * 0.05;
+  const hintRadius = dotRadius + size * 0.09;
   const hintStart = pointOnCircle(center, center, hintRadius, HINT_START_DEG);
   const hintEnd = pointOnCircle(center, center, hintRadius, HINT_END_DEG);
   const hintArcPath = `M ${hintStart.x} ${hintStart.y} A ${hintRadius} ${hintRadius} 0 0 1 ${hintEnd.x} ${hintEnd.y}`;
