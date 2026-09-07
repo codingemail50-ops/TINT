@@ -39,16 +39,18 @@ const FLAME_PROFILE = [
   0.8, 0.5, 0.68, 0.96, 0.72, 0.58, 0.84, 0.62, 0.76, 0.46, 0.66, 0.4, 0.3, 0.2,
 ];
 
-// Distance-from-core shading, same idea as flameShapes.ts's shadeGrid but
-// tuned for a wide/short grid — core sits low-center (the reference's
-// palest patch sits near the base of the tallest peaks, not at the top).
+// Distance-from-core shading — same grading as the app's other flame
+// sprites (pixelMascot.ts's buildMeditatingFlame): a small pale-gold core,
+// a modest light-orange ring around it, vivid orange as the dominant body
+// color, and the deepest/darkest shade reserved for a thin band near the
+// silhouette's own outline — not a wide pale dome swallowing half the body.
 const CORE_X = (FLAME_COLS - 1) * 0.5;
-const CORE_Y = FLAME_ROWS * 0.85;
+const CORE_Y = FLAME_ROWS - 1.5;
 const MAX_DIST = Math.hypot(FLAME_COLS * 0.5, FLAME_ROWS * 0.8);
 
 function shadeOf(col: number, row: number): number {
   const d = Math.hypot(col - CORE_X, row - CORE_Y) / MAX_DIST;
-  return d < 0.32 ? 3 : d < 0.55 ? 2 : d < 0.8 ? 1 : 0;
+  return d < 0.14 ? 3 : d < 0.3 ? 2 : d < 0.62 ? 1 : 0;
 }
 
 function buildFlameGrid(growth: number, jitter: number[]): boolean[][] {
