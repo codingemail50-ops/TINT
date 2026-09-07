@@ -53,17 +53,10 @@ function shadeOf(col: number, row: number): number {
   return d < 0.14 ? 3 : d < 0.3 ? 2 : d < 0.62 ? 1 : 0;
 }
 
-// Once the flame has fully grown, every column must cover at least this many
-// rows — otherwise the jagged low points between peaks (fine mid-growth, it
-// reads as the fire still climbing) let "TINT" keep peeking through during
-// the hold/burn beat, even after the flame has supposedly finished growing.
-const MIN_COVER_ROWS = Math.ceil(TITLE_HEIGHT / FLAME_CELL);
-
 function buildFlameGrid(growth: number, jitter: number[]): boolean[][] {
   const grid: boolean[][] = Array.from({ length: FLAME_ROWS }, () => Array(FLAME_COLS).fill(false));
   FLAME_PROFILE.forEach((p, col) => {
-    let activeRows = Math.max(0, Math.min(FLAME_ROWS, Math.round(FLAME_ROWS * growth * p * jitter[col])));
-    if (growth >= 1) activeRows = Math.max(activeRows, MIN_COVER_ROWS);
+    const activeRows = Math.max(0, Math.min(FLAME_ROWS, Math.round(FLAME_ROWS * growth * p * jitter[col])));
     for (let i = 0; i < activeRows; i++) grid[FLAME_ROWS - 1 - i][col] = true;
   });
   return grid;
@@ -110,10 +103,10 @@ type Phase = 'growing' | 'transitioning' | 'done';
 const STEP_MS = 40;
 const GROWTH_STEPS = 24; // ~960ms to climb
 const HOLD_FLICKER_STEPS = 25; // ~1000ms burning at full height
-const CROSSFADE_MS = 500;
+const CROSSFADE_MS = 600;
 
 function randomJitter(): number[] {
-  return FLAME_PROFILE.map(() => 0.88 + Math.random() * 0.24);
+  return FLAME_PROFILE.map(() => 0.82 + Math.random() * 0.34);
 }
 
 export const SplashScreen: React.FC = () => {
