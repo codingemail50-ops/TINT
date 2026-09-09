@@ -4,7 +4,6 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, BorderRadius } from '../constants/theme';
-import { WalkthroughScreen } from '../screens/WalkthroughScreen';
 import { AvatarExamScreen } from '../screens/AvatarExamScreen';
 import { FocusGoalScreen } from '../screens/FocusGoalScreen';
 import { CreateAccountScreen } from '../screens/CreateAccountScreen';
@@ -56,7 +55,7 @@ async function ensureSession(): Promise<string | null> {
 }
 
 type Screen =
-  | 'boot' | 'walkthrough' | 'avatarExam' | 'focusGoal' | 'createAccount'
+  | 'boot' | 'avatarExam' | 'focusGoal' | 'createAccount'
   | 'todo' | 'focus' | 'productivity' | 'leaderboard' | 'profile';
 
 const TAB_CONFIG = [
@@ -70,7 +69,7 @@ const TAB_CONFIG = [
 // the bottom tab bar must not paint over onboarding screens — every launch
 // goes through onboarding now (see FORCE_ONBOARDING_ON_LAUNCH below), so
 // this fires on ordinary use, not just first installs.
-const ONBOARDING_SCREENS = new Set<Screen>(['walkthrough', 'avatarExam', 'focusGoal', 'createAccount']);
+const ONBOARDING_SCREENS = new Set<Screen>(['avatarExam', 'focusGoal', 'createAccount']);
 
 interface OnboardingDraft {
   avatar: string;
@@ -145,11 +144,9 @@ const AppNavigatorInner: React.FC = () => {
         }
       }
 
-      // The one genuinely "first launch" branch — no cloud profile, no local
-      // user either. Everywhere else that lands on avatarExam (post-logout,
-      // post-login-without-a-profile) is a returning person, not a first-time
-      // one, so the walkthrough only shows here.
-      setScreen('walkthrough');
+      // Walkthrough is disabled for now (see render below) while it gets
+      // redesigned — straight to avatarExam like before it existed.
+      setScreen('avatarExam');
     })();
   }, []);
 
@@ -332,9 +329,6 @@ const AppNavigatorInner: React.FC = () => {
     <View style={styles.root}>
       <GestureDetector gesture={swipeGesture}>
         <View style={styles.swipeArea}>
-          {screen === 'walkthrough' && (
-            <WalkthroughScreen onDone={() => setScreen('avatarExam')} />
-          )}
           {screen === 'avatarExam' && (
             <AvatarExamScreen
               onComplete={handleAvatarExamComplete}
