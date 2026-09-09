@@ -27,13 +27,21 @@ interface Props {
   onGuest: (data: { name: string }) => void;
   /** Logged into an existing account — hasProfile tells the caller whether
    *  to skip the rest of onboarding (avatar/goal already set) or not. */
-  onLoggedIn: (hasProfile: boolean, userId?: string) => void;
+  onLoggedIn: (hasProfile: boolean, userId?: string, googleEmail?: string) => void;
   onBack?: () => void;
   initialMode?: Mode;
   /** The avatar picked on step 1 — tiled as a scrolling brick-pattern
    *  background, rows alternating direction. Omitted for the direct-login
    *  shortcut, which skips step 1. */
   avatar?: string;
+  /** Already authenticated via Google with no profile yet (a brand-new
+   *  Google sign-up) — the account/credential half of this screen is
+   *  redundant and actively confusing in that case (there's no TINT
+   *  password to create, and tapping Google again here just loops back to
+   *  avatar-picking since there's still no profile). Collapses the screen
+   *  down to just the one thing still needed: a username. */
+  skipCredentials?: boolean;
+  onGoogleUsernameSet?: (name: string) => void;
 }
 
 function friendlyError(message: string): string {
@@ -55,7 +63,9 @@ function friendlyError(message: string): string {
 // Screen 3 of onboarding — username + email/password, Google Sign-In, or
 // stay anonymous. Google Sign-In only functions on a native Android build
 // (see ../utils/googleAuth.ts) — Expo Go/web show a clear "not available" alert instead.
-export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLoggedIn, onBack, initialMode = 'signup', avatar }) => {
+export const CreateAccountScreen: React.FC<Props> = ({
+  onSignedUp, onGuest, onLoggedIn, onBack, initialMode = 'signup', avatar, skipCredentials, onGoogleUsernameSet,
+}) => {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -83,6 +93,12 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
     ? email.trim().length > 3 && password.length >= 6
     : usernameOk && email.trim().length > 3 && password.length >= 6);
   const canContinueGuest = mode === 'signup' && usernameOk && !loading;
+
+  const handleGoogleUsername = async () => {
+    if (!usernameOk) return;
+    await buttonPress();
+    onGoogleUsernameSet?.(username.trim());
+  };
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -156,9 +172,13 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
       setPassword('');
 
       // Same convention as the email/password login path: hasProfile=true,
-      // and AppNavigator's existing fallback already routes a brand-new
-      // user (no cloud profile row yet) into onboarding instead of crashing.
-      onLoggedIn(true, data.user?.id);
+      // and AppNavigator's existing fallback routes a brand-new user (no
+      // cloud profile row yet) into onboarding instead of crashing. Passing
+      // the email along too lets that fallback skip straight past this
+      // screen's credential form on the way back through (see
+      // skipCredentials above) — there's no TINT password to create when
+      // Google already authenticated this account.
+      onLoggedIn(true, data.user?.id, data.user?.email ?? undefined);
     } catch (err: any) {
       const code = isErrorWithCode?.(err) ? err.code : null;
       if (code && statusCodes && code === statusCodes.SIGN_IN_CANCELLED) {
@@ -197,22 +217,19 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
 
         <View style={styles.header}>
           <Text style={styles.wordmark}>There is no tomorrow</Text>
-          <Text style={styles.title}>{mode === 'signup' ? 'Create your account' : 'Welcome back'}</Text>
+          <Text style={styles.title}>{skipCredentials ? "You're signed in" : mode === 'signup' ? 'Create your account' : 'Welcome back'}</Text>
           <Text style={styles.sub}>
-            {mode === 'signup'
+            {skipCredentials
+              ? 'Just need a username to finish setting up your account.'
+              : mode === 'signup'
               ? 'Your progress, streaks, and rank stay with you — sign up to keep them safe.'
               : 'Log in to pick up where you left off.'}
           </Text>
         </View>
 
-        <View style={styles.form}>
-          {/* A TINT username/password is a separate credential from
-              Google's — several testers assumed these fields were somehow
-              tied to their Gmail password. Labeling this group explicitly
-              and visually separating it from the Google option below (a
-              divider + its own caption) is meant to head that off. */}
-          <Text style={styles.groupLabel}>{mode === 'signup' ? 'Create a TINT account' : 'Log in with your TINT account'}</Text>
-          {mode === 'signup' && (
+        {skipCredentials ? (
+          <View style={styles.form}>
+            <Text style={styles.groupLabel}>Username</Text>
             <TextInput
               style={styles.input}
               value={username}
@@ -222,85 +239,118 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
               autoCapitalize="words"
               autoComplete="username"
               textContentType="username"
-              returnKeyType="next"
-            />
-          )}
-          <View style={styles.passwordWrap}>
-            <TextInput
-              style={[styles.input, styles.passwordInput]}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor={Colors.textMuted}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              autoComplete={mode === 'signup' ? 'new-password' : 'password'}
-              textContentType={mode === 'signup' ? 'newPassword' : 'password'}
-              returnKeyType="next"
+              returnKeyType="done"
+              onSubmitEditing={handleGoogleUsername}
             />
             <TouchableOpacity
-              style={styles.eyeBtn}
-              onPress={() => setShowPassword(v => !v)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={[styles.submitBtn, !usernameOk && styles.submitBtnDisabled]}
+              onPress={handleGoogleUsername}
+              disabled={!usernameOk}
+              activeOpacity={0.85}
             >
-              <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={Colors.textMuted} />
+              <Text style={styles.submitText}>Continue</Text>
             </TouchableOpacity>
           </View>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            placeholderTextColor={Colors.textMuted}
-            autoCapitalize="none"
-            autoComplete="email"
-            textContentType="emailAddress"
-            keyboardType="email-address"
-            returnKeyType="done"
-            onSubmitEditing={handleSubmit}
-          />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+        ) : (
+          <>
+            <View style={styles.form}>
+              {/* A TINT username/password is a separate credential from
+                  Google's — several testers assumed these fields were somehow
+                  tied to their Gmail password. Labeling this group explicitly
+                  and visually separating it from the Google option below (a
+                  divider + its own caption) is meant to head that off. */}
+              <Text style={styles.groupLabel}>{mode === 'signup' ? 'Create a TINT account' : 'Log in with your TINT account'}</Text>
+              {mode === 'signup' && (
+                <TextInput
+                  style={styles.input}
+                  value={username}
+                  onChangeText={setUsername}
+                  placeholder="Username"
+                  placeholderTextColor={Colors.textMuted}
+                  autoCapitalize="words"
+                  autoComplete="username"
+                  textContentType="username"
+                  returnKeyType="next"
+                />
+              )}
+              <View style={styles.passwordWrap}>
+                <TextInput
+                  style={[styles.input, styles.passwordInput]}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="Password"
+                  placeholderTextColor={Colors.textMuted}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoComplete={mode === 'signup' ? 'new-password' : 'password'}
+                  textContentType={mode === 'signup' ? 'newPassword' : 'password'}
+                  returnKeyType="next"
+                />
+                <TouchableOpacity
+                  style={styles.eyeBtn}
+                  onPress={() => setShowPassword(v => !v)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={Colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor={Colors.textMuted}
+                autoCapitalize="none"
+                autoComplete="email"
+                textContentType="emailAddress"
+                keyboardType="email-address"
+                returnKeyType="done"
+                onSubmitEditing={handleSubmit}
+              />
+              {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <TouchableOpacity
-            style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-            activeOpacity={0.85}
-          >
-            {loading ? (
-              <ActivityIndicator color={Colors.background} />
-            ) : (
-              <Text style={styles.submitText}>{mode === 'signup' ? 'Sign Up' : 'Log In'}</Text>
+              <TouchableOpacity
+                style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
+                onPress={handleSubmit}
+                disabled={!canSubmit}
+                activeOpacity={0.85}
+              >
+                {loading ? (
+                  <ActivityIndicator color={Colors.background} />
+                ) : (
+                  <Text style={styles.submitText}>{mode === 'signup' ? 'Sign Up' : 'Log In'}</Text>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <TouchableOpacity style={styles.googleBtn} onPress={handleGoogle} activeOpacity={0.85}>
+                <Ionicons name="logo-google" size={18} color={Colors.textPrimary} />
+                <Text style={styles.googleText}>Sign in with Google</Text>
+              </TouchableOpacity>
+              <Text style={styles.googleCaption}>Uses your Google account directly — no separate username or password needed.</Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => { buttonPress(); setError(''); setMode(mode === 'signup' ? 'login' : 'signup'); }}
+              style={styles.switchRow}
+            >
+              <Text style={styles.switchText}>
+                {mode === 'signup' ? 'Already have an account? ' : "Don't have an account? "}
+                <Text style={styles.switchLink}>{mode === 'signup' ? 'Log in' : 'Sign up'}</Text>
+              </Text>
+            </TouchableOpacity>
+
+            {mode === 'signup' && (
+              <TouchableOpacity onPress={handleGuest} disabled={!canContinueGuest} style={styles.guestRow}>
+                <Text style={[styles.guestText, !canContinueGuest && { opacity: 0.4 }]}>Continue as guest</Text>
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
-
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity style={styles.googleBtn} onPress={handleGoogle} activeOpacity={0.85}>
-            <Ionicons name="logo-google" size={18} color={Colors.textPrimary} />
-            <Text style={styles.googleText}>Sign in with Google</Text>
-          </TouchableOpacity>
-          <Text style={styles.googleCaption}>Uses your Google account directly — no separate username or password needed.</Text>
-        </View>
-
-        <TouchableOpacity
-          onPress={() => { buttonPress(); setError(''); setMode(mode === 'signup' ? 'login' : 'signup'); }}
-          style={styles.switchRow}
-        >
-          <Text style={styles.switchText}>
-            {mode === 'signup' ? 'Already have an account? ' : "Don't have an account? "}
-            <Text style={styles.switchLink}>{mode === 'signup' ? 'Log in' : 'Sign up'}</Text>
-          </Text>
-        </TouchableOpacity>
-
-        {mode === 'signup' && (
-          <TouchableOpacity onPress={handleGuest} disabled={!canContinueGuest} style={styles.guestRow}>
-            <Text style={[styles.guestText, !canContinueGuest && { opacity: 0.4 }]}>Continue as guest</Text>
-          </TouchableOpacity>
+          </>
         )}
       </View>
     </KeyboardAvoidingView>

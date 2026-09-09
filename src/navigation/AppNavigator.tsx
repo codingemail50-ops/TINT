@@ -110,6 +110,10 @@ const AppNavigatorInner: React.FC = () => {
   // to createAccount in login mode, without collecting avatar/exam/goal —
   // this flag is what tells createAccount which mode to open in.
   const [loginShortcut, setLoginShortcut] = useState(false);
+  // A brand-new Google sign-up (already authenticated, no profile yet) —
+  // tells createAccount to collapse down to just a username field instead
+  // of showing a redundant TINT password form on the way back through.
+  const [googleSignupPending, setGoogleSignupPending] = useState(false);
   const tabFadeAnim = useRef(new Animated.Value(0)).current;
   const userIdRef = useRef<string | null>(null);
   const { status: focusStatus, requestExpand } = useFocusSessionStatus();
@@ -195,6 +199,7 @@ const AppNavigatorInner: React.FC = () => {
     userIdRef.current = null;
     setShowTabs(false);
     setLoginShortcut(false);
+    setGoogleSignupPending(false);
     setAppState({ user: null, streak: 0, longestStreak: 0, lastActiveDate: null, history: [], totalTasksCompleted: 0 });
     tabFadeAnim.setValue(0);
     setScreen('avatarExam');
@@ -252,7 +257,7 @@ const AppNavigatorInner: React.FC = () => {
     setScreen('focusGoal');
   };
 
-  const handleLoggedIn = async (hasProfile: boolean, userId?: string) => {
+  const handleLoggedIn = async (hasProfile: boolean, userId?: string, googleEmail?: string) => {
     // signInWithPassword's own response already carries the user id — a
     // separate getUser() call here was a fully redundant network round
     // trip on every login, adding to the perceived delay for no reason.
@@ -284,9 +289,23 @@ const AppNavigatorInner: React.FC = () => {
         return;
       }
     }
-    // Logged in but no cloud profile row yet — run through onboarding to collect one.
+    // Logged in but no cloud profile row yet — run through onboarding to
+    // collect one. If this came from Google, the account is already
+    // authenticated with a real email — no password to create, so
+    // createAccount (reached again after avatarExam) skips straight to
+    // just asking for a username instead of the full credential form.
     setLoginShortcut(false);
+    if (googleEmail) {
+      draftRef.current.email = googleEmail;
+      setGoogleSignupPending(true);
+    }
     setScreen('avatarExam');
+  };
+
+  const handleGoogleUsernameSet = (name: string) => {
+    draftRef.current.name = name;
+    setGoogleSignupPending(false);
+    setScreen('focusGoal');
   };
 
   const handleStateChange = (newState: AppState) => {
@@ -369,6 +388,8 @@ const AppNavigatorInner: React.FC = () => {
               onBack={loginShortcut ? undefined : () => setScreen('avatarExam')}
               initialMode={loginShortcut ? 'login' : 'signup'}
               avatar={draftRef.current.avatar}
+              skipCredentials={googleSignupPending}
+              onGoogleUsernameSet={handleGoogleUsernameSet}
             />
           )}
           {screen === 'focusGoal' && (
