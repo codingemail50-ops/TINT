@@ -188,29 +188,6 @@ export async function syncFocusLog(
   }
 }
 
-// ── Check whether a user row already exists in Supabase ─────────────────────
-export async function checkUserExists(userId: string): Promise<boolean> {
-  try {
-    const { data, error } = await supabase
-      .from('user_data')
-      .select('id')
-      .eq('id', userId)
-      .single();
-
-    if (error) {
-      // PGRST116 means no row found
-      if (error.code === 'PGRST116') return false;
-      console.error('[supabaseStorage] checkUserExists error:', error.message);
-      return false;
-    }
-
-    return !!data;
-  } catch (err) {
-    console.error('[supabaseStorage] checkUserExists exception:', err);
-    return false;
-  }
-}
-
 // ── Leaderboard: every user's public-facing row ──────────────────────────────
 export interface CloudLeaderboardRow {
   id: string;

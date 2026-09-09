@@ -25,7 +25,6 @@ import {
   loadUserFromSupabase,
   syncAppStateToSupabase,
   saveNewUserToSupabase,
-  checkUserExists,
 } from '../utils/supabaseStorage';
 
 // Supabase auth is fully wired up — returning users go straight back into
@@ -41,7 +40,17 @@ async function ensureSession(): Promise<string | null> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) return session.user.id;
+  } catch (err) {
+    // getSession() throwing here (rather than just returning no session)
+    // used to mean this whole function gave up and returned null — which
+    // reads as "no session at all this launch", not just "no *persisted*
+    // session". A returning user whose real session failed to restore for
+    // a transient reason still deserves the same fallback attempt at
+    // establishing *some* session that a fresh install gets below.
+    console.error('[AppNavigator] getSession() threw, falling back to anonymous sign-in:', err);
+  }
 
+  try {
     const { data, error } = await supabase.auth.signInAnonymously();
     if (error) {
       console.error('[AppNavigator] Anonymous sign-in failed:', error.message);
@@ -49,7 +58,7 @@ async function ensureSession(): Promise<string | null> {
     }
     return data.session?.user.id ?? null;
   } catch (err) {
-    console.error('[AppNavigator] ensureSession exception:', err);
+    console.error('[AppNavigator] signInAnonymously() exception:', err);
     return null;
   }
 }
@@ -117,16 +126,22 @@ const AppNavigatorInner: React.FC = () => {
 
       if (!FORCE_ONBOARDING_ON_LAUNCH) {
         if (userId) {
-          const exists = await checkUserExists(userId);
-          if (exists) {
-            const loaded = await loadUserFromSupabase(userId);
-            if (loaded) {
-              setAppState(loaded);
-              setShowTabs(true);
-              setScreen('todo');
-              Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-              return;
-            }
+          // Was a separate checkUserExists() + loadUserFromSupabase() pair —
+          // an extra network round trip for no benefit, since a "yes" answer
+          // was always immediately followed by loading the full row anyway.
+          // It also silently conflated "definitely no such user" with "the
+          // check itself failed" (any non-not-found error returned false
+          // too), which could send a genuine returning user down the
+          // brand-new-user path over a transient network hiccup.
+          // loadUserFromSupabase already returns null for both cases and
+          // is the one path actually exercised/trusted elsewhere.
+          const loaded = await loadUserFromSupabase(userId);
+          if (loaded) {
+            setAppState(loaded);
+            setShowTabs(true);
+            setScreen('todo');
+            Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+            return;
           }
         }
 
@@ -251,6 +266,17 @@ const AppNavigatorInner: React.FC = () => {
     if (hasProfile && userIdRef.current) {
       const loaded = await loadUserFromSupabase(userIdRef.current);
       if (loaded) {
+        // Same cross-account leak finishOnboarding already guards against
+        // (local storage isn't namespaced per-account) — but that only
+        // covers the fresh-signup path. Logging into an *existing* account
+        // (this path, including Google) skipped it entirely: if a previous
+        // account on this device left a focus session running when the app
+        // got killed, its stale descriptor would still be sitting in
+        // AsyncStorage, and the next time this newly-logged-in account
+        // opened the Focus tab, FocusScreen would find that leftover
+        // session past its planned end time and log its *full* duration as
+        // a session this account never ran.
+        void clearActiveSession();
         setAppState(loaded);
         setShowTabs(true);
         setScreen('todo');
