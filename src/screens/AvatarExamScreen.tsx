@@ -100,7 +100,12 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin }) => {
           every cell, which is what made reopening the wall feel laggy. The
           "picked" state overlays on top rather than replacing this section. */}
       <View style={styles.wallSection}>
-        <AvatarWall icons={AVATARS} selected={avatar} onPick={onPickAvatar} rows={6} cellSize={56} angleDeg={-7} durationMs={22000} active={picking} />
+        {/* Slowed way down from the original 22s loop — at that speed icons
+            drifted past faster than someone deciding which one to tap could
+            react, which read as "laggy"/unresponsive even though taps
+            themselves worked fine. ~2x slower gives enough time to track and
+            tap a specific icon before it scrolls out of reach. */}
+        <AvatarWall icons={AVATARS} selected={avatar} onPick={onPickAvatar} rows={6} cellSize={56} angleDeg={-7} durationMs={42000} active={picking} />
         {picking ? (
           <LinearGradient
             colors={['rgba(6,6,8,0.9)', 'rgba(6,6,8,0)', 'rgba(6,6,8,0.9)']}
