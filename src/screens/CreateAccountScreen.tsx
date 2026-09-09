@@ -60,6 +60,7 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { buttonPress } = useHaptics();
@@ -224,18 +225,27 @@ export const CreateAccountScreen: React.FC<Props> = ({ onSignedUp, onGuest, onLo
               returnKeyType="next"
             />
           )}
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            placeholderTextColor={Colors.textMuted}
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete={mode === 'signup' ? 'new-password' : 'password'}
-            textContentType={mode === 'signup' ? 'newPassword' : 'password'}
-            returnKeyType="next"
-          />
+          <View style={styles.passwordWrap}>
+            <TextInput
+              style={[styles.input, styles.passwordInput]}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Password"
+              placeholderTextColor={Colors.textMuted}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoComplete={mode === 'signup' ? 'new-password' : 'password'}
+              textContentType={mode === 'signup' ? 'newPassword' : 'password'}
+              returnKeyType="next"
+            />
+            <TouchableOpacity
+              style={styles.eyeBtn}
+              onPress={() => setShowPassword(v => !v)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={Colors.textMuted} />
+            </TouchableOpacity>
+          </View>
           <TextInput
             style={styles.input}
             value={email}
@@ -325,6 +335,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  passwordWrap: { justifyContent: 'center' },
+  passwordInput: { paddingRight: 44 },
+  eyeBtn: { position: 'absolute', right: Spacing.md, height: '100%', justifyContent: 'center' },
   error: { color: Colors.danger, fontSize: 13, fontFamily: Fonts.regular },
 
   submitBtn: {
