@@ -24,14 +24,15 @@ interface Props {
 const DEGREES_PER_STEP = 9;
 const ROTATION_SENSITIVITY = 0.45;
 
-// A static curved hint arc hugging the dial's rim, showing which way to
-// drag to increase the value — the spinning blob alone gives no visual cue
-// for that, and testing found people don't intuit it's a rotary control at
-// all. Kept short and dimmed (not full-strength pop orange) so it reads as
-// a quiet affordance rather than a competing focal point next to the value.
-const HINT_START_DEG = -26;
-const HINT_END_DEG = 26;
-const HINT_OPACITY = 0.55;
+// A static curved hint arrow floating clear above the dial (not hugging its
+// rim), showing which way to drag to increase the value — the spinning blob
+// alone gives no visual cue for that, and testing found people don't
+// intuit it's a rotary control at all. Bold and full-opacity, matching the
+// reference: a simple wide arc with a solid arrowhead, not a subtle ring
+// segment glued to the dial's own curvature.
+const HINT_START_DEG = -48;
+const HINT_END_DEG = 48;
+const HINT_OPACITY = 1;
 
 function pointOnCircle(cx: number, cy: number, r: number, angleDeg: number) {
   const rad = (angleDeg * Math.PI) / 180;
@@ -120,17 +121,16 @@ export const BlobDial: React.FC<Props> = ({
     transform: [{ rotate: `${rotation.value}deg` }],
   }));
 
-  // Fixed (non-rotating) hint arc, following the dial's own curvature just
-  // outside its rim — pushed out far enough that its stroke clears the
-  // rotating orange value dot, but otherwise reading as a short segment of
-  // the same circle rather than a separate shape floating above it.
+  // Fixed (non-rotating) hint arc, floating above the dial with a clear gap
+  // (not tucked against its rim) so it reads as its own arrow pointing at
+  // the dial rather than another ring on it.
   const center = size / 2;
-  const hintRadius = dotRadius + size * 0.08;
+  const hintRadius = dotRadius + size * 0.16;
   const hintStart = pointOnCircle(center, center, hintRadius, HINT_START_DEG);
   const hintEnd = pointOnCircle(center, center, hintRadius, HINT_END_DEG);
   const hintArcPath = `M ${hintStart.x} ${hintStart.y} A ${hintRadius} ${hintRadius} 0 0 1 ${hintEnd.x} ${hintEnd.y}`;
-  const hintStrokeWidth = Math.max(4, size * 0.022);
-  const arrowSize = size * 0.05;
+  const hintStrokeWidth = Math.max(5, size * 0.028);
+  const arrowSize = size * 0.06;
   const arrowTangentDeg = HINT_END_DEG + 90;
   // A chunkier, more solid triangle than a thin caret — wider at the back
   // so it reads as a filled arrowhead even at small dial sizes.
