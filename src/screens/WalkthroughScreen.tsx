@@ -5,7 +5,6 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts, Typography } from '../constants/theme';
-import { MeditatingFlame } from '../components/MeditatingFlame';
 import { useHaptics } from '../hooks/useHaptics';
 
 const { width: W } = Dimensions.get('window');
@@ -17,10 +16,9 @@ interface Props {
 type Slide = {
   title: string;
   body: string;
-  // Either the brand mascot (welcome/streak beats) or a plain Ionicons glyph
-  // in a circular badge (feature beats) — keeps every slide visually
-  // consistent without needing a bespoke illustration per screen.
-  icon: React.ReactNode;
+  // A plain Ionicons glyph in a circular badge — omitted on the welcome
+  // slide, which leads with the wordmark/tagline alone instead of an icon.
+  icon?: React.ReactNode;
 };
 
 // Declared before SLIDES (which references styles.iconBadge in its literal
@@ -65,7 +63,6 @@ const SLIDES: Slide[] = [
   {
     title: 'There is no tomorrow',
     body: "TINT helps you beat procrastination one focused session at a time — no more \"I'll start tomorrow.\"",
-    icon: <MeditatingFlame size={100} />,
   },
   {
     title: 'Deep, distraction-free focus',
@@ -162,7 +159,7 @@ export const WalkthroughScreen: React.FC<Props> = ({ onDone }) => {
       >
         {SLIDES.map((slide, i) => (
           <View key={i} style={[styles.slide, { width: W }]}>
-            <View style={styles.iconWrap}>{slide.icon}</View>
+            {slide.icon && <View style={styles.iconWrap}>{slide.icon}</View>}
             <Text style={styles.title}>{slide.title}</Text>
             <Text style={styles.body}>{slide.body}</Text>
           </View>
