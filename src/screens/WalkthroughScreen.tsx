@@ -1,32 +1,28 @@
 import React, { useRef, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, TextInput,
-  KeyboardAvoidingView, Platform, Animated, Easing,
-  NativeSyntheticEvent, NativeScrollEvent,
+  Animated, Easing, NativeSyntheticEvent, NativeScrollEvent,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts, Typography } from '../constants/theme';
 import { Bonfire } from '../components/Bonfire';
+import { BlobDial } from '../components/BlobDial';
 import { PixelIcon } from '../components/PixelIcon';
+import { PixelFlame } from '../components/PixelFlame';
+import { WalkthroughIcon } from '../components/WalkthroughIcon';
+import { DateWheelPicker } from '../components/DateWheelPicker';
+import { FutureGoal } from '../utils/storage';
 import { useHaptics } from '../hooks/useHaptics';
 
 const { width: W } = Dimensions.get('window');
 
-// Ad hoc for now — not yet part of UserProfile/Supabase, just so the goal
-// someone types on the reality-check screen isn't thrown away the moment
-// they move on. Promote to real profile storage once the persistence story
-// for this field is decided.
-export const YEAR_GOAL_STORAGE_KEY = 'tint:onboarding_year_goal';
-
 interface Props {
-  onDone: () => void;
+  onDone: (futureGoal?: FutureGoal) => void;
 }
 
-// A slow, continuous breathing loop — used on the mock-UI screens (2 and 3)
-// to keep them visibly alive even though, unlike the flame, they have
-// nothing that "naturally" animates on its own.
+// A slow, continuous breathing loop — keeps the mock-UI screens visibly
+// alive even though, unlike the flame, they have nothing that "naturally"
+// animates on its own.
 function usePulse(duration = 1400, min = 0.94, max = 1) {
   const value = useRef(new Animated.Value(min)).current;
   useEffect(() => {
@@ -42,45 +38,50 @@ function usePulse(duration = 1400, min = 0.94, max = 1) {
   return value;
 }
 
-// ── Screen 1 — hook + motivational goal ─────────────────────────────────
-const HookSlide: React.FC = () => (
-  <View style={styles.slideInner}>
-    <View style={styles.flameWrap}>
-      <Bonfire progress={0.75} streak={5} maxHeight={140} />
-    </View>
-    <Text style={styles.eyebrow}>THERE IS NO TOMORROW</Text>
-    <Text style={styles.title}>Whatever you're chasing, it starts today.</Text>
-    <Text style={styles.body}>TINT keeps you locked in on the work that gets you there — one focused day at a time.</Text>
-  </View>
-);
+function useFadeIn(delay: number) {
+  const value = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(value, { toValue: 1, duration: 500, delay, useNativeDriver: true }).start();
+  }, [value, delay]);
+  return value;
+}
 
-// ── Screen 2 — "Lock In" feature tour, with a mocked UI preview ─────────
-const FEATURES: { icon: keyof typeof Ionicons.glyphMap; label: string }[] = [
-  { icon: 'shield-checkmark', label: 'App blocking' },
-  { icon: 'checkbox', label: 'Structured tasks' },
-  { icon: 'timer', label: 'Focus timer' },
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
 ];
+function formatGoalDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${MONTH_NAMES[(m ?? 1) - 1]} ${d}, ${y}`;
+}
 
-const LockInSlide: React.FC = () => {
+// ── Screen 1 — the problem, not a feature pitch ─────────────────────────
+const ProblemSlide: React.FC = () => {
+  const revealOpacity = useFadeIn(700);
+  return (
+    <View style={styles.slideInner}>
+      <View style={styles.flameWrap}>
+        <Bonfire progress={0.5} streak={3} maxHeight={100} />
+      </View>
+      <Text style={styles.title}>You already know what you want to do.</Text>
+      <Text style={styles.bodyStrong}>The problem is actually doing it.</Text>
+      <Animated.Text style={[styles.reveal, { opacity: revealOpacity }]}>That's what TINT is for.</Animated.Text>
+    </View>
+  );
+};
+
+// ── Screen 2 — structure your day ───────────────────────────────────────
+const TaskSlide: React.FC = () => {
   const pulse = usePulse();
   return (
     <View style={styles.slideInner}>
-      <Text style={styles.eyebrow}>LOCK IN</Text>
-      <Text style={styles.title}>Everything you need to lock in.</Text>
-      <Text style={styles.body}>Block distracting apps, structure your tasks, and run a focus timer — all built to keep momentum, not just track it.</Text>
-
-      <View style={styles.featureRow}>
-        {FEATURES.map(f => (
-          <View key={f.label} style={styles.featurePill}>
-            <Ionicons name={f.icon} size={16} color={Colors.pop} />
-            <Text style={styles.featurePillText}>{f.label}</Text>
-          </View>
-        ))}
-      </View>
+      <WalkthroughIcon name="checklist" size={40} style={{ marginBottom: Spacing.md }} />
+      <Text style={styles.eyebrow}>TODAY</Text>
+      <Text style={styles.title}>Know what matters today.</Text>
+      <Text style={styles.body}>Add what you need to do. Mark what matters most. Focus on that first.</Text>
 
       <View style={styles.mockCard}>
         <Text style={styles.mockCardHeader}>TODAY</Text>
-
         <View style={styles.mockTaskRow}>
           <View style={styles.mockCheckbox} />
           <Text style={styles.mockTaskLabel}>Finish practice set</Text>
@@ -88,36 +89,69 @@ const LockInSlide: React.FC = () => {
             <Text style={styles.mockTagText}>High Priority</Text>
           </Animated.View>
         </View>
-
         <View style={styles.mockDivider} />
-
-        <View style={styles.mockTimerRow}>
-          <Ionicons name="timer-outline" size={18} color={Colors.textSecondary} />
-          <Text style={styles.mockTimerLabel}>Focus Timer</Text>
-          <Text style={styles.mockTimerValue}>25:00</Text>
+        <View style={styles.mockTaskRow}>
+          <View style={styles.mockCheckbox} />
+          <Text style={styles.mockTaskLabel}>Review yesterday's mistakes</Text>
         </View>
       </View>
+
+      <Text style={styles.closingLine}>Your future goal is huge. Today's job doesn't have to be.</Text>
     </View>
   );
 };
 
-// ── Screen 3 — friends / compete ────────────────────────────────────────
+// ── Screen 3 — block distractions, the real dial as the visual ─────────
+const FocusSlide: React.FC = () => {
+  const [demoMins, setDemoMins] = useState(25);
+  return (
+    <View style={styles.slideInner}>
+      <WalkthroughIcon name="shield" size={40} style={{ marginBottom: Spacing.md }} />
+      <Text style={styles.eyebrow}>FOCUS</Text>
+      <Text style={styles.title}>Once you decide to focus, protect it.</Text>
+      <Text style={styles.body}>Set your time → lock in → distracting apps stay out of the way.</Text>
+
+      <View style={styles.dialWrap}>
+        <BlobDial
+          size={150}
+          minValue={5}
+          maxValue={120}
+          step={5}
+          value={demoMins}
+          onChange={setDemoMins}
+          formatValue={v => `${v}m`}
+          unitLabel="FOCUS"
+        />
+      </View>
+
+      <Text style={styles.closingLine}>You already decided this time matters. TINT protects that decision.</Text>
+    </View>
+  );
+};
+
+// ── Screen 4 — lock in together ──────────────────────────────────────────
 const MOCK_RANKS: { avatar: string; name: string; streak: number; you?: boolean }[] = [
   { avatar: 'fox', name: 'Aarav', streak: 12 },
   { avatar: 'panda', name: 'You', streak: 9, you: true },
   { avatar: 'owl', name: 'Zara', streak: 7 },
 ];
 
-const CompeteSlide: React.FC = () => {
+const SquadSlide: React.FC = () => {
   const pulse = usePulse(1100, 0.97, 1.03);
   return (
     <View style={styles.slideInner}>
-      <Text style={styles.eyebrow}>COMPETE</Text>
-      <Text style={styles.title}>Who's actually locked in?</Text>
-      <Text style={styles.body}>Add friends and climb the leaderboard together — same exam, same grind, real competition.</Text>
+      <WalkthroughIcon name="trophy" size={40} style={{ marginBottom: Spacing.md }} />
+      <Text style={styles.eyebrow}>SQUAD</Text>
+      <Text style={styles.title}>You're not the only one trying to lock in.</Text>
+      <Text style={styles.body}>Add your friends. See who's locked in. Push each other.</Text>
 
       <View style={styles.mockCard}>
-        <Text style={styles.mockCardHeader}>SQUAD</Text>
+        <View style={styles.mockSquadHeader}>
+          <Text style={styles.mockCardHeader}>SQUAD</Text>
+          <View style={styles.mockAddFriendPill}>
+            <Text style={styles.mockAddFriendText}>+ Add a friend</Text>
+          </View>
+        </View>
         {MOCK_RANKS.map((r, i) => (
           <Animated.View
             key={r.name}
@@ -128,7 +162,7 @@ const CompeteSlide: React.FC = () => {
               <PixelIcon name={r.avatar} size={20} />
             </View>
             <Text style={[styles.mockRankName, r.you && styles.mockRankNameYou]}>{r.name}</Text>
-            <Ionicons name="flame" size={14} color={r.you ? Colors.background : Colors.pop} />
+            <PixelFlame size={14} state="static" />
             <Text style={[styles.mockRankStreak, r.you && styles.mockRankNameYou]}>{r.streak}</Text>
           </Animated.View>
         ))}
@@ -137,41 +171,92 @@ const CompeteSlide: React.FC = () => {
   );
 };
 
-// ── Screen 4 — reality check + interactive goal, ends the walkthrough ──
-const RealitySlide: React.FC<{ goal: string; onChangeGoal: (v: string) => void }> = ({ goal, onChangeGoal }) => (
-  <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.slideInner}>
-    <Text style={styles.eyebrow}>REALITY CHECK</Text>
-    <Text style={styles.title}>Fast forward to December 31st.</Text>
-    <Text style={styles.body}>
-      One version of you kept every promise you made yourself this year. The other's still waiting for "tomorrow." Which one are you?
-    </Text>
+// ── Screen 5 — your future self, the interactive one ────────────────────
+interface FutureSlideProps {
+  goalText: string;
+  onChangeGoalText: (v: string) => void;
+  goalDate: string | null;
+  onOpenDatePicker: () => void;
+  confirmed: boolean;
+  onConfirm: () => void;
+  onLockIn: () => void;
+}
 
-    <View style={styles.goalBox}>
-      <Text style={styles.goalLabel}>THE ONE GOAL YOU'RE LOCKING IN FOR</Text>
-      <TextInput
-        style={styles.goalInput}
-        value={goal}
-        onChangeText={onChangeGoal}
-        placeholder="AIR 1, Rank 1, whatever it is"
-        placeholderTextColor={Colors.textMuted}
-        returnKeyType="done"
-        maxLength={60}
-      />
+const FutureSlide: React.FC<FutureSlideProps> = ({
+  goalText, onChangeGoalText, goalDate, onOpenDatePicker, confirmed, onConfirm, onLockIn,
+}) => {
+  const canConfirm = goalText.trim().length >= 2 && !!goalDate;
+  const revealOpacity = useFadeIn(150);
+
+  if (confirmed && goalDate) {
+    return (
+      <View style={styles.slideInner}>
+        <WalkthroughIcon name="flag" size={44} style={{ marginBottom: Spacing.lg }} />
+        <Animated.View style={{ opacity: revealOpacity, alignItems: 'center' }}>
+          <Text style={styles.revealDate}>{formatGoalDate(goalDate)}</Text>
+          <Text style={styles.revealGoal}>{goalText}</Text>
+          <Text style={styles.revealLine}>That's where you're going.</Text>
+          <Text style={styles.revealLine}>Today is one of the days that gets you there.</Text>
+        </Animated.View>
+        <TouchableOpacity style={styles.lockInBtn} onPress={onLockIn} activeOpacity={0.85}>
+          <Text style={styles.lockInText}>Let's lock in.</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.slideInner}>
+      <Text style={styles.eyebrow}>YOUR FUTURE SELF</Text>
+      <Text style={styles.title}>Where do you want to be?</Text>
+
+      <View style={styles.goalBox}>
+        <Text style={styles.goalLabel}>BY WHEN</Text>
+        <TouchableOpacity style={styles.dateBtn} onPress={onOpenDatePicker} activeOpacity={0.8}>
+          <Text style={goalDate ? styles.dateBtnTextSet : styles.dateBtnTextEmpty}>
+            {goalDate ? formatGoalDate(goalDate) : 'Pick a date'}
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={[styles.goalLabel, { marginTop: Spacing.lg }]}>WHAT YOU'RE GOING FOR</Text>
+        <TextInput
+          style={styles.goalInput}
+          value={goalText}
+          onChangeText={onChangeGoalText}
+          placeholder="UCEED AIR 1, IIT Bombay..."
+          placeholderTextColor={Colors.textMuted}
+          returnKeyType="done"
+          maxLength={60}
+        />
+      </View>
+
+      <TouchableOpacity
+        style={[styles.confirmBtn, !canConfirm && styles.confirmBtnDisabled]}
+        onPress={onConfirm}
+        disabled={!canConfirm}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.confirmText}>That's it.</Text>
+      </TouchableOpacity>
     </View>
-  </KeyboardAvoidingView>
-);
+  );
+};
 
-const SLIDE_COUNT = 4;
+const SLIDE_COUNT = 5;
 const isLastSlide = (index: number) => index === SLIDE_COUNT - 1;
 
-// Short, skippable feature tour shown once on a genuinely first launch —
-// leads with the emotional hook (not a feature explainer), positions
-// blocking/tasks/timer as supporting tools rather than the headline, then
-// closes on an interactive reality-check that actually captures the user's
-// own goal instead of just telling them to set one later.
+// Short, skippable feature tour shown once on a genuinely first launch.
+// Leads with the emotional problem (not a feature pitch), gives each
+// practical piece of TINT its own short beat, then closes on an
+// interactive commitment screen that actually captures the user's own
+// goal — the central idea being future-self -> today's priority -> lock in,
+// not a permanent stream of motivational quotes.
 export const WalkthroughScreen: React.FC<Props> = ({ onDone }) => {
   const [index, setIndex] = useState(0);
-  const [goal, setGoal] = useState('');
+  const [goalText, setGoalText] = useState('');
+  const [goalDate, setGoalDate] = useState<string | null>(null);
+  const [goalConfirmed, setGoalConfirmed] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const { buttonPress } = useHaptics();
 
@@ -187,18 +272,26 @@ export const WalkthroughScreen: React.FC<Props> = ({ onDone }) => {
 
   const handleNext = () => {
     void buttonPress();
-    if (isLastSlide(index)) {
-      const trimmed = goal.trim();
-      if (trimmed) void AsyncStorage.setItem(YEAR_GOAL_STORAGE_KEY, trimmed);
-      onDone();
-    } else {
-      goToIndex(index + 1);
-    }
+    goToIndex(index + 1);
   };
 
   const handleSkip = () => {
     void buttonPress();
     onDone();
+  };
+
+  const handleConfirmGoal = () => {
+    void buttonPress();
+    setGoalConfirmed(true);
+  };
+
+  const handleLockIn = () => {
+    void buttonPress();
+    if (goalDate && goalText.trim()) {
+      onDone({ text: goalText.trim(), targetDate: goalDate });
+    } else {
+      onDone();
+    }
   };
 
   return (
@@ -216,27 +309,48 @@ export const WalkthroughScreen: React.FC<Props> = ({ onDone }) => {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
+        scrollEnabled={!isLastSlide(index)}
         onMomentumScrollEnd={handleMomentumEnd}
         keyboardShouldPersistTaps="handled"
         style={{ flex: 1 }}
       >
-        <View style={{ width: W }}><HookSlide /></View>
-        <View style={{ width: W }}><LockInSlide /></View>
-        <View style={{ width: W }}><CompeteSlide /></View>
-        <View style={{ width: W }}><RealitySlide goal={goal} onChangeGoal={setGoal} /></View>
+        <View style={{ width: W }}><ProblemSlide /></View>
+        <View style={{ width: W }}><TaskSlide /></View>
+        <View style={{ width: W }}><FocusSlide /></View>
+        <View style={{ width: W }}><SquadSlide /></View>
+        <View style={{ width: W }}>
+          <FutureSlide
+            goalText={goalText}
+            onChangeGoalText={setGoalText}
+            goalDate={goalDate}
+            onOpenDatePicker={() => setDatePickerOpen(true)}
+            confirmed={goalConfirmed}
+            onConfirm={handleConfirmGoal}
+            onLockIn={handleLockIn}
+          />
+        </View>
       </ScrollView>
 
-      <View style={styles.footer}>
-        <View style={styles.dots}>
-          {Array.from({ length: SLIDE_COUNT }).map((_, i) => (
-            <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
-          ))}
+      {!isLastSlide(index) && (
+        <View style={styles.footer}>
+          <View style={styles.dots}>
+            {Array.from({ length: SLIDE_COUNT }).map((_, i) => (
+              <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
+            ))}
+          </View>
+          <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
+            <Text style={styles.nextText}>Next</Text>
+          </TouchableOpacity>
         </View>
+      )}
 
-        <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
-          <Text style={styles.nextText}>{isLastSlide(index) ? 'Lock It In' : 'Next'}</Text>
-        </TouchableOpacity>
-      </View>
+      <DateWheelPicker
+        visible={datePickerOpen}
+        initialDate={goalDate ?? undefined}
+        onClose={() => setDatePickerOpen(false)}
+        onConfirm={iso => { setGoalDate(iso); setDatePickerOpen(false); }}
+        title="Where You're Going"
+      />
     </View>
   );
 };
@@ -258,17 +372,21 @@ const styles = StyleSheet.create({
   title: {
     ...Typography.displayMedium, color: Colors.textPrimary, textAlign: 'center', marginBottom: Spacing.md,
   },
+  bodyStrong: {
+    ...Typography.headlineLarge, color: Colors.pop, textAlign: 'center', fontFamily: Fonts.bold,
+  },
   body: {
     ...Typography.bodyLarge, color: Colors.textSecondary, textAlign: 'center',
   },
-
-  featureRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Spacing.sm, marginTop: Spacing.xl },
-  featurePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: Colors.surfaceElevated, borderWidth: 1, borderColor: Colors.border,
-    borderRadius: BorderRadius.full, paddingVertical: 7, paddingHorizontal: 12,
+  reveal: {
+    fontFamily: Fonts.pixel, fontSize: 20, color: Colors.textMuted,
+    letterSpacing: 0.5, textTransform: 'uppercase', textAlign: 'center', marginTop: Spacing.xxl,
   },
-  featurePillText: { fontSize: 12, fontFamily: Fonts.semibold, color: Colors.textPrimary },
+  closingLine: {
+    ...Typography.bodyMedium, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.xl, fontStyle: 'italic',
+  },
+
+  dialWrap: { marginTop: Spacing.lg, marginBottom: Spacing.sm },
 
   mockCard: {
     width: '100%', marginTop: Spacing.xl,
@@ -278,19 +396,23 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '-1.5deg' }],
   },
   mockCardHeader: {
-    fontSize: 11, fontFamily: Fonts.bold, color: Colors.textMuted, letterSpacing: 1.5, marginBottom: Spacing.md,
+    fontSize: 11, fontFamily: Fonts.bold, color: Colors.textMuted, letterSpacing: 1.5,
   },
-  mockTaskRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  mockSquadHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md,
+  },
+  mockAddFriendPill: {
+    backgroundColor: Colors.popGlow, borderRadius: BorderRadius.full, paddingVertical: 4, paddingHorizontal: 10,
+  },
+  mockAddFriendText: { fontSize: 10, fontFamily: Fonts.bold, color: Colors.pop },
+  mockTaskRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.md },
   mockCheckbox: {
     width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: Colors.textMuted,
   },
   mockTaskLabel: { flex: 1, fontSize: 14, fontFamily: Fonts.medium, color: Colors.textPrimary },
   mockTag: { backgroundColor: Colors.popGlow, borderRadius: BorderRadius.sm, paddingVertical: 4, paddingHorizontal: 8 },
   mockTagText: { fontSize: 10, fontFamily: Fonts.bold, color: Colors.pop },
-  mockDivider: { height: 1, backgroundColor: Colors.border, marginVertical: Spacing.md },
-  mockTimerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  mockTimerLabel: { flex: 1, fontSize: 13, fontFamily: Fonts.medium, color: Colors.textSecondary },
-  mockTimerValue: { fontSize: 16, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: 0.5 },
+  mockDivider: { height: 1, backgroundColor: Colors.border, marginTop: Spacing.md },
 
   mockRankRow: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
@@ -308,12 +430,40 @@ const styles = StyleSheet.create({
   mockRankStreak: { fontSize: 13, fontFamily: Fonts.bold, color: Colors.textPrimary },
 
   goalBox: { width: '100%', marginTop: Spacing.xl },
-  goalLabel: { fontSize: 11, fontFamily: Fonts.bold, color: Colors.textMuted, letterSpacing: 1, marginBottom: Spacing.sm, textAlign: 'center' },
+  goalLabel: { fontSize: 11, fontFamily: Fonts.bold, color: Colors.textMuted, letterSpacing: 1, marginBottom: Spacing.sm },
+  dateBtn: {
+    borderWidth: 1.5, borderColor: Colors.border, borderRadius: BorderRadius.md,
+    paddingVertical: 14, paddingHorizontal: Spacing.md,
+  },
+  dateBtnTextEmpty: { fontSize: 16, fontFamily: Fonts.medium, color: Colors.textMuted },
+  dateBtnTextSet: { fontSize: 16, fontFamily: Fonts.semibold, color: Colors.textPrimary },
   goalInput: {
     borderWidth: 1.5, borderColor: Colors.pop, borderRadius: BorderRadius.md,
     paddingVertical: 14, paddingHorizontal: Spacing.md,
-    fontSize: 16, fontFamily: Fonts.semibold, color: Colors.textPrimary, textAlign: 'center',
+    fontSize: 16, fontFamily: Fonts.semibold, color: Colors.textPrimary,
   },
+
+  confirmBtn: {
+    width: '100%', backgroundColor: Colors.pop, borderRadius: BorderRadius.full,
+    paddingVertical: 16, alignItems: 'center', marginTop: Spacing.xxl,
+  },
+  confirmBtnDisabled: { opacity: 0.4 },
+  confirmText: { fontSize: 16, fontFamily: Fonts.bold, color: '#000' },
+
+  revealDate: {
+    fontFamily: Fonts.pixel, fontSize: 30, color: Colors.pop, letterSpacing: 0.5, textAlign: 'center',
+  },
+  revealGoal: {
+    ...Typography.headlineMedium, color: Colors.textPrimary, textAlign: 'center', marginTop: Spacing.sm,
+  },
+  revealLine: {
+    ...Typography.bodyLarge, color: Colors.textSecondary, textAlign: 'center', marginTop: Spacing.lg,
+  },
+  lockInBtn: {
+    width: '100%', backgroundColor: Colors.pop, borderRadius: BorderRadius.full,
+    paddingVertical: 18, alignItems: 'center', marginTop: Spacing.xxl,
+  },
+  lockInText: { fontSize: 17, fontFamily: Fonts.bold, color: '#000' },
 
   footer: { paddingHorizontal: Spacing.xl, paddingBottom: 48, alignItems: 'center', gap: Spacing.xl },
   dots: { flexDirection: 'row', gap: 8 },

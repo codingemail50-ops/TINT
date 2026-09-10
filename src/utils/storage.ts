@@ -2,6 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Task, CustomExam } from '../data/examPresets';
 import { now as devNow } from './devClock';
 
+export interface FutureGoal {
+  /** What they're working toward — freeform, e.g. "UCEED AIR 1". */
+  text: string;
+  /** ISO date (YYYY-MM-DD) they're aiming for it by. */
+  targetDate: string;
+}
+
 export interface UserProfile {
   name: string;
   email: string;
@@ -11,6 +18,9 @@ export interface UserProfile {
   dailyFocusGoalMins: number;
   /** Set instead of (or alongside) examTypes when picked via "Other". */
   customExam?: CustomExam;
+  /** Set on the walkthrough's final screen — null for anyone who skipped
+   *  the walkthrough or onboarded before this field existed. */
+  futureGoal?: FutureGoal | null;
 }
 
 export interface DayRecord {

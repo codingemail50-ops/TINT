@@ -69,12 +69,16 @@ interface Props {
   initialDate?: string;
   onClose: () => void;
   onConfirm: (isoDate: string) => void;
+  /** Defaults to this component's original (only) use case — exam-date
+   *  entry. Overridable so other callers (e.g. the walkthrough's own
+   *  future-goal date) aren't stuck with a modal that says "Exam Date". */
+  title?: string;
 }
 
 // Replaces a free-text "YYYY-MM-DD" field (easy to mistype into something
 // that silently fails a format check) with three scroll wheels that can
 // only ever produce a valid, correctly-formatted date.
-export const DateWheelPicker: React.FC<Props> = ({ visible, initialDate, onClose, onConfirm }) => {
+export const DateWheelPicker: React.FC<Props> = ({ visible, initialDate, onClose, onConfirm, title = 'Exam Date' }) => {
   const seed = initialDate ? new Date(initialDate + 'T00:00:00') : new Date();
   const validSeed = isNaN(seed.getTime()) ? new Date() : seed;
   const currentYear = new Date().getFullYear();
@@ -100,7 +104,7 @@ export const DateWheelPicker: React.FC<Props> = ({ visible, initialDate, onClose
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
-          <Text style={styles.title}>Exam Date</Text>
+          <Text style={styles.title}>{title}</Text>
 
           <View style={styles.wheelRow}>
             <View style={styles.highlightBox} pointerEvents="none" />

@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, BorderRadius } from '../constants/theme';
+import { WalkthroughScreen } from '../screens/WalkthroughScreen';
 import { AvatarExamScreen } from '../screens/AvatarExamScreen';
 import { FocusGoalScreen } from '../screens/FocusGoalScreen';
 import { CreateAccountScreen } from '../screens/CreateAccountScreen';
@@ -12,7 +13,7 @@ import { FocusScreen } from '../screens/FocusScreen';
 import { ProductivityScreen } from '../screens/ProductivityScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
-import { StorageService, AppState, UserProfile } from '../utils/storage';
+import { StorageService, AppState, UserProfile, FutureGoal } from '../utils/storage';
 import { ExamType, CustomExam } from '../data/examPresets';
 import { supabase } from '../lib/supabase';
 import { FocusSessionProvider, useFocusSessionStatus } from '../context/FocusSessionContext';
@@ -64,7 +65,7 @@ async function ensureSession(): Promise<string | null> {
 }
 
 type Screen =
-  | 'boot' | 'avatarExam' | 'focusGoal' | 'createAccount'
+  | 'boot' | 'walkthrough' | 'avatarExam' | 'focusGoal' | 'createAccount'
   | 'todo' | 'focus' | 'productivity' | 'leaderboard' | 'profile';
 
 const TAB_CONFIG = [
@@ -78,7 +79,7 @@ const TAB_CONFIG = [
 // the bottom tab bar must not paint over onboarding screens — every launch
 // goes through onboarding now (see FORCE_ONBOARDING_ON_LAUNCH below), so
 // this fires on ordinary use, not just first installs.
-const ONBOARDING_SCREENS = new Set<Screen>(['avatarExam', 'focusGoal', 'createAccount']);
+const ONBOARDING_SCREENS = new Set<Screen>(['walkthrough', 'avatarExam', 'focusGoal', 'createAccount']);
 
 interface OnboardingDraft {
   avatar: string;
@@ -87,6 +88,7 @@ interface OnboardingDraft {
   dailyFocusGoalMins: number;
   name: string;
   email: string;
+  futureGoal?: FutureGoal;
 }
 
 export const AppNavigator: React.FC = () => (
@@ -163,9 +165,11 @@ const AppNavigatorInner: React.FC = () => {
         }
       }
 
-      // Walkthrough is disabled for now (see render below) while it gets
-      // redesigned — straight to avatarExam like before it existed.
-      setScreen('avatarExam');
+      // The one genuinely "first launch" branch — no cloud profile, no local
+      // user either. Everywhere else that lands on avatarExam (post-logout,
+      // post-login-without-a-profile) is a returning person, not a
+      // first-time one, so the walkthrough only shows here.
+      setScreen('walkthrough');
     })();
   }, []);
 
@@ -177,6 +181,15 @@ const AppNavigatorInner: React.FC = () => {
   }), []);
 
   const navigateTo = (s: Screen) => setScreen(s);
+
+  // Walkthrough's own final screen collects the one thing onboarding itself
+  // never asked for — what they're actually using TINT to get to. Carried
+  // in the draft alongside everything else and saved together at the very
+  // end (finishOnboarding), not written anywhere on its own.
+  const handleWalkthroughDone = (futureGoal?: FutureGoal) => {
+    draftRef.current.futureGoal = futureGoal;
+    setScreen('avatarExam');
+  };
 
   // ── Onboarding flow: avatarExam -> createAccount -> focusGoal ────────────
   const handleAvatarExamComplete = (data: { avatar: string; examTypes: ExamType[]; customExam?: CustomExam }) => {
@@ -211,8 +224,11 @@ const AppNavigatorInner: React.FC = () => {
   // app the same way a returning user does.
   const handleFocusGoalComplete = (mins: number) => {
     draftRef.current.dailyFocusGoalMins = mins;
-    const { avatar, examTypes, customExam, name, email } = draftRef.current;
-    finishOnboarding({ name, email, examTypes, customExam, avatar, createdAt: new Date().toISOString(), dailyFocusGoalMins: mins });
+    const { avatar, examTypes, customExam, name, email, futureGoal } = draftRef.current;
+    finishOnboarding({
+      name, email, examTypes, customExam, avatar, futureGoal: futureGoal ?? null,
+      createdAt: new Date().toISOString(), dailyFocusGoalMins: mins,
+    });
   };
 
   const finishOnboarding = (user: UserProfile) => {
@@ -374,6 +390,9 @@ const AppNavigatorInner: React.FC = () => {
     <View style={styles.root}>
       <GestureDetector gesture={swipeGesture}>
         <View style={styles.swipeArea}>
+          {screen === 'walkthrough' && (
+            <WalkthroughScreen onDone={handleWalkthroughDone} />
+          )}
           {screen === 'avatarExam' && (
             <AvatarExamScreen
               onComplete={handleAvatarExamComplete}

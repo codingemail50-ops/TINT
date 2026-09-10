@@ -21,6 +21,8 @@ interface UserDataRow {
   focus_today_mins?: number;
   focus_week_mins?: number;
   focus_alltime_mins?: number;
+  future_goal_text?: string | null;
+  future_goal_date?: string | null;
 }
 
 // ── Save a brand-new user to Supabase (upsert) ───────────────────────────────
@@ -52,6 +54,8 @@ export async function saveNewUserToSupabase(
       today_tasks: null,
       today_tasks_date: null,
       daily_focus_goal_mins: profile.dailyFocusGoalMins,
+      future_goal_text: profile.futureGoal?.text ?? null,
+      future_goal_date: profile.futureGoal?.targetDate ?? null,
     };
 
     const { error } = await supabase
@@ -100,6 +104,9 @@ export async function loadUserFromSupabase(userId: string): Promise<AppState | n
       avatar: row.avatar ?? 'star',
       createdAt: new Date().toISOString(),
       dailyFocusGoalMins: row.daily_focus_goal_mins ?? 60,
+      futureGoal: row.future_goal_text && row.future_goal_date
+        ? { text: row.future_goal_text, targetDate: row.future_goal_date }
+        : null,
     };
 
     const appState: AppState = {
@@ -145,6 +152,10 @@ export async function syncAppStateToSupabase(
       updates.avatar = appState.user.avatar;
       updates.exams = appState.user.examTypes;
       updates.daily_focus_goal_mins = appState.user.dailyFocusGoalMins;
+      if (appState.user.futureGoal !== undefined) {
+        updates.future_goal_text = appState.user.futureGoal?.text ?? null;
+        updates.future_goal_date = appState.user.futureGoal?.targetDate ?? null;
+      }
     }
 
     const { error } = await supabase
