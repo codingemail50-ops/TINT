@@ -1,12 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, TextInput, Image,
   Animated, Easing, NativeSyntheticEvent, NativeScrollEvent,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Colors, Spacing, BorderRadius, Fonts, Typography } from '../constants/theme';
 import { Bonfire } from '../components/Bonfire';
-import { BlobDial } from '../components/BlobDial';
 import { PixelIcon } from '../components/PixelIcon';
 import { PixelFlame } from '../components/PixelFlame';
 import { WalkthroughIcon } from '../components/WalkthroughIcon';
@@ -15,6 +14,14 @@ import { FutureGoal } from '../utils/storage';
 import { useHaptics } from '../hooks/useHaptics';
 
 const { width: W } = Dimensions.get('window');
+
+// Native <Image> sizing via aspectRatio + percentage width doesn't reliably
+// scale on RN Web (it falls back to the source's raw pixel height), so the
+// screenshot assets below are sized with explicit computed pixel dimensions.
+const TASK_IMG_W = W * 0.78;
+const TASK_IMG_H = TASK_IMG_W * (1270 / 980);
+const DIAL_IMG_W = W * 0.46;
+const DIAL_IMG_H = DIAL_IMG_W * (610 / 710);
 
 interface Props {
   onDone: (futureGoal?: FutureGoal) => void;
@@ -63,8 +70,7 @@ const ProblemSlide: React.FC = () => {
       <View style={styles.flameWrap}>
         <Bonfire progress={0.5} streak={3} maxHeight={100} />
       </View>
-      <Text style={styles.title}>You already know what you want to do.</Text>
-      <Text style={styles.bodyStrong}>The problem is actually doing it.</Text>
+      <Text style={styles.title}>You know what you want to do, but you're not able to do it.</Text>
       <Animated.Text style={[styles.reveal, { opacity: revealOpacity }]}>That's what TINT is for.</Animated.Text>
     </View>
   );
@@ -72,59 +78,36 @@ const ProblemSlide: React.FC = () => {
 
 // ── Screen 2 — structure your day ───────────────────────────────────────
 const TaskSlide: React.FC = () => {
-  const pulse = usePulse();
   return (
     <View style={styles.slideInner}>
       <WalkthroughIcon name="checklist" size={40} style={{ marginBottom: Spacing.md }} />
       <Text style={styles.eyebrow}>TODAY</Text>
-      <Text style={styles.title}>Know what matters today.</Text>
-      <Text style={styles.body}>Add what you need to do. Mark what matters most. Focus on that first.</Text>
+      <Text style={styles.title}>Prioritize your tasks.</Text>
+      <Text style={styles.bodyBig}>Add what you need to do. Mark what matters most. Focus on that first.</Text>
 
-      <View style={styles.mockCard}>
-        <Text style={styles.mockCardHeader}>TODAY</Text>
-        <View style={styles.mockTaskRow}>
-          <View style={styles.mockCheckbox} />
-          <Text style={styles.mockTaskLabel}>Finish practice set</Text>
-          <Animated.View style={[styles.mockTag, { transform: [{ scale: pulse }] }]}>
-            <Text style={styles.mockTagText}>High Priority</Text>
-          </Animated.View>
-        </View>
-        <View style={styles.mockDivider} />
-        <View style={styles.mockTaskRow}>
-          <View style={styles.mockCheckbox} />
-          <Text style={styles.mockTaskLabel}>Review yesterday's mistakes</Text>
-        </View>
-      </View>
-
-      <Text style={styles.closingLine}>Your future goal is huge. Today's job doesn't have to be.</Text>
+      <Image
+        source={require('../../assets/walkthrough/task-panels.png')}
+        style={styles.screenshotTask}
+        resizeMode="contain"
+      />
     </View>
   );
 };
 
 // ── Screen 3 — block distractions, the real dial as the visual ─────────
 const FocusSlide: React.FC = () => {
-  const [demoMins, setDemoMins] = useState(25);
   return (
     <View style={styles.slideInner}>
       <WalkthroughIcon name="shield" size={40} style={{ marginBottom: Spacing.md }} />
       <Text style={styles.eyebrow}>FOCUS</Text>
-      <Text style={styles.title}>Once you decide to focus, protect it.</Text>
-      <Text style={styles.body}>Set your time → lock in → distracting apps stay out of the way.</Text>
+      <Text style={styles.title}>We've locked in, but we need to stay locked in.</Text>
+      <Text style={styles.body}>Set your time. Block all distractions. Get the real dopamine hit that you're one step closer to your goal — every day.</Text>
 
-      <View style={styles.dialWrap}>
-        <BlobDial
-          size={150}
-          minValue={5}
-          maxValue={120}
-          step={5}
-          value={demoMins}
-          onChange={setDemoMins}
-          formatValue={v => `${v}m`}
-          unitLabel="FOCUS"
-        />
-      </View>
-
-      <Text style={styles.closingLine}>You already decided this time matters. TINT protects that decision.</Text>
+      <Image
+        source={require('../../assets/walkthrough/focus-dial.png')}
+        style={styles.screenshotDial}
+        resizeMode="contain"
+      />
     </View>
   );
 };
@@ -142,10 +125,10 @@ const SquadSlide: React.FC = () => {
     <View style={styles.slideInner}>
       <WalkthroughIcon name="trophy" size={40} style={{ marginBottom: Spacing.md }} />
       <Text style={styles.eyebrow}>SQUAD</Text>
-      <Text style={styles.title}>You're not the only one trying to lock in.</Text>
-      <Text style={styles.body}>Add your friends. See who's locked in. Push each other.</Text>
+      <Text style={styles.title}>Find out who's actually putting in the hours.</Text>
+      <Text style={styles.body}>Add your friends. Push each other's limits. Lock in together.</Text>
 
-      <View style={styles.mockCard}>
+      <View style={[styles.mockCard, styles.mockCardLower]}>
         <View style={styles.mockSquadHeader}>
           <Text style={styles.mockCardHeader}>SQUAD</Text>
           <View style={styles.mockAddFriendPill}>
@@ -257,6 +240,7 @@ export const WalkthroughScreen: React.FC<Props> = ({ onDone }) => {
   const [goalDate, setGoalDate] = useState<string | null>(null);
   const [goalConfirmed, setGoalConfirmed] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [pageHeight, setPageHeight] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const { buttonPress } = useHaptics();
 
@@ -311,14 +295,15 @@ export const WalkthroughScreen: React.FC<Props> = ({ onDone }) => {
         showsHorizontalScrollIndicator={false}
         scrollEnabled={!isLastSlide(index)}
         onMomentumScrollEnd={handleMomentumEnd}
+        onLayout={e => setPageHeight(e.nativeEvent.layout.height)}
         keyboardShouldPersistTaps="handled"
         style={{ flex: 1 }}
       >
-        <View style={{ width: W }}><ProblemSlide /></View>
-        <View style={{ width: W }}><TaskSlide /></View>
-        <View style={{ width: W }}><FocusSlide /></View>
-        <View style={{ width: W }}><SquadSlide /></View>
-        <View style={{ width: W }}>
+        <View style={{ width: W, height: pageHeight || undefined }}><ProblemSlide /></View>
+        <View style={{ width: W, height: pageHeight || undefined }}><TaskSlide /></View>
+        <View style={{ width: W, height: pageHeight || undefined }}><FocusSlide /></View>
+        <View style={{ width: W, height: pageHeight || undefined }}><SquadSlide /></View>
+        <View style={{ width: W, height: pageHeight || undefined }}>
           <FutureSlide
             goalText={goalText}
             onChangeGoalText={setGoalText}
@@ -361,7 +346,7 @@ const styles = StyleSheet.create({
   skipBtn: { position: 'absolute', top: 58, right: Spacing.xl, zIndex: 2 },
   skipText: { fontSize: 15, color: Colors.textSecondary, fontFamily: Fonts.medium },
 
-  slideInner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xl, paddingTop: 70 },
+  slideInner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xl },
 
   flameWrap: { marginBottom: Spacing.lg },
 
@@ -372,21 +357,19 @@ const styles = StyleSheet.create({
   title: {
     ...Typography.displayMedium, color: Colors.textPrimary, textAlign: 'center', marginBottom: Spacing.md,
   },
-  bodyStrong: {
-    ...Typography.headlineLarge, color: Colors.pop, textAlign: 'center', fontFamily: Fonts.bold,
-  },
   body: {
     ...Typography.bodyLarge, color: Colors.textSecondary, textAlign: 'center',
   },
+  bodyBig: {
+    ...Typography.headlineMedium, color: Colors.textSecondary, textAlign: 'center', fontFamily: Fonts.medium,
+  },
   reveal: {
-    fontFamily: Fonts.pixel, fontSize: 20, color: Colors.textMuted,
+    fontFamily: Fonts.pixel, fontSize: 22, color: Colors.textPrimary,
     letterSpacing: 0.5, textTransform: 'uppercase', textAlign: 'center', marginTop: Spacing.xxl,
   },
-  closingLine: {
-    ...Typography.bodyMedium, color: Colors.textMuted, textAlign: 'center', marginTop: Spacing.xl, fontStyle: 'italic',
-  },
 
-  dialWrap: { marginTop: Spacing.lg, marginBottom: Spacing.sm },
+  screenshotTask: { width: TASK_IMG_W, height: TASK_IMG_H, marginTop: Spacing.lg },
+  screenshotDial: { width: DIAL_IMG_W, height: DIAL_IMG_H, marginTop: Spacing.lg },
 
   mockCard: {
     width: '100%', marginTop: Spacing.xl,
@@ -395,6 +378,7 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     transform: [{ rotate: '-1.5deg' }],
   },
+  mockCardLower: { marginTop: Spacing.xxl },
   mockCardHeader: {
     fontSize: 11, fontFamily: Fonts.bold, color: Colors.textMuted, letterSpacing: 1.5,
   },
@@ -405,14 +389,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.popGlow, borderRadius: BorderRadius.full, paddingVertical: 4, paddingHorizontal: 10,
   },
   mockAddFriendText: { fontSize: 10, fontFamily: Fonts.bold, color: Colors.pop },
-  mockTaskRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.md },
-  mockCheckbox: {
-    width: 18, height: 18, borderRadius: 5, borderWidth: 1.5, borderColor: Colors.textMuted,
-  },
-  mockTaskLabel: { flex: 1, fontSize: 14, fontFamily: Fonts.medium, color: Colors.textPrimary },
-  mockTag: { backgroundColor: Colors.popGlow, borderRadius: BorderRadius.sm, paddingVertical: 4, paddingHorizontal: 8 },
-  mockTagText: { fontSize: 10, fontFamily: Fonts.bold, color: Colors.pop },
-  mockDivider: { height: 1, backgroundColor: Colors.border, marginTop: Spacing.md },
 
   mockRankRow: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
