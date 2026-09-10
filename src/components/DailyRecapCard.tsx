@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Share } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { useHaptics } from '../hooks/useHaptics';
@@ -25,8 +26,16 @@ export const DailyRecapCard: React.FC<Props> = ({ visible, data, onClose }) => {
     await buttonPress();
     setSharing(true);
     try {
+      // React Native's own core Share.share() only ever reads title/message
+      // on Android — its "url" field is silently dropped there (iOS-only),
+      // so it can't actually attach the captured image to the share sheet
+      // on the one platform this app ships on. expo-sharing's shareAsync()
+      // is built specifically for handing a local file to the native share
+      // sheet on both platforms, FileProvider handling included.
       const uri = await captureRef(cardRef, { format: 'png', quality: 1 });
-      await Share.share({ url: uri, message: 'My TINT day.' });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share your day' });
+      }
     } catch {
       // Sharing is a nice-to-have here — a failed capture/share shouldn't
       // trap the user behind a broken button, the card is still on screen.

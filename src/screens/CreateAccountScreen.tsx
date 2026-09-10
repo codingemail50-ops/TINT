@@ -179,11 +179,7 @@ export const CreateAccountScreen: React.FC<Props> = ({
 
       // Same convention as the email/password login path: hasProfile=true,
       // and AppNavigator's existing fallback routes a brand-new user (no
-      // cloud profile row yet) into onboarding instead of crashing. Passing
-      // the email along too lets that fallback skip straight past this
-      // screen's credential form on the way back through (see
-      // skipCredentials above) — there's no TINT password to create when
-      // Google already authenticated this account.
+      // cloud profile row yet) into onboarding instead of crashing.
       onLoggedIn(true, data.user?.id, data.user?.email ?? undefined);
     } catch (err: any) {
       const code = isErrorWithCode?.(err) ? err.code : null;
