@@ -22,7 +22,7 @@ type Mode = 'signup' | 'login';
 
 interface Props {
   /** Signed up (or upgraded the anonymous session) with a username to attach. */
-  onSignedUp: (data: { name: string; email: string }) => void;
+  onSignedUp: (data: { name: string; email: string; userId?: string }) => void;
   /** Logged into an existing account — hasProfile tells the caller whether
    *  to skip the rest of onboarding (avatar/goal already set) or not. */
   onLoggedIn: (hasProfile: boolean, userId?: string, googleEmail?: string) => void;
@@ -111,14 +111,25 @@ export const CreateAccountScreen: React.FC<Props> = ({
         // network latency for no benefit (ensureSession() on boot already
         // established this exact session).
         const { data: { session: current } } = await withTimeout(supabase.auth.getSession());
+        let userId: string | undefined;
         if (current?.user?.is_anonymous) {
           const { error: upgradeErr } = await withTimeout(supabase.auth.updateUser({ email: email.trim(), password }));
           if (upgradeErr) throw upgradeErr;
+          // Upgrading an anonymous session keeps its existing id.
+          userId = current.user.id;
         } else {
-          const { error: signUpErr } = await withTimeout(supabase.auth.signUp({ email: email.trim(), password }));
+          const { data: signUpData, error: signUpErr } = await withTimeout(supabase.auth.signUp({ email: email.trim(), password }));
           if (signUpErr) throw signUpErr;
+          userId = signUpData.user?.id;
         }
-        onSignedUp({ name: username.trim(), email: email.trim() });
+        // Passing this straight through means the profile row that finishes
+        // onboarding writes to Supabase uses the id this exact signup call
+        // just returned, instead of a separate ensureSession() call later
+        // possibly failing independently and silently — which was leaving
+        // some accounts authenticated but with no profile row at all, so
+        // every future login found "nothing to load" and bounced back to
+        // onboarding as if they'd never signed up.
+        onSignedUp({ name: username.trim(), email: email.trim(), userId });
       } else {
         const { data: loginData, error: loginErr } = await withTimeout(supabase.auth.signInWithPassword({ email: email.trim(), password }));
         if (loginErr) throw loginErr;

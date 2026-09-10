@@ -290,9 +290,16 @@ const AppNavigatorInner: React.FC = () => {
       });
   };
 
-  const handleSignedUp = ({ name, email }: { name: string; email: string }) => {
+  const handleSignedUp = ({ name, email, userId }: { name: string; email: string; userId?: string }) => {
     draftRef.current.name = name;
     draftRef.current.email = email;
+    // Trust the id the signup call itself returned over whatever boot's
+    // ensureSession() came up with — if that ran into the same slow/flaky
+    // network this whole flow has been fighting, userIdRef could still be
+    // null here, and finishOnboarding's own fallback re-fetch is one more
+    // thing that could independently fail and leave the account with no
+    // profile row at all.
+    if (userId) userIdRef.current = userId;
     setScreen('focusGoal');
   };
 
