@@ -136,6 +136,15 @@ export const CreateAccountScreen: React.FC<Props> = ({
     setError('');
     setLoading(true);
     try {
+      // Google Play Services caches which account was used for this app
+      // last time and, without this, silently reuses it on every future
+      // signIn() call instead of showing the account picker at all — the
+      // documented way to force the chooser back open is to sign out of
+      // the native Google session immediately beforehand. This only clears
+      // the cached *native* selection, not the actual TINT/Supabase
+      // session, so it's safe to call unconditionally (including the very
+      // first time, when there's nothing to sign out of).
+      try { await GoogleSignin.signOut(); } catch {}
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const response = await GoogleSignin.signIn();
       if (!isSuccessResponse?.(response)) {
