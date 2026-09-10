@@ -19,7 +19,7 @@ const { width: W } = Dimensions.get('window');
 // scale on RN Web (it falls back to the source's raw pixel height), so the
 // screenshot assets below are sized with explicit computed pixel dimensions.
 const TASK_IMG_W = W * 0.78;
-const TASK_IMG_H = TASK_IMG_W * (1270 / 980);
+const TASK_IMG_H = TASK_IMG_W * (1170 / 980);
 const DIAL_IMG_W = W * 0.46;
 const DIAL_IMG_H = DIAL_IMG_W * (610 / 710);
 
