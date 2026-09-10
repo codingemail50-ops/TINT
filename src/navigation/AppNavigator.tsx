@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, ActivityIndicator } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -296,12 +296,6 @@ const AppNavigatorInner: React.FC = () => {
     setScreen('focusGoal');
   };
 
-  const handleGuestNamed = ({ name }: { name: string }) => {
-    draftRef.current.name = name;
-    draftRef.current.email = '';
-    setScreen('focusGoal');
-  };
-
   const handleLoggedIn = async (hasProfile: boolean, userId?: string, googleEmail?: string) => {
     // signInWithPassword's own response already carries the user id — a
     // separate getUser() call here was a fully redundant network round
@@ -309,12 +303,21 @@ const AppNavigatorInner: React.FC = () => {
     if (userId) {
       userIdRef.current = userId;
     } else {
-      const { data: { user } } = await supabase.auth.getUser();
+      const TIMED_OUT = Symbol('timed-out');
+      const result = await Promise.race([
+        supabase.auth.getUser(),
+        new Promise<typeof TIMED_OUT>(resolve => setTimeout(() => resolve(TIMED_OUT), 8000)),
+      ]);
+      const user = result === TIMED_OUT ? null : result.data.user;
       userIdRef.current = user?.id ?? userIdRef.current;
     }
 
     if (hasProfile && userIdRef.current) {
-      const loaded = await loadUserFromSupabase(userIdRef.current);
+      // Bounded the same way as the boot-time load — without this, a
+      // slow/cold connection left the screen stuck on whatever it was
+      // showing (createAccount, mid Google sign-in) with no error and no
+      // way forward, since nothing here ever timed out on its own.
+      const loaded = await withTimeout(loadUserFromSupabase(userIdRef.current), 8000, null);
       if (loaded) {
         // Same cross-account leak finishOnboarding already guards against
         // (local storage isn't namespaced per-account) — but that only
@@ -407,6 +410,11 @@ const AppNavigatorInner: React.FC = () => {
     <View style={styles.root}>
       <GestureDetector gesture={swipeGesture}>
         <View style={styles.swipeArea}>
+          {screen === 'boot' && (
+            <View style={styles.bootScreen}>
+              <ActivityIndicator color={Colors.pop} size="small" />
+            </View>
+          )}
           {screen === 'walkthrough' && (
             <WalkthroughScreen onDone={handleWalkthroughDone} />
           )}
@@ -419,7 +427,6 @@ const AppNavigatorInner: React.FC = () => {
           {screen === 'createAccount' && (
             <CreateAccountScreen
               onSignedUp={handleSignedUp}
-              onGuest={handleGuestNamed}
               onLoggedIn={handleLoggedIn}
               onBack={loginShortcut ? undefined : () => setScreen('avatarExam')}
               initialMode={loginShortcut ? 'login' : 'signup'}
@@ -544,6 +551,12 @@ const styles = StyleSheet.create({
   },
   swipeArea: {
     flex: 1,
+  },
+  // Boot resolves within a few seconds even on a bad connection (see the
+  // timeouts above), but rendering literally nothing here for that whole
+  // stretch reads as the app being frozen rather than loading.
+  bootScreen: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
   },
   tabScreenSlot: {
     ...StyleSheet.absoluteFillObject,

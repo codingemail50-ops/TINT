@@ -23,8 +23,6 @@ type Mode = 'signup' | 'login';
 interface Props {
   /** Signed up (or upgraded the anonymous session) with a username to attach. */
   onSignedUp: (data: { name: string; email: string }) => void;
-  /** Stayed anonymous, but still picked a username. */
-  onGuest: (data: { name: string }) => void;
   /** Logged into an existing account — hasProfile tells the caller whether
    *  to skip the rest of onboarding (avatar/goal already set) or not. */
   onLoggedIn: (hasProfile: boolean, userId?: string, googleEmail?: string) => void;
@@ -34,6 +32,22 @@ interface Props {
    *  background, rows alternating direction. Omitted for the direct-login
    *  shortcut, which skips step 1. */
   avatar?: string;
+}
+
+// Supabase's client has no built-in request timeout, and these auth calls
+// are the one thing standing between tapping Sign Up/Log In and getting
+// into the app — a slow/cold connection left them hanging with the button
+// stuck on its loading spinner and no way to tell it wasn't ever going to
+// resolve. Rejecting after `ms` turns that into a normal, retryable error.
+const AUTH_TIMEOUT_MS = 15000;
+function withTimeout<T>(promise: Promise<T>, ms = AUTH_TIMEOUT_MS): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Request timed out — check your connection and try again.')), ms);
+    promise.then(
+      value => { clearTimeout(timer); resolve(value); },
+      err => { clearTimeout(timer); reject(err); },
+    );
+  });
 }
 
 function friendlyError(message: string): string {
@@ -56,7 +70,7 @@ function friendlyError(message: string): string {
 // stay anonymous. Google Sign-In only functions on a native Android build
 // (see ../utils/googleAuth.ts) — Expo Go/web show a clear "not available" alert instead.
 export const CreateAccountScreen: React.FC<Props> = ({
-  onSignedUp, onGuest, onLoggedIn, onBack, initialMode = 'signup', avatar,
+  onSignedUp, onLoggedIn, onBack, initialMode = 'signup', avatar,
 }) => {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [username, setUsername] = useState('');
@@ -84,8 +98,6 @@ export const CreateAccountScreen: React.FC<Props> = ({
   const canSubmit = !loading && (mode === 'login'
     ? email.trim().length > 3 && password.length >= 6
     : usernameOk && email.trim().length > 3 && password.length >= 6);
-  const canContinueGuest = mode === 'signup' && usernameOk && !loading;
-
   const handleSubmit = async () => {
     if (!canSubmit) return;
     await buttonPress();
@@ -93,17 +105,22 @@ export const CreateAccountScreen: React.FC<Props> = ({
     setLoading(true);
     try {
       if (mode === 'signup') {
-        const { data: { user: current } } = await supabase.auth.getUser();
-        if (current?.is_anonymous) {
-          const { error: upgradeErr } = await supabase.auth.updateUser({ email: email.trim(), password });
+        // getSession() reads the already-persisted local session (no
+        // network round trip) — getUser() deliberately re-validates against
+        // Supabase's server on every call, which was doubling this step's
+        // network latency for no benefit (ensureSession() on boot already
+        // established this exact session).
+        const { data: { session: current } } = await withTimeout(supabase.auth.getSession());
+        if (current?.user?.is_anonymous) {
+          const { error: upgradeErr } = await withTimeout(supabase.auth.updateUser({ email: email.trim(), password }));
           if (upgradeErr) throw upgradeErr;
         } else {
-          const { error: signUpErr } = await supabase.auth.signUp({ email: email.trim(), password });
+          const { error: signUpErr } = await withTimeout(supabase.auth.signUp({ email: email.trim(), password }));
           if (signUpErr) throw signUpErr;
         }
         onSignedUp({ name: username.trim(), email: email.trim() });
       } else {
-        const { data: loginData, error: loginErr } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        const { data: loginData, error: loginErr } = await withTimeout(supabase.auth.signInWithPassword({ email: email.trim(), password }));
         if (loginErr) throw loginErr;
         onLoggedIn(true, loginData.user?.id);
       }
@@ -112,12 +129,6 @@ export const CreateAccountScreen: React.FC<Props> = ({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleGuest = async () => {
-    if (!canContinueGuest) return;
-    await buttonPress();
-    onGuest({ name: username.trim() });
   };
 
   const handleGoogle = async () => {
@@ -154,7 +165,7 @@ export const CreateAccountScreen: React.FC<Props> = ({
       const idToken = response.data.idToken;
       if (!idToken) throw new Error('Google did not return an ID token.');
 
-      const { data, error: supaError } = await supabase.auth.signInWithIdToken({ provider: 'google', token: idToken });
+      const { data, error: supaError } = await withTimeout(supabase.auth.signInWithIdToken({ provider: 'google', token: idToken }));
       if (supaError) throw supaError;
 
       // Whatever's sitting in the TINT-account fields above (even
@@ -309,12 +320,6 @@ export const CreateAccountScreen: React.FC<Props> = ({
             <Text style={styles.switchLink}>{mode === 'signup' ? 'Log in' : 'Sign up'}</Text>
           </Text>
         </TouchableOpacity>
-
-        {mode === 'signup' && (
-          <TouchableOpacity onPress={handleGuest} disabled={!canContinueGuest} style={styles.guestRow}>
-            <Text style={[styles.guestText, !canContinueGuest && { opacity: 0.4 }]}>Continue as guest</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -379,7 +384,4 @@ const styles = StyleSheet.create({
   switchRow: { alignItems: 'center' },
   switchText: { fontSize: 14, color: Colors.textSecondary, fontFamily: Fonts.regular },
   switchLink: { color: Colors.primary, fontFamily: Fonts.semibold },
-
-  guestRow: { alignItems: 'center', paddingTop: Spacing.md },
-  guestText: { fontSize: 13, color: Colors.textMuted, textDecorationLine: 'underline', fontFamily: Fonts.regular },
 });
