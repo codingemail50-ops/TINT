@@ -142,7 +142,6 @@ export const FocusScreen: React.FC<Props> = ({
   phaseRef.current = phase;
   pausedRef.current = paused;
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;
   const dialFadeAnim = useRef(new Animated.Value(1)).current;
   const blobEnterAnim = useRef(new Animated.Value(1)).current;
   const { taskComplete, buttonPress } = useHaptics();
@@ -170,8 +169,6 @@ export const FocusScreen: React.FC<Props> = ({
   }, []);
 
   useEffect(() => {
-    Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(KEYS.BLOCKED_APPS);
@@ -533,7 +530,6 @@ export const FocusScreen: React.FC<Props> = ({
 
       {phase !== 'active' && (
         <Animated.ScrollView
-          style={{ opacity: fadeAnim }}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >

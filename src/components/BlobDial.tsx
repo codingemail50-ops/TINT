@@ -27,9 +27,9 @@ const ROTATION_SENSITIVITY = 0.45;
 // A static curved hint arrow floating clear above the dial (not hugging its
 // rim), showing which way to drag to increase the value — the spinning blob
 // alone gives no visual cue for that, and testing found people don't
-// intuit it's a rotary control at all. Bold and full-opacity, matching the
-// reference: a simple wide arc with a solid arrowhead, not a subtle ring
-// segment glued to the dial's own curvature.
+// intuit it's a rotary control at all. Deliberately plain: an arc plus a
+// two-line caret at its end, both drawn with the same stroke — not a filled
+// shape or anything fancier.
 const HINT_START_DEG = -48;
 const HINT_END_DEG = 48;
 const HINT_OPACITY = 1;
@@ -130,11 +130,15 @@ export const BlobDial: React.FC<Props> = ({
   const hintEnd = pointOnCircle(center, center, hintRadius, HINT_END_DEG);
   const hintArcPath = `M ${hintStart.x} ${hintStart.y} A ${hintRadius} ${hintRadius} 0 0 1 ${hintEnd.x} ${hintEnd.y}`;
   const hintStrokeWidth = Math.max(5, size * 0.028);
-  const arrowSize = size * 0.06;
-  const arrowTangentDeg = HINT_END_DEG + 90;
-  // A chunkier, more solid triangle than a thin caret — wider at the back
-  // so it reads as a filled arrowhead even at small dial sizes.
-  const arrowPath = `M ${-arrowSize} ${-arrowSize * 0.8} L ${arrowSize * 0.9} 0 L ${-arrowSize} ${arrowSize * 0.8} L ${-arrowSize * 0.55} 0 Z`;
+  const arrowSize = size * 0.075;
+  // Tangent direction of the arc at its end point (the derivative of
+  // pointOnCircle's parametric circle is (cos, sin) of the same angle) —
+  // rotating a caret whose tip points along local +x by this angle makes
+  // it continue the arc's own curve instead of pointing some other way.
+  const arrowTangentDeg = HINT_END_DEG;
+  // Just a caret: two straight strokes meeting at the tip, same stroke as
+  // the arc itself — not a filled triangle.
+  const arrowPath = `M ${-arrowSize} ${-arrowSize} L 0 0 L ${-arrowSize} ${arrowSize}`;
 
   return (
     <GestureDetector gesture={pan}>
@@ -148,7 +152,15 @@ export const BlobDial: React.FC<Props> = ({
         <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFillObject} pointerEvents="none">
           <G opacity={HINT_OPACITY}>
             <Path d={hintArcPath} stroke={Colors.pop} strokeWidth={hintStrokeWidth} fill="none" strokeLinecap="round" />
-            <Path d={arrowPath} fill={Colors.pop} transform={`translate(${hintEnd.x}, ${hintEnd.y}) rotate(${arrowTangentDeg})`} />
+            <Path
+              d={arrowPath}
+              stroke={Colors.pop}
+              strokeWidth={hintStrokeWidth}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              transform={`translate(${hintEnd.x}, ${hintEnd.y}) rotate(${arrowTangentDeg})`}
+            />
           </G>
         </Svg>
         <Text style={[styles.value, { fontSize: size * 0.16 }]}>{formatValue ? formatValue(value) : String(value)}</Text>
