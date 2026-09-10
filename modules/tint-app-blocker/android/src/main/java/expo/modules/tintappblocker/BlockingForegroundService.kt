@@ -50,7 +50,12 @@ class BlockingForegroundService : Service() {
     const val EXTRA_END_AT_MS = "expo.modules.tintappblocker.extra.END_AT_MS"
     private const val CHANNEL_ID = "tint_focus_blocking"
     private const val NOTIFICATION_ID = 8421
-    private const val POLL_INTERVAL_MS = 1500L
+    // Was 1500ms — a blocked app (YouTube, Instagram, ...) could sit fully
+    // visible for up to that long before the overlay appeared, which read
+    // as the block not working. UsageStatsManager.queryEvents over a short
+    // 10s lookback is a cheap call, so polling this much more often is a
+    // fine trade for the overlay actually feeling instant.
+    private const val POLL_INTERVAL_MS = 300L
     private const val LOOKBACK_MS = 10_000L
   }
 

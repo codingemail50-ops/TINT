@@ -19,9 +19,11 @@ import { supabase } from '../lib/supabase';
 import { FocusSessionProvider, useFocusSessionStatus } from '../context/FocusSessionContext';
 import { FocusMiniPlayer } from '../components/FocusMiniPlayer';
 import { loadDevOffset, subscribeDevClock } from '../utils/devClock';
-import { saveFocusLog } from '../utils/focusLog';
+import { saveFocusLog, loadFocusLog } from '../utils/focusLog';
 import { saveDistractionLog } from '../utils/distractionLog';
 import { clearActiveSession } from '../utils/activeFocusSession';
+import { buildYesterdayRecap, hasShownRecapFor, markRecapShown, DailyRecapData } from '../utils/dailyRecap';
+import { DailyRecapCard } from '../components/DailyRecapCard';
 import {
   loadUserFromSupabase,
   syncAppStateToSupabase,
@@ -32,6 +34,21 @@ import {
 // the app instead of onboarding. (This used to force onboarding on every
 // launch during early development, before real accounts existed.)
 const FORCE_ONBOARDING_ON_LAUNCH = false;
+
+// Bounds any promise to at most `ms` — used below so a slow/flaky network
+// on boot degrades to the local-storage fallback path within a few seconds
+// instead of leaving the app on a blank screen indefinitely. Supabase's
+// client has no built-in request timeout, and a stalled mobile connection
+// can leave a bare `await` hanging for minutes with nothing on screen.
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>(resolve => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    promise.then(
+      value => { clearTimeout(timer); resolve(value); },
+      () => { clearTimeout(timer); resolve(fallback); },
+    );
+  });
+}
 
 // Every device still gets an anonymous Supabase session created behind the
 // scenes on first launch — signing up upgrades that same session to a real
@@ -112,14 +129,27 @@ const AppNavigatorInner: React.FC = () => {
   // to createAccount in login mode, without collecting avatar/exam/goal —
   // this flag is what tells createAccount which mode to open in.
   const [loginShortcut, setLoginShortcut] = useState(false);
-  // A brand-new Google sign-up (already authenticated, no profile yet) —
-  // tells createAccount to collapse down to just a username field instead
-  // of showing a redundant TINT password form on the way back through.
-  const [googleSignupPending, setGoogleSignupPending] = useState(false);
+  const [recapData, setRecapData] = useState<DailyRecapData | null>(null);
+  const recapCheckedRef = useRef(false);
   const tabFadeAnim = useRef(new Animated.Value(0)).current;
   const userIdRef = useRef<string | null>(null);
   const { status: focusStatus, requestExpand } = useFocusSessionStatus();
   const draftRef = useRef<OnboardingDraft>({ avatar: 'star', examTypes: [], dailyFocusGoalMins: 60, name: '', email: '' });
+
+  // Checks once per app-open (guarded by the ref, not just `showTabs`,
+  // since appState updates constantly from ordinary task toggles) whether
+  // yesterday's recap hasn't been shown yet, and pops it if so.
+  useEffect(() => {
+    if (!showTabs || recapCheckedRef.current || !appState.user) return;
+    recapCheckedRef.current = true;
+    void (async () => {
+      const focusLog = await loadFocusLog();
+      const recap = buildYesterdayRecap(appState, focusLog);
+      if (recap && !(await hasShownRecapFor(recap.dateKey))) {
+        setRecapData(recap);
+      }
+    })();
+  }, [showTabs, appState]);
 
   // No splash animation — resolve session/local state directly on mount.
   useEffect(() => {
@@ -127,7 +157,7 @@ const AppNavigatorInner: React.FC = () => {
       // Must resolve before anything below reads "today" — otherwise a
       // saved dev day-skip offset wouldn't apply until the next reload.
       await loadDevOffset();
-      const userId = await ensureSession();
+      const userId = await withTimeout(ensureSession(), 6000, null);
       userIdRef.current = userId;
 
       if (!FORCE_ONBOARDING_ON_LAUNCH) {
@@ -141,7 +171,7 @@ const AppNavigatorInner: React.FC = () => {
           // brand-new-user path over a transient network hiccup.
           // loadUserFromSupabase already returns null for both cases and
           // is the one path actually exercised/trusted elsewhere.
-          const loaded = await loadUserFromSupabase(userId);
+          const loaded = await withTimeout(loadUserFromSupabase(userId), 6000, null);
           if (loaded) {
             setAppState(loaded);
             setShowTabs(true);
@@ -166,10 +196,9 @@ const AppNavigatorInner: React.FC = () => {
       }
 
       // The one genuinely "first launch" branch — no cloud profile, no local
-      // user either. Everywhere else that lands on avatarExam (post-logout,
-      // post-login-without-a-profile) is a returning person, not a
-      // first-time one, so the walkthrough only shows here.
-      setScreen('walkthrough');
+      // user either. Onboarding now starts with avatar/exam, then account
+      // creation, then the walkthrough right before landing in the app.
+      setScreen('avatarExam');
     })();
   }, []);
 
@@ -183,15 +212,18 @@ const AppNavigatorInner: React.FC = () => {
   const navigateTo = (s: Screen) => setScreen(s);
 
   // Walkthrough's own final screen collects the one thing onboarding itself
-  // never asked for — what they're actually using TINT to get to. Carried
-  // in the draft alongside everything else and saved together at the very
-  // end (finishOnboarding), not written anywhere on its own.
+  // never asked for — what they're actually using TINT to get to. It's the
+  // very last onboarding step, so finishing it finishes onboarding.
   const handleWalkthroughDone = (futureGoal?: FutureGoal) => {
     draftRef.current.futureGoal = futureGoal;
-    setScreen('avatarExam');
+    const { avatar, examTypes, customExam, name, email, dailyFocusGoalMins } = draftRef.current;
+    finishOnboarding({
+      name, email, examTypes, customExam, avatar, futureGoal: futureGoal ?? null,
+      createdAt: new Date().toISOString(), dailyFocusGoalMins,
+    });
   };
 
-  // ── Onboarding flow: avatarExam -> createAccount -> focusGoal ────────────
+  // ── Onboarding flow: avatarExam -> createAccount -> focusGoal -> walkthrough ──
   const handleAvatarExamComplete = (data: { avatar: string; examTypes: ExamType[]; customExam?: CustomExam }) => {
     draftRef.current.avatar = data.avatar;
     draftRef.current.examTypes = data.examTypes;
@@ -212,7 +244,8 @@ const AppNavigatorInner: React.FC = () => {
     userIdRef.current = null;
     setShowTabs(false);
     setLoginShortcut(false);
-    setGoogleSignupPending(false);
+    setRecapData(null);
+    recapCheckedRef.current = false;
     setAppState({ user: null, streak: 0, longestStreak: 0, lastActiveDate: null, history: [], totalTasksCompleted: 0 });
     tabFadeAnim.setValue(0);
     setScreen('avatarExam');
@@ -220,15 +253,11 @@ const AppNavigatorInner: React.FC = () => {
   };
 
   // Tail of onboarding — persists the full profile (avatar/exams from step 1
-  // + name/email from step 2 + the goal just set here), then boots into the
-  // app the same way a returning user does.
+  // + name/email from step 2 + the goal just set here), then on to the
+  // walkthrough — the last onboarding step before landing in the app.
   const handleFocusGoalComplete = (mins: number) => {
     draftRef.current.dailyFocusGoalMins = mins;
-    const { avatar, examTypes, customExam, name, email, futureGoal } = draftRef.current;
-    finishOnboarding({
-      name, email, examTypes, customExam, avatar, futureGoal: futureGoal ?? null,
-      createdAt: new Date().toISOString(), dailyFocusGoalMins: mins,
-    });
+    setScreen('walkthrough');
   };
 
   const finishOnboarding = (user: UserProfile) => {
@@ -305,23 +334,11 @@ const AppNavigatorInner: React.FC = () => {
         return;
       }
     }
-    // Logged in but no cloud profile row yet — run through onboarding to
-    // collect one. If this came from Google, the account is already
-    // authenticated with a real email — no password to create, so
-    // createAccount (reached again after avatarExam) skips straight to
-    // just asking for a username instead of the full credential form.
+    // Logged in but no cloud profile row yet — run through the same
+    // onboarding a brand-new signup goes through, starting from avatar/exam.
+    if (googleEmail) draftRef.current.email = googleEmail;
     setLoginShortcut(false);
-    if (googleEmail) {
-      draftRef.current.email = googleEmail;
-      setGoogleSignupPending(true);
-    }
     setScreen('avatarExam');
-  };
-
-  const handleGoogleUsernameSet = (name: string) => {
-    draftRef.current.name = name;
-    setGoogleSignupPending(false);
-    setScreen('focusGoal');
   };
 
   const handleStateChange = (newState: AppState) => {
@@ -407,8 +424,6 @@ const AppNavigatorInner: React.FC = () => {
               onBack={loginShortcut ? undefined : () => setScreen('avatarExam')}
               initialMode={loginShortcut ? 'login' : 'signup'}
               avatar={draftRef.current.avatar}
-              skipCredentials={googleSignupPending}
-              onGoogleUsernameSet={handleGoogleUsernameSet}
             />
           )}
           {screen === 'focusGoal' && (
@@ -506,6 +521,17 @@ const AppNavigatorInner: React.FC = () => {
             );
           })}
         </Animated.View>
+      )}
+
+      {recapData && (
+        <DailyRecapCard
+          visible
+          data={recapData}
+          onClose={() => {
+            void markRecapShown(recapData.dateKey);
+            setRecapData(null);
+          }}
+        />
       )}
     </View>
   );
