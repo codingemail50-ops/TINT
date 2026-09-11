@@ -38,10 +38,19 @@ import {
 const FORCE_ONBOARDING_ON_LAUNCH = false;
 
 // Bounds any promise to at most `ms` — used below so a slow/flaky network
-// on boot degrades to the local-storage fallback path within a few seconds
+// on boot degrades to the local-storage fallback path within a bounded time
 // instead of leaving the app on a blank screen indefinitely. Supabase's
 // client has no built-in request timeout, and a stalled mobile connection
 // can leave a bare `await` hanging for minutes with nothing on screen.
+//
+// This does NOT cancel the underlying request (no AbortController hook
+// available here) — it just stops waiting on it. This project is hosted in
+// Seoul; testing from much further away can genuinely take this long per
+// request on a real mobile connection, so too short a bound here doesn't
+// make things safer, it just makes the app give up on requests that were
+// actually going to succeed a few seconds later. 20s (was 6-8s) is a
+// deliberately generous bound for exactly that reason.
+const REMOTE_TIMEOUT_MS = 20000;
 function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   return new Promise<T>(resolve => {
     const timer = setTimeout(() => resolve(fallback), ms);
@@ -143,7 +152,7 @@ const AppNavigatorInner: React.FC = () => {
       // Must resolve before anything below reads "today" — otherwise a
       // saved dev day-skip offset wouldn't apply until the next reload.
       await loadDevOffset();
-      const userId = await withTimeout(ensureSession(), 6000, null);
+      const userId = await withTimeout(ensureSession(), REMOTE_TIMEOUT_MS, null);
       userIdRef.current = userId;
 
       if (!FORCE_ONBOARDING_ON_LAUNCH) {
@@ -157,7 +166,7 @@ const AppNavigatorInner: React.FC = () => {
           // brand-new-user path over a transient network hiccup.
           // loadUserFromSupabase already returns null for both cases and
           // is the one path actually exercised/trusted elsewhere.
-          const loaded = await withTimeout(loadUserFromSupabase(userId), 6000, null);
+          const loaded = await withTimeout(loadUserFromSupabase(userId), REMOTE_TIMEOUT_MS, null);
           if (loaded) {
             setAppState(loaded);
             setShowTabs(true);
@@ -213,7 +222,7 @@ const AppNavigatorInner: React.FC = () => {
     const state = await StorageService.getAppState();
     await StorageService.saveAppState({ ...state, user });
     if (!userIdRef.current) {
-      userIdRef.current = await withTimeout(ensureSession(), 6000, null);
+      userIdRef.current = await withTimeout(ensureSession(), REMOTE_TIMEOUT_MS, null);
     }
     if (userIdRef.current) {
       void saveNewUserToSupabase(userIdRef.current, user.email, user);
@@ -301,7 +310,7 @@ const AppNavigatorInner: React.FC = () => {
         Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
 
         if (!userIdRef.current) {
-          userIdRef.current = await withTimeout(ensureSession(), 6000, null);
+          userIdRef.current = await withTimeout(ensureSession(), REMOTE_TIMEOUT_MS, null);
         }
         if (userIdRef.current && state.user) {
           // The email is already sitting on state.user — it was set from
@@ -360,7 +369,7 @@ const AppNavigatorInner: React.FC = () => {
       const TIMED_OUT = Symbol('timed-out');
       const result = await Promise.race([
         supabase.auth.getUser(),
-        new Promise<typeof TIMED_OUT>(resolve => setTimeout(() => resolve(TIMED_OUT), 8000)),
+        new Promise<typeof TIMED_OUT>(resolve => setTimeout(() => resolve(TIMED_OUT), REMOTE_TIMEOUT_MS)),
       ]);
       const user = result === TIMED_OUT ? null : result.data.user;
       userIdRef.current = user?.id ?? userIdRef.current;
@@ -371,7 +380,7 @@ const AppNavigatorInner: React.FC = () => {
       // slow/cold connection left the screen stuck on whatever it was
       // showing (createAccount, mid Google sign-in) with no error and no
       // way forward, since nothing here ever timed out on its own.
-      const loaded = await withTimeout(loadUserFromSupabase(userIdRef.current), 8000, null);
+      const loaded = await withTimeout(loadUserFromSupabase(userIdRef.current), REMOTE_TIMEOUT_MS, null);
       if (loaded) {
         // Same cross-account leak finishOnboarding already guards against
         // (local storage isn't namespaced per-account) — but that only

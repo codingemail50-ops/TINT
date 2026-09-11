@@ -39,7 +39,18 @@ interface Props {
 // into the app — a slow/cold connection left them hanging with the button
 // stuck on its loading spinner and no way to tell it wasn't ever going to
 // resolve. Rejecting after `ms` turns that into a normal, retryable error.
-const AUTH_TIMEOUT_MS = 15000;
+//
+// IMPORTANT: this doesn't cancel the underlying request — Supabase's client
+// has no AbortController hook exposed here, so the real signUp()/etc. call
+// keeps running on the server after this rejects. On a genuinely slow (not
+// actually broken) connection — this project is hosted in Seoul; testing
+// from much further away can realistically take this long per request —
+// that request can still SUCCEED a few seconds after the app has already
+// shown "timed out" and given up. That leaves a fully authenticated user in
+// Supabase with no profile ever written for it, since the app never learns
+// the signup actually went through. 30s (was 15s) trades a slower worst-case
+// error for far fewer of these silently-orphaned accounts.
+const AUTH_TIMEOUT_MS = 30000;
 function withTimeout<T>(promise: Promise<T>, ms = AUTH_TIMEOUT_MS): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Request timed out — check your connection and try again.')), ms);
