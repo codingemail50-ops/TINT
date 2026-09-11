@@ -52,33 +52,17 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
   });
 }
 
-// Every device still gets an anonymous Supabase session created behind the
-// scenes on first launch — signing up upgrades that same session to a real
-// account (same user id) rather than discarding it, so a guest who later
-// signs up doesn't lose anything already saved locally.
+// This project has "Allow anonymous sign-ins" turned off in Supabase, so
+// signInAnonymously() would always fail — every device relies entirely on
+// an explicit signup/login to get a session; there's no silent fallback
+// session before that. This just reads whatever's already persisted
+// locally, if anything.
 async function ensureSession(): Promise<string | null> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) return session.user.id;
+    return session?.user.id ?? null;
   } catch (err) {
-    // getSession() throwing here (rather than just returning no session)
-    // used to mean this whole function gave up and returned null — which
-    // reads as "no session at all this launch", not just "no *persisted*
-    // session". A returning user whose real session failed to restore for
-    // a transient reason still deserves the same fallback attempt at
-    // establishing *some* session that a fresh install gets below.
-    console.error('[AppNavigator] getSession() threw, falling back to anonymous sign-in:', err);
-  }
-
-  try {
-    const { data, error } = await supabase.auth.signInAnonymously();
-    if (error) {
-      console.error('[AppNavigator] Anonymous sign-in failed:', error.message);
-      return null;
-    }
-    return data.session?.user.id ?? null;
-  } catch (err) {
-    console.error('[AppNavigator] signInAnonymously() exception:', err);
+    console.error('[AppNavigator] getSession() threw:', err);
     return null;
   }
 }
@@ -183,7 +167,7 @@ const AppNavigatorInner: React.FC = () => {
           }
         }
 
-        // No cloud profile yet (brand-new anonymous user, or offline) — fall back to local storage
+        // No session yet (never signed up/in on this device) or offline — fall back to local storage
         const state = await StorageService.getAppState();
         setAppState(state);
         const user = await StorageService.getUser();
@@ -252,7 +236,9 @@ const AppNavigatorInner: React.FC = () => {
     setAppState({ user: null, streak: 0, longestStreak: 0, lastActiveDate: null, history: [], totalTasksCompleted: 0 });
     tabFadeAnim.setValue(0);
     setScreen('avatarExam');
-    void ensureSession().then(id => { userIdRef.current = id; });
+    // No anonymous-session fallback to re-establish here (this project has
+    // it disabled) — userIdRef just stays null until the next explicit
+    // signup/login.
   };
 
   // Tail of onboarding — persists the full profile (avatar/exams from step 1,

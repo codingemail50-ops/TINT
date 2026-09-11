@@ -105,39 +105,27 @@ export const CreateAccountScreen: React.FC<Props> = ({
     setLoading(true);
     try {
       if (mode === 'signup') {
-        // getSession() reads the already-persisted local session (no
-        // network round trip) — getUser() deliberately re-validates against
-        // Supabase's server on every call, which was doubling this step's
-        // network latency for no benefit (ensureSession() on boot already
-        // established this exact session).
-        const { data: { session: current } } = await withTimeout(supabase.auth.getSession());
-        let userId: string | undefined;
-        if (current?.user?.is_anonymous) {
-          const { error: upgradeErr } = await withTimeout(supabase.auth.updateUser({ email: email.trim(), password }));
-          if (upgradeErr) throw upgradeErr;
-          // Upgrading an anonymous session keeps its existing id.
-          userId = current.user.id;
-        } else {
-          const { data: signUpData, error: signUpErr } = await withTimeout(supabase.auth.signUp({ email: email.trim(), password }));
-          if (signUpErr) throw signUpErr;
-          // If the Supabase project has "Confirm email" turned on,
-          // signUp() creates the auth user but returns session: null until
-          // they click the confirmation link — the client has no active
-          // session at all afterward. Every request this app makes right
-          // after (starting with writing this profile row) is then sent
-          // completely unauthenticated, and Postgres RLS ("auth.uid() =
-          // id") silently rejects it — no confirmation screen exists
-          // anywhere in this app's onboarding, so that failure was
-          // invisible and looked exactly like "signup succeeded, profile
-          // just never saved." This is the one path (fresh signUp, not the
-          // anonymous-session upgrade above) actually exposed to it.
-          if (!signUpData.session) {
-            throw new Error(
-              'Your account was created but needs email confirmation before you can continue — check your inbox, or turn off "Confirm email" in the Supabase project (Authentication → Sign In / Providers → Email) if that\'s not intended for this app.'
-            );
-          }
-          userId = signUpData.user?.id;
+        // No anonymous-session upgrade path — this Supabase project has
+        // "Allow anonymous sign-ins" turned off, so there's never an
+        // existing anonymous session to upgrade. Every signup is a plain,
+        // direct signUp() call.
+        const { data: signUpData, error: signUpErr } = await withTimeout(supabase.auth.signUp({ email: email.trim(), password }));
+        if (signUpErr) throw signUpErr;
+        // If the Supabase project has "Confirm email" turned on, signUp()
+        // creates the auth user but returns session: null until they click
+        // the confirmation link — the client has no active session at all
+        // afterward. Every request this app makes right after (starting
+        // with writing this profile row) is then sent completely
+        // unauthenticated, and Postgres RLS ("auth.uid() = id") silently
+        // rejects it — no confirmation screen exists anywhere in this
+        // app's onboarding, so that failure was invisible and looked
+        // exactly like "signup succeeded, profile just never saved."
+        if (!signUpData.session) {
+          throw new Error(
+            'Your account was created but needs email confirmation before you can continue — check your inbox, or turn off "Confirm email" in the Supabase project (Authentication → Sign In / Providers → Email) if that\'s not intended for this app.'
+          );
         }
+        const userId = signUpData.user?.id;
         // Passing this straight through means the profile row that finishes
         // onboarding writes to Supabase uses the id this exact signup call
         // just returned, instead of a separate ensureSession() call later
