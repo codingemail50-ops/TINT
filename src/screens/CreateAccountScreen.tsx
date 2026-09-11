@@ -120,6 +120,22 @@ export const CreateAccountScreen: React.FC<Props> = ({
         } else {
           const { data: signUpData, error: signUpErr } = await withTimeout(supabase.auth.signUp({ email: email.trim(), password }));
           if (signUpErr) throw signUpErr;
+          // If the Supabase project has "Confirm email" turned on,
+          // signUp() creates the auth user but returns session: null until
+          // they click the confirmation link — the client has no active
+          // session at all afterward. Every request this app makes right
+          // after (starting with writing this profile row) is then sent
+          // completely unauthenticated, and Postgres RLS ("auth.uid() =
+          // id") silently rejects it — no confirmation screen exists
+          // anywhere in this app's onboarding, so that failure was
+          // invisible and looked exactly like "signup succeeded, profile
+          // just never saved." This is the one path (fresh signUp, not the
+          // anonymous-session upgrade above) actually exposed to it.
+          if (!signUpData.session) {
+            throw new Error(
+              'Your account was created but needs email confirmation before you can continue — check your inbox, or turn off "Confirm email" in the Supabase project (Authentication → Sign In / Providers → Email) if that\'s not intended for this app.'
+            );
+          }
           userId = signUpData.user?.id;
         }
         // Passing this straight through means the profile row that finishes

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, ActivityIndicator, Alert } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +29,7 @@ import {
   loadUserFromSupabase,
   syncAppStateToSupabase,
   saveNewUserToSupabase,
+  lastLoadUserError,
 } from '../utils/supabaseStorage';
 
 // Supabase auth is fully wired up — returning users go straight back into
@@ -294,7 +295,25 @@ const AppNavigatorInner: React.FC = () => {
           // via getUser() was a pointless extra network call (no timeout
           // on it either) standing between a successful signup and this
           // profile actually reaching Supabase.
-          void saveNewUserToSupabase(userIdRef.current, state.user.email, state.user);
+          const result = await saveNewUserToSupabase(userIdRef.current, state.user.email, state.user);
+          // This write silently failing (network, RLS, anything) is exactly
+          // what's been making login look broken after a seemingly-successful
+          // signup — the account authenticates fine but has no profile row,
+          // so every later login finds "nothing to load" and bounces back to
+          // onboarding. Surfacing it here means the *next* failure shows its
+          // real cause instead of vanishing into a console no one can see on
+          // a release build.
+          if (!result.success) {
+            Alert.alert(
+              'Your account needs one more step',
+              `Signed up, but your profile couldn't be saved yet: ${result.error ?? 'unknown error'}. You may need to sign up again once this is fixed, or check your connection.`
+            );
+          }
+        } else if (!userIdRef.current) {
+          Alert.alert(
+            'Your account needs one more step',
+            'Signed up, but no account id was available to save your profile against — please check your connection and try signing up again.'
+          );
         }
       });
   };
@@ -350,6 +369,15 @@ const AppNavigatorInner: React.FC = () => {
         setShowTabs(true);
         setScreen('todo');
         Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+        return;
+      }
+      // Distinguishes "this account genuinely has no profile row" (send them
+      // through onboarding, the existing behavior below) from "the read
+      // itself failed" (network, RLS, a timeout) — the two used to look
+      // identical from here, which is exactly why login bouncing back to
+      // onboarding was impossible to diagnose without device logs.
+      if (lastLoadUserError) {
+        Alert.alert('Couldn\'t log in', `Your account exists, but loading its data failed: ${lastLoadUserError}. Check your connection and try again.`);
         return;
       }
     }

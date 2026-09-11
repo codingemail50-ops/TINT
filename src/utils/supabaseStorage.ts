@@ -38,7 +38,7 @@ export async function saveNewUserToSupabase(
   email: string,
   profile: Omit<UserProfile, 'email'>,
   attempt = 1
-): Promise<void> {
+): Promise<{ success: boolean; error?: string }> {
   try {
     const row: Partial<UserDataRow> = {
       id: userId,
@@ -68,18 +68,29 @@ export async function saveNewUserToSupabase(
         await new Promise(r => setTimeout(r, 1500 * attempt));
         return saveNewUserToSupabase(userId, email, profile, attempt + 1);
       }
+      return { success: false, error: error.message };
     }
-  } catch (err) {
+    return { success: true };
+  } catch (err: any) {
     console.error('[supabaseStorage] saveNewUserToSupabase exception:', err);
     if (attempt < 3) {
       await new Promise(r => setTimeout(r, 1500 * attempt));
       return saveNewUserToSupabase(userId, email, profile, attempt + 1);
     }
+    return { success: false, error: err?.message ?? 'Unknown error' };
   }
 }
 
 // ── Load a user's AppState from Supabase, also cache to AsyncStorage ─────────
+// lastLoadError is set only on a genuine failure (network, RLS, etc.) — never
+// for "no such row", so callers can tell "this account really has no
+// profile yet" apart from "the read itself broke," which otherwise look
+// identical (both just resolve to null) and were impossible to tell apart
+// from a release build with no visible logs.
+export let lastLoadUserError: string | null = null;
+
 export async function loadUserFromSupabase(userId: string): Promise<AppState | null> {
+  lastLoadUserError = null;
   try {
     const { data, error } = await supabase
       .from('user_data')
@@ -91,6 +102,7 @@ export async function loadUserFromSupabase(userId: string): Promise<AppState | n
       if (error?.code !== 'PGRST116') {
         // PGRST116 = no rows found — not an actual error
         console.error('[supabaseStorage] loadUserFromSupabase error:', error?.message);
+        lastLoadUserError = error?.message ?? 'Unknown error';
       }
       return null;
     }
@@ -127,8 +139,9 @@ export async function loadUserFromSupabase(userId: string): Promise<AppState | n
     }
 
     return appState;
-  } catch (err) {
+  } catch (err: any) {
     console.error('[supabaseStorage] loadUserFromSupabase exception:', err);
+    lastLoadUserError = err?.message ?? 'Unknown error';
     return null;
   }
 }
