@@ -22,6 +22,7 @@ import { loadDevOffset, subscribeDevClock } from '../utils/devClock';
 import { saveFocusLog, loadFocusLog } from '../utils/focusLog';
 import { saveDistractionLog } from '../utils/distractionLog';
 import { clearActiveSession } from '../utils/activeFocusSession';
+import { stopAppBlocking } from '../utils/appBlocking';
 import { buildYesterdayRecap, hasShownRecapFor, markRecapShown, DailyRecapData } from '../utils/dailyRecap';
 import { DailyRecapCard } from '../components/DailyRecapCard';
 import {
@@ -212,18 +213,14 @@ const AppNavigatorInner: React.FC = () => {
   const navigateTo = (s: Screen) => setScreen(s);
 
   // Walkthrough's own final screen collects the one thing onboarding itself
-  // never asked for — what they're actually using TINT to get to. It's the
-  // very last onboarding step, so finishing it finishes onboarding.
+  // never asked for — what they're actually using TINT to get to. Runs
+  // right after signup, before the daily-focus-goal dial.
   const handleWalkthroughDone = (futureGoal?: FutureGoal) => {
     draftRef.current.futureGoal = futureGoal;
-    const { avatar, examTypes, customExam, name, email, dailyFocusGoalMins } = draftRef.current;
-    finishOnboarding({
-      name, email, examTypes, customExam, avatar, futureGoal: futureGoal ?? null,
-      createdAt: new Date().toISOString(), dailyFocusGoalMins,
-    });
+    setScreen('focusGoal');
   };
 
-  // ── Onboarding flow: avatarExam -> createAccount -> focusGoal -> walkthrough ──
+  // ── Onboarding flow: avatarExam -> createAccount -> walkthrough -> focusGoal ──
   const handleAvatarExamComplete = (data: { avatar: string; examTypes: ExamType[]; customExam?: CustomExam }) => {
     draftRef.current.avatar = data.avatar;
     draftRef.current.examTypes = data.examTypes;
@@ -241,6 +238,11 @@ const AppNavigatorInner: React.FC = () => {
   // and kicks off a fresh anonymous session, the same state a brand-new
   // install would boot into.
   const handleLogout = () => {
+    // Belt-and-braces alongside the native service's own endAtMs self-stop
+    // (see BlockingForegroundService) — a stray leftover session (app
+    // killed mid-session, timer that never fired) shouldn't keep blocking
+    // apps after the account that started it has logged out.
+    stopAppBlocking();
     userIdRef.current = null;
     setShowTabs(false);
     setLoginShortcut(false);
@@ -252,12 +254,15 @@ const AppNavigatorInner: React.FC = () => {
     void ensureSession().then(id => { userIdRef.current = id; });
   };
 
-  // Tail of onboarding — persists the full profile (avatar/exams from step 1
-  // + name/email from step 2 + the goal just set here), then on to the
-  // walkthrough — the last onboarding step before landing in the app.
+  // Tail of onboarding — persists the full profile (avatar/exams from step 1,
+  // name/email from signup, the future goal from the walkthrough, and the
+  // daily-focus-goal minutes just set here), then lands in the app.
   const handleFocusGoalComplete = (mins: number) => {
-    draftRef.current.dailyFocusGoalMins = mins;
-    setScreen('walkthrough');
+    const { avatar, examTypes, customExam, name, email, futureGoal } = draftRef.current;
+    finishOnboarding({
+      name, email, examTypes, customExam, avatar, futureGoal: futureGoal ?? null,
+      createdAt: new Date().toISOString(), dailyFocusGoalMins: mins,
+    });
   };
 
   const finishOnboarding = (user: UserProfile) => {
@@ -281,11 +286,15 @@ const AppNavigatorInner: React.FC = () => {
         Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
 
         if (!userIdRef.current) {
-          userIdRef.current = await ensureSession();
+          userIdRef.current = await withTimeout(ensureSession(), 6000, null);
         }
         if (userIdRef.current && state.user) {
-          const { data: { user: authUser } } = await supabase.auth.getUser();
-          void saveNewUserToSupabase(userIdRef.current, authUser?.email ?? '', state.user);
+          // The email is already sitting on state.user — it was set from
+          // the signup form itself (or is '' for a guest). Re-fetching it
+          // via getUser() was a pointless extra network call (no timeout
+          // on it either) standing between a successful signup and this
+          // profile actually reaching Supabase.
+          void saveNewUserToSupabase(userIdRef.current, state.user.email, state.user);
         }
       });
   };
@@ -300,7 +309,7 @@ const AppNavigatorInner: React.FC = () => {
     // thing that could independently fail and leave the account with no
     // profile row at all.
     if (userId) userIdRef.current = userId;
-    setScreen('focusGoal');
+    setScreen('walkthrough');
   };
 
   const handleLoggedIn = async (hasProfile: boolean, userId?: string, googleEmail?: string) => {
@@ -441,11 +450,7 @@ const AppNavigatorInner: React.FC = () => {
             />
           )}
           {screen === 'focusGoal' && (
-            <FocusGoalScreen
-              onComplete={handleFocusGoalComplete}
-              onBack={() => setScreen('createAccount')}
-              onLogin={handleLoginShortcut}
-            />
+            <FocusGoalScreen onComplete={handleFocusGoalComplete} />
           )}
           {/* Today and Focus stay mounted (visibility toggled via
               display:none) instead of being swapped in and out of the tree —

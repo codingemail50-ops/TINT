@@ -85,11 +85,7 @@ class BlockingForegroundService : Service() {
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     if (intent?.action == ACTION_STOP) {
-      stopPolling()
-      removeOverlay()
-      @Suppress("DEPRECATION")
-      stopForeground(true)
-      stopSelf()
+      stopBlockingAndSelf()
       return START_NOT_STICKY
     }
 
@@ -172,6 +168,19 @@ class BlockingForegroundService : Service() {
     stopPolling()
     val runnable = object : Runnable {
       override fun run() {
+        // Belt-and-braces: this service only ever hears about a session
+        // ending via an explicit ACTION_STOP from the JS side (finishSession/
+        // exitSession). If the app gets killed, crashes, or its timer just
+        // doesn't fire exactly when expected, nothing was ever telling this
+        // service to stop — it would keep blocking apps indefinitely past
+        // the session's actual end time, with no way to notice short of
+        // force-clearing the app. Checked here (not inside
+        // checkForegroundApp(), which skips its own work while the screen
+        // is off) so it still fires on schedule even with the screen off.
+        if (endAtMs > 0L && System.currentTimeMillis() >= endAtMs) {
+          stopBlockingAndSelf()
+          return
+        }
         checkForegroundApp()
         handler.postDelayed(this, POLL_INTERVAL_MS)
       }
@@ -183,6 +192,14 @@ class BlockingForegroundService : Service() {
   private fun stopPolling() {
     pollRunnable?.let { handler.removeCallbacks(it) }
     pollRunnable = null
+  }
+
+  private fun stopBlockingAndSelf() {
+    stopPolling()
+    removeOverlay()
+    @Suppress("DEPRECATION")
+    stopForeground(true)
+    stopSelf()
   }
 
   private fun checkForegroundApp() {

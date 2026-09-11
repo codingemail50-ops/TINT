@@ -208,8 +208,13 @@ export const CreateAccountScreen: React.FC<Props> = ({
     }
   };
 
+  // "height" on Android (not "padding" — that's iOS-only in practice, it
+  // no-ops there) actually shrinks this view when the keyboard opens, which
+  // is what was missing: the email field (last in the form, and this screen
+  // centers its content vertically) was sitting behind the keyboard with
+  // nothing pushing it back into view.
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.container}>
         <StatusBar style="light" />
         {/* Tiled the whole screen height on purpose (not just a header band) —
