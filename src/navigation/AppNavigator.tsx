@@ -197,12 +197,40 @@ const AppNavigatorInner: React.FC = () => {
 
   const navigateTo = (s: Screen) => setScreen(s);
 
+  // Best-effort, quiet save of onboarding progress so far — called after
+  // every remaining onboarding step (not just the last one). Before this,
+  // the profile was only ever written anywhere — locally or to Supabase —
+  // after the very last screen (the focus-goal dial's "Lock This In"). If a
+  // signup got interrupted before that exact tap for any reason (closed the
+  // app, backed out, anything), the account was fully authenticated but had
+  // nothing saved anywhere — logging into it afterward correctly found
+  // nothing, with no error to show, since nothing had actually failed. That
+  // looked identical to "login is broken" from the outside. Saving
+  // progressively means an account is loggable-into from the moment signup
+  // succeeds, with sensible defaults for whatever hasn't been set yet.
+  const saveOnboardingProgress = async (user: UserProfile) => {
+    await StorageService.saveUser(user);
+    const state = await StorageService.getAppState();
+    await StorageService.saveAppState({ ...state, user });
+    if (!userIdRef.current) {
+      userIdRef.current = await withTimeout(ensureSession(), 6000, null);
+    }
+    if (userIdRef.current) {
+      void saveNewUserToSupabase(userIdRef.current, user.email, user);
+    }
+  };
+
   // Walkthrough's own final screen collects the one thing onboarding itself
   // never asked for — what they're actually using TINT to get to. Runs
   // right after signup, before the daily-focus-goal dial.
   const handleWalkthroughDone = (futureGoal?: FutureGoal) => {
     draftRef.current.futureGoal = futureGoal;
     setScreen('focusGoal');
+    const { avatar, examTypes, customExam, name, email, dailyFocusGoalMins } = draftRef.current;
+    void saveOnboardingProgress({
+      name, email, examTypes, customExam, avatar, futureGoal: futureGoal ?? null,
+      createdAt: new Date().toISOString(), dailyFocusGoalMins,
+    });
   };
 
   // ── Onboarding flow: avatarExam -> createAccount -> walkthrough -> focusGoal ──
@@ -315,6 +343,11 @@ const AppNavigatorInner: React.FC = () => {
     // profile row at all.
     if (userId) userIdRef.current = userId;
     setScreen('walkthrough');
+    const { avatar, examTypes, customExam, dailyFocusGoalMins } = draftRef.current;
+    void saveOnboardingProgress({
+      name, email, examTypes, customExam, avatar, futureGoal: null,
+      createdAt: new Date().toISOString(), dailyFocusGoalMins,
+    });
   };
 
   const handleLoggedIn = async (hasProfile: boolean, userId?: string, googleEmail?: string) => {
