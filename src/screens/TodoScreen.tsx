@@ -354,14 +354,18 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     if (userId) void syncFocusLog(userId, updatedLog);
   };
 
-  // Natural completion of a task-linked Focus session — mark the task done
-  // and log the focus minutes. The overlay stays open (showing "Session
-  // Complete!") until the user actually leaves it, which fires
-  // handleTaskSessionExit below — that's what clears timerTaskId.
+  // Natural completion of a task-linked Focus session — mark the task done.
+  // The focus minutes themselves are NOT logged here: FocusScreen's own
+  // finishSession() already appended this exact session to the focus log
+  // and synced it before calling onExternalFinish (this callback) — logging
+  // it again here was double-counting every task-linked session's time on
+  // the leaderboard (a session that ran twice as long as it should've).
+  // The overlay stays open (showing "Session Complete!") until the user
+  // actually leaves it, which fires handleTaskSessionExit below — that's
+  // what clears timerTaskId.
   const handleTaskSessionFinish = (actualSeconds: number) => {
     if (!timerTaskId) return;
     void applyCompletion(timerTaskId, true);
-    void logFocusMinutes(actualSeconds / 60);
   };
 
   // Leaving a task-linked Focus session: early abandon (task stays
@@ -463,6 +467,15 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     await StorageService.saveTodayTasks(updated);
     setEditingTask(null);
     buttonPress();
+  };
+
+  // Long-press's edit modal is the one reliably-discoverable place to remove
+  // a task — the swipe-to-delete gesture only ever worked for custom tasks,
+  // leaving no way at all to remove a preset one. This works for any task.
+  const handleDeleteEditingTask = async () => {
+    if (!editingTask) return;
+    await handleDelete(editingTask.id);
+    setEditingTask(null);
   };
 
   const progressColor = progress >= 1 ? Colors.success : progress >= 0.5 ? Colors.primary : Colors.accent;
@@ -847,6 +860,10 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                 <View style={[styles.toggleThumb, editPriority && styles.toggleThumbOn]} />
               </View>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.deleteTaskRow} onPress={handleDeleteEditingTask} activeOpacity={0.75}>
+              <Ionicons name="trash-outline" size={16} color={Colors.danger} />
+              <Text style={styles.deleteTaskText}>Remove task</Text>
+            </TouchableOpacity>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingTask(null)}>
                 <Text style={styles.cancelText}>Cancel</Text>
@@ -1050,6 +1067,11 @@ const styles = StyleSheet.create({
   },
   repeatLabel: { ...Typography.labelLarge, color: Colors.textPrimary },
   repeatSub:   { ...Typography.bodySmall, color: Colors.textMuted, marginTop: 2 },
+  deleteTaskRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    paddingVertical: Spacing.sm, marginBottom: Spacing.sm,
+  },
+  deleteTaskText: { ...Typography.labelLarge, color: Colors.danger },
   toggle: {
     width: 44, height: 26,
     borderRadius: 13,

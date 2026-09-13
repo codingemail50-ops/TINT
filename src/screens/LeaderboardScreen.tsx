@@ -66,19 +66,27 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
 
   const entries: LeaderboardEntry[] = useMemo(() => {
     const filteredRows = examFilter === EXAM_ALL ? rows : rows.filter(r => r.exams.includes(examFilter));
-    const cloud: LeaderboardEntry[] = filteredRows.map(r => ({
-      id: r.id,
-      name: r.name,
-      streak: r.streak,
-      consistency: r.consistency,
-      tasksCompleted: r.tasksCompleted,
-      avatar: r.avatar,
-      exams: r.exams,
-      focusTodayMins: r.focusTodayMins,
-      focusWeekMins: r.focusWeekMins,
-      focusAllTimeMins: r.focusAllTimeMins,
-      isCurrentUser: !!userId && r.id === userId,
-    }));
+    const cloud: LeaderboardEntry[] = filteredRows.map(r => {
+      const isMe = !!userId && r.id === userId;
+      return {
+        id: r.id,
+        name: r.name,
+        streak: r.streak,
+        consistency: r.consistency,
+        tasksCompleted: r.tasksCompleted,
+        avatar: r.avatar,
+        exams: r.exams,
+        // For my own row, the local log (just recomputed above) is always
+        // at least as fresh as whatever synced to Supabase — syncFocusLog
+        // is fire-and-forget with no retry, so the cloud copy can lag
+        // behind a session that just finished. Never show myself a stale
+        // number when the real one is sitting right here on-device.
+        focusTodayMins: isMe ? myFocus.today : r.focusTodayMins,
+        focusWeekMins: isMe ? myFocus.week : r.focusWeekMins,
+        focusAllTimeMins: isMe ? myFocus.allTime : r.focusAllTimeMins,
+        isCurrentUser: isMe,
+      };
+    });
     const hasUser = cloud.some(e => e.isCurrentUser);
     const withMe = hasUser ? cloud : [...cloud, userEntry];
     // Applies even when the exam filter already scoped the query, so "me"

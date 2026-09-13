@@ -85,7 +85,14 @@ export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPres
 
   const pan = Gesture.Pan()
     .enabled(!!canDrag)
-    .activateAfterLongPress(150)
+    // Was activateAfterLongPress(150) racing against longPress's 450ms —
+    // pan only needs elapsed time to activate, not actual movement, so it
+    // was winning that race and claiming the gesture on every hold before
+    // longPress ever got a chance to fire, no matter how still the finger
+    // stayed. minDistance requires real movement to activate instead, so a
+    // still hold now correctly falls through to longPress at 450ms, and an
+    // actual swipe/drag still activates pan immediately regardless of time.
+    .minDistance(10)
     .onUpdate(e => {
       dragX.value = e.translationX;
       dragY.value = onTogglePriority ? e.translationY : 0;
