@@ -28,10 +28,43 @@ function notify() {
   for (const l of listeners) l();
 }
 
+// A task-linked focus session naturally completing used to log its minutes
+// twice — once in FocusScreen's own completion handler, once again in
+// Today's screen right after (since fixed, see TodoScreen's
+// handleTaskSessionFinish) — leaving two back-to-back entries with the
+// same date and (near enough) the same duration, logged within a second or
+// two of each other. Real, separately-run sessions essentially never land
+// on that exact signature by coincidence, so it's safe to treat as the bug
+// and collapse it to one entry. This runs on every read so a device that
+// already picked up the bug self-heals the next time the app is opened,
+// instead of staying permanently inflated until someone manually fixes the
+// data.
+function dedupeFocusLog(log: FocusLogEntry[]): FocusLogEntry[] {
+  const cleaned: FocusLogEntry[] = [];
+  for (const entry of log) {
+    const prev = cleaned[cleaned.length - 1];
+    const isDupOfPrev = !!prev
+      && prev.date === entry.date
+      && Math.abs(prev.mins - entry.mins) < 0.01
+      && !!prev.timestamp && !!entry.timestamp
+      && Math.abs(new Date(entry.timestamp).getTime() - new Date(prev.timestamp).getTime()) < 5000;
+    if (!isDupOfPrev) cleaned.push(entry);
+  }
+  return cleaned;
+}
+
 export async function loadFocusLog(): Promise<FocusLogEntry[]> {
   try {
     const raw = await AsyncStorage.getItem(FOCUS_LOG_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const log: FocusLogEntry[] = raw ? JSON.parse(raw) : [];
+    const cleaned = dedupeFocusLog(log);
+    if (cleaned.length !== log.length) {
+      // Persist the repair directly (not via saveFocusLog, which would
+      // fire subscribeFocusLog's listeners for what's really just a read)
+      // so it isn't redetected and rewritten on every subsequent read.
+      AsyncStorage.setItem(FOCUS_LOG_KEY, JSON.stringify(cleaned)).catch(() => {});
+    }
+    return cleaned;
   } catch { return []; }
 }
 

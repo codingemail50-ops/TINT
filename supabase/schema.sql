@@ -224,3 +224,61 @@ as $$
 $$;
 
 grant execute on function public.find_user_by_email(text) to authenticated;
+
+-- ── One-time repair: duplicate focus_log entries ────────────────────────
+-- A task-linked focus session naturally completing used to log its minutes
+-- twice (once in FocusScreen's own completion handler, once again right
+-- after in Today's screen -- since fixed in the app) leaving two back-to-
+-- back entries in focus_log with the same date and the same duration,
+-- logged within a few seconds of each other. That inflated every affected
+-- person's leaderboard time (e.g. a real 3-hour session showing as more
+-- like 6) permanently, since focus_alltime_mins never ages out. The app
+-- now also self-heals this on-device the next time it's opened, but that
+-- only fixes what's stored locally + whatever that person syncs next --
+-- this repairs every row's stored focus_log (and focus_alltime_mins) in
+-- one pass so the leaderboard is correct immediately for everyone,
+-- including people who don't reopen the app right away. Safe to re-run --
+-- once the duplicates are gone there's nothing left to remove.
+with expanded as (
+  select
+    u.id,
+    t.elem,
+    t.ordinality,
+    (t.elem->>'mins')::double precision as mins,
+    t.elem->>'date' as date,
+    nullif(t.elem->>'timestamp', '')::timestamptz as ts
+  from public.user_data u,
+    jsonb_array_elements(coalesce(u.focus_log, '[]'::jsonb)) with ordinality as t(elem, ordinality)
+),
+flagged as (
+  select *,
+    lag(mins) over (partition by id order by ordinality) as prev_mins,
+    lag(date) over (partition by id order by ordinality) as prev_date,
+    lag(ts) over (partition by id order by ordinality) as prev_ts
+  from expanded
+),
+deduped as (
+  select id, elem, ordinality
+  from flagged
+  where not (
+    prev_mins is not null
+    and date = prev_date
+    and abs(mins - prev_mins) < 0.01
+    and ts is not null and prev_ts is not null
+    and abs(extract(epoch from (ts - prev_ts))) < 5
+  )
+),
+rebuilt as (
+  select id, jsonb_agg(elem order by ordinality) as new_log
+  from deduped
+  group by id
+)
+update public.user_data u
+set focus_log = r.new_log,
+    focus_alltime_mins = (
+      select coalesce(sum((e->>'mins')::double precision), 0)
+      from jsonb_array_elements(r.new_log) e
+    )
+from rebuilt r
+where u.id = r.id
+  and r.new_log is distinct from u.focus_log;
