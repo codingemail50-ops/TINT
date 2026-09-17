@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { AppState, UserProfile, computeLifetimeConsistency } from './storage';
-import { computeFocusStats } from './focusLog';
+import { FocusLogEntry, computeFocusStats, saveFocusLog } from './focusLog';
+import { saveDistractionLog } from './distractionLog';
 
 // ── Types for the user_data row ──────────────────────────────────────────────
 interface UserDataRow {
@@ -18,6 +19,7 @@ interface UserDataRow {
   today_tasks: unknown;
   today_tasks_date: string | null;
   daily_focus_goal_mins: number | null;
+  focus_log?: FocusLogEntry[];
   focus_today_mins?: number;
   focus_week_mins?: number;
   focus_alltime_mins?: number;
@@ -89,7 +91,16 @@ export async function saveNewUserToSupabase(
 // from a release build with no visible logs.
 export let lastLoadUserError: string | null = null;
 
-export async function loadUserFromSupabase(userId: string): Promise<AppState | null> {
+// resetLocalLogs: true for an explicit login into an (possibly different)
+// existing account — local storage isn't namespaced per-account, so
+// whatever another account left in tint_focus_log/tint_distraction_log on
+// this device would otherwise silently blend into this account's numbers
+// the next time a session completes (loadFocusLog() just reads local
+// storage unconditionally). false for the boot-time "resume the same
+// already-logged-in account" path, where local can legitimately be a
+// session or two ahead of the last successful (fire-and-forget) sync and
+// overwriting it with the older remote copy would lose real data.
+export async function loadUserFromSupabase(userId: string, resetLocalLogs = false): Promise<AppState | null> {
   lastLoadUserError = null;
   try {
     const { data, error } = await supabase
@@ -136,6 +147,15 @@ export async function loadUserFromSupabase(userId: string): Promise<AppState | n
       await AsyncStorage.setItem('tint_app_state', JSON.stringify(appState));
     } catch (cacheErr) {
       console.warn('[supabaseStorage] Failed to cache to AsyncStorage:', cacheErr);
+    }
+
+    if (resetLocalLogs) {
+      // This account's own synced history replaces whatever's local —
+      // never merged/appended, since a previous account's leftover entries
+      // must not survive into this login. No remote copy of the
+      // distraction log exists (it's on-device only), so it just resets.
+      await saveFocusLog(Array.isArray(row.focus_log) ? row.focus_log : []);
+      await saveDistractionLog([]);
     }
 
     return appState;
@@ -185,9 +205,17 @@ export async function syncAppStateToSupabase(
 }
 
 // ── Sync the focus log to Supabase (update existing row's focus_log jsonb) ──
+// Fire-and-forget from every call site, so a transient failure here used to
+// just get logged and dropped — the leaderboard would then keep showing
+// whatever the last *successful* sync pushed, indefinitely, with nothing to
+// ever retry it. That's indistinguishable from "the leaderboard doesn't
+// work" for anyone whose connection hiccups right as a session ends. A few
+// retries with backoff, same pattern as saveNewUserToSupabase, covers the
+// common transient case.
 export async function syncFocusLog(
   userId: string,
-  focusLog: { date: string; mins: number }[]
+  focusLog: { date: string; mins: number }[],
+  attempt = 1
 ): Promise<void> {
   try {
     // Rollups for the public leaderboard (see focus_today/week/alltime_mins
@@ -206,9 +234,17 @@ export async function syncFocusLog(
 
     if (error) {
       console.error('[supabaseStorage] syncFocusLog error:', error.message);
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1500 * attempt));
+        return syncFocusLog(userId, focusLog, attempt + 1);
+      }
     }
   } catch (err) {
     console.error('[supabaseStorage] syncFocusLog exception:', err);
+    if (attempt < 3) {
+      await new Promise(r => setTimeout(r, 1500 * attempt));
+      return syncFocusLog(userId, focusLog, attempt + 1);
+    }
   }
 }
 

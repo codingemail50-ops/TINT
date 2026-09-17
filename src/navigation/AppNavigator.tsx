@@ -380,12 +380,22 @@ const AppNavigatorInner: React.FC = () => {
       // slow/cold connection left the screen stuck on whatever it was
       // showing (createAccount, mid Google sign-in) with no error and no
       // way forward, since nothing here ever timed out on its own.
-      const loaded = await withTimeout(loadUserFromSupabase(userIdRef.current), REMOTE_TIMEOUT_MS, null);
+      // resetLocalLogs=true: same cross-account leak finishOnboarding
+      // already guards against (local storage isn't namespaced per-account)
+      // — but that only covered the fresh-signup path. Logging into an
+      // *existing* account (this path, including Google) skipped it
+      // entirely: whatever focus/distraction log a previous account left in
+      // AsyncStorage on this device would silently blend into this
+      // account's numbers the moment its next session completed (the
+      // leaderboard's "3 hours showing as 7" bug — someone else's leftover
+      // local minutes getting added on top of a real new session and pushed
+      // straight to this account's own Supabase row). This makes
+      // loadUserFromSupabase overwrite local focus/distraction logs with
+      // this account's own synced history instead of leaving the stale
+      // ones in place.
+      const loaded = await withTimeout(loadUserFromSupabase(userIdRef.current, true), REMOTE_TIMEOUT_MS, null);
       if (loaded) {
-        // Same cross-account leak finishOnboarding already guards against
-        // (local storage isn't namespaced per-account) — but that only
-        // covers the fresh-signup path. Logging into an *existing* account
-        // (this path, including Google) skipped it entirely: if a previous
+        // Same reasoning, for the active-session descriptor: if a previous
         // account on this device left a focus session running when the app
         // got killed, its stale descriptor would still be sitting in
         // AsyncStorage, and the next time this newly-logged-in account
