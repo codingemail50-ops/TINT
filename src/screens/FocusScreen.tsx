@@ -488,13 +488,6 @@ export const FocusScreen: React.FC<Props> = ({
     try { await AsyncStorage.setItem(KEYS.BLOCKED_APPS, JSON.stringify(updated)); } catch {}
   };
 
-  const addCustomApp = () => {
-    Alert.alert(
-      'Add custom apps',
-      'Picking any app on your phone (not just this list) needs a native app-picker, which requires a custom build. Coming soon.'
-    );
-  };
-
   const handleGrantPermission = async (permission: BlockingPermission) => {
     await buttonPress();
     try {
@@ -616,12 +609,6 @@ export const FocusScreen: React.FC<Props> = ({
                     </TouchableOpacity>
                   );
                 })}
-                <TouchableOpacity style={styles.addAppRow} onPress={addCustomApp} activeOpacity={0.7}>
-                  <View style={styles.addAppIcon}>
-                    <Ionicons name="add" size={14} color={Colors.primary} />
-                  </View>
-                  <Text style={styles.addAppText}>Add app to block</Text>
-                </TouchableOpacity>
               </View>
             </>
           )}
@@ -739,8 +726,8 @@ const styles = StyleSheet.create({
   hidden: { display: 'none' },
   // Bottom padding needs to clear the persistent tab bar (see
   // TAB_BAR_CLEARANCE) — the blocked-apps list sits at the very bottom of
-  // this scroll content, and Spacing.xxxl alone left its last rows and the
-  // "Add app to block" row hidden behind the tab bar on a real device.
+  // this scroll content, and Spacing.xxxl alone left its last rows hidden
+  // behind the tab bar on a real device.
   scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 56, paddingBottom: Spacing.xxxl + TAB_BAR_CLEARANCE },
 
   title: { ...Typography.displayMedium, color: Colors.textPrimary },
@@ -863,11 +850,4 @@ const styles = StyleSheet.create({
   appToggleOn: { backgroundColor: Colors.pop },
   appToggleDot: { width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.textPrimary, marginLeft: 3 },
   appToggleDotOn: { marginLeft: 19, backgroundColor: Colors.background },
-  addAppRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 },
-  addAppIcon: {
-    width: 24, height: 24, borderRadius: 12,
-    borderWidth: 1.5, borderColor: Colors.primary, borderStyle: 'dashed',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  addAppText: { color: Colors.primary, fontSize: 14.5, fontFamily: Fonts.medium },
 });

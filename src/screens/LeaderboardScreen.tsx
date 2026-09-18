@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { LeaderboardEntry, LeaderboardPeriod, minsForPeriod } from '../data/leaderboard';
@@ -104,7 +104,12 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      {/* Wraps the whole scroll so the "Add a friend" search box (moved
+          right below the scope toggle, close to the top, for the same
+          reason) shrinks the visible area instead of just sitting wherever
+          the keyboard happens to land on top of it. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Locked In</Text>
 
         <View style={styles.periodRow}>
@@ -131,6 +136,18 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
             <Text style={[styles.scopeText, scope === 'global' && styles.scopeTextActive]}>Global</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Friend requests are the app's main USP but used to live only in
+            Profile, a screen people rarely open — surfaced here too, right
+            where someone looking at their Squad would want to grow it. Kept
+            high up (right under the scope toggle) rather than at the
+            bottom of the list, so the "Add a friend" field is never far
+            enough down the scroll to end up hidden behind the keyboard. */}
+        {scope === 'local' && (
+          <View style={styles.friendsSection}>
+            <FriendsPanel userId={userId} />
+          </View>
+        )}
 
         {/* Only worth showing when there's an actual choice to make —
             enrolled in one exam, "compare within my exam" is the whole
@@ -166,17 +183,9 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
           ))}
         </View>
 
-        {/* Friend requests are the app's main USP but used to live only in
-            Profile, a screen people rarely open — surfaced here too, right
-            where someone looking at their Squad would want to grow it. */}
-        {scope === 'local' && (
-          <View style={styles.friendsSection}>
-            <FriendsPanel userId={userId} />
-          </View>
-        )}
-
         <View style={{ height: 100 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 };
@@ -211,7 +220,7 @@ const styles = StyleSheet.create({
   examTabActive: { color: Colors.pop, borderColor: Colors.pop },
 
   friendsSection: {
-    marginTop: Spacing.xl, paddingTop: Spacing.lg,
+    marginTop: Spacing.md, paddingTop: Spacing.lg, marginBottom: Spacing.lg,
     borderTopWidth: 1, borderTopColor: Colors.border,
   },
 

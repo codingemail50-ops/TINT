@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
 import { AppState } from '../utils/storage';
-import { FocusLogEntry, loadFocusLog, FocusTimeframe, FocusBucket, getFocusSummary, getFocusHeatmap } from '../utils/focusLog';
+import { FocusLogEntry, loadFocusLog, FocusTimeframe, FocusBucket, getFocusSummary, getFocusHeatmap, computeFocusStats } from '../utils/focusLog';
 import { DistractionLogEntry, loadDistractionLog } from '../utils/distractionLog';
 import { subscribeDevClock, now as devNow } from '../utils/devClock';
 import { REALITY_CHECK_MESSAGES } from '../data/examPresets';
@@ -365,6 +365,13 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
 
   const todayRecord = appState.history.find(h => h.date === new Date().toDateString());
 
+  // Always visible regardless of which Day/Week/Month/All Time tab is
+  // selected — the point is a permanent "here's everything you've put in
+  // since day one" number for motivation, not one more thing that changes
+  // when you switch tabs (the All Time tab's own "Time focused" stat
+  // already shows this same total, but only while that tab is selected).
+  const lifetimeMins = useMemo(() => computeFocusStats(focusLog).allTime, [focusLog]);
+
   const categoryTime = useMemo(() => {
     if (!todayRecord) return [];
     const byCategory = new Map<string, number>();
@@ -384,6 +391,14 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
 
         <Text style={styles.title}>Insights</Text>
         <Text style={styles.subtitle}>{summary.periodLabel}</Text>
+
+        <View style={styles.lifetimeCard}>
+          <Ionicons name="flame" size={22} color={Colors.pop} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.lifetimeValue}>{formatMinsShort(lifetimeMins)}</Text>
+            <Text style={styles.lifetimeLabel}>Total focus time since you started with TINT</Text>
+          </View>
+        </View>
 
         <View style={styles.tabRow}>
           {TIMEFRAMES.map(tf => (
@@ -463,6 +478,15 @@ const styles = StyleSheet.create({
 
   title: { ...Typography.displayMedium, color: Colors.pop },
   subtitle: { ...Typography.bodyMedium, color: Colors.textSecondary, marginTop: 4, marginBottom: Spacing.lg },
+
+  lifetimeCard: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+    backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.lg,
+    padding: Spacing.md, marginBottom: Spacing.lg,
+    borderWidth: 1, borderColor: Colors.pop + '33',
+  },
+  lifetimeValue: { fontSize: 22, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.5 },
+  lifetimeLabel: { ...Typography.bodySmall, color: Colors.textSecondary, marginTop: 2 },
 
   tabRow: {
     flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: BorderRadius.full,

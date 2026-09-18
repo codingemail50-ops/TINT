@@ -1,9 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, TextInput, Image,
-  Animated, Easing, NativeSyntheticEvent, NativeScrollEvent,
+  Animated, Easing, NativeSyntheticEvent, NativeScrollEvent, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts, Typography } from '../constants/theme';
 import { Bonfire } from '../components/Bonfire';
 import { PixelIcon } from '../components/PixelIcon';
@@ -259,6 +260,11 @@ export const WalkthroughScreen: React.FC<Props> = ({ onDone }) => {
     goToIndex(index + 1);
   };
 
+  const handleBack = () => {
+    void buttonPress();
+    goToIndex(index - 1);
+  };
+
   const handleSkip = () => {
     void buttonPress();
     onDone();
@@ -282,52 +288,73 @@ export const WalkthroughScreen: React.FC<Props> = ({ onDone }) => {
     <View style={styles.container}>
       <StatusBar style="light" />
 
+      {/* Swiping back works on every slide except the last (scrollEnabled
+          is off there so a stray swipe while typing the goal doesn't lose
+          your place) -- but nothing ever told anyone that gesture existed,
+          and the last slide had no way back at all. An explicit button,
+          symmetric with Skip on the other side, works everywhere and
+          doesn't rely on it being discovered. */}
+      {index > 0 && (
+        <TouchableOpacity style={styles.backBtn} onPress={handleBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+          <Ionicons name="chevron-back" size={22} color={Colors.textSecondary} />
+        </TouchableOpacity>
+      )}
+
       {!isLastSlide(index) && (
         <TouchableOpacity style={styles.skipBtn} onPress={handleSkip} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Text style={styles.skipText}>Skip</Text>
         </TouchableOpacity>
       )}
 
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        scrollEnabled={!isLastSlide(index)}
-        onMomentumScrollEnd={handleMomentumEnd}
-        onLayout={e => setPageHeight(e.nativeEvent.layout.height)}
-        keyboardShouldPersistTaps="handled"
-        style={{ flex: 1 }}
-      >
-        <View style={{ width: W, height: pageHeight || undefined }}><ProblemSlide /></View>
-        <View style={{ width: W, height: pageHeight || undefined }}><TaskSlide /></View>
-        <View style={{ width: W, height: pageHeight || undefined }}><FocusSlide /></View>
-        <View style={{ width: W, height: pageHeight || undefined }}><SquadSlide /></View>
-        <View style={{ width: W, height: pageHeight || undefined }}>
-          <FutureSlide
-            goalText={goalText}
-            onChangeGoalText={setGoalText}
-            goalDate={goalDate}
-            onOpenDatePicker={() => setDatePickerOpen(true)}
-            confirmed={goalConfirmed}
-            onConfirm={handleConfirmGoal}
-            onLockIn={handleLockIn}
-          />
-        </View>
-      </ScrollView>
-
-      {!isLastSlide(index) && (
-        <View style={styles.footer}>
-          <View style={styles.dots}>
-            {Array.from({ length: SLIDE_COUNT }).map((_, i) => (
-              <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
-            ))}
+      {/* The goal-text input on the last slide used to sit wherever the
+          keyboard happened to land on top of it — nothing here shrank or
+          shifted for the keyboard at all. Shrinking the available height
+          (behavior 'height'/'padding') feeds back into the ScrollView's own
+          onLayout below, which re-measures pageHeight smaller and
+          re-centers each slide's content inside that smaller box, keeping
+          the input clear of the keyboard. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEnabled={!isLastSlide(index)}
+          onMomentumScrollEnd={handleMomentumEnd}
+          onLayout={e => setPageHeight(e.nativeEvent.layout.height)}
+          keyboardShouldPersistTaps="handled"
+          style={{ flex: 1 }}
+        >
+          <View style={{ width: W, height: pageHeight || undefined }}><ProblemSlide /></View>
+          <View style={{ width: W, height: pageHeight || undefined }}><TaskSlide /></View>
+          <View style={{ width: W, height: pageHeight || undefined }}><FocusSlide /></View>
+          <View style={{ width: W, height: pageHeight || undefined }}><SquadSlide /></View>
+          <View style={{ width: W, height: pageHeight || undefined }}>
+            <FutureSlide
+              goalText={goalText}
+              onChangeGoalText={setGoalText}
+              goalDate={goalDate}
+              onOpenDatePicker={() => setDatePickerOpen(true)}
+              confirmed={goalConfirmed}
+              onConfirm={handleConfirmGoal}
+              onLockIn={handleLockIn}
+            />
           </View>
-          <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
-            <Text style={styles.nextText}>Next</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        </ScrollView>
+
+        {!isLastSlide(index) && (
+          <View style={styles.footer}>
+            <View style={styles.dots}>
+              {Array.from({ length: SLIDE_COUNT }).map((_, i) => (
+                <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
+              ))}
+            </View>
+            <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
+              <Text style={styles.nextText}>Next</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </KeyboardAvoidingView>
 
       <DateWheelPicker
         visible={datePickerOpen}
@@ -344,6 +371,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
 
   skipBtn: { position: 'absolute', top: 58, right: Spacing.xl, zIndex: 2 },
+  backBtn: { position: 'absolute', top: 54, left: Spacing.lg, zIndex: 2, padding: 4 },
   skipText: { fontSize: 15, color: Colors.textSecondary, fontFamily: Fonts.medium },
 
   slideInner: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xl },

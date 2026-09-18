@@ -97,17 +97,27 @@ export const BlobDial: React.FC<Props> = ({
         if (delta < -180) delta += 360;
         const atMax = currentValueSV.value >= maxValue;
         const atMin = currentValueSV.value <= minValue;
+        // Discard overshoot past either end identically for both the
+        // visual spin and the step accumulator. Previously only `rotation`
+        // froze here while `accum` kept absorbing the extra drag (fully
+        // consumed by repeated no-op bumpValue calls at the cap) -- that
+        // desynced the two, so the next time you dragged back to the same
+        // value, the leftover in `accum` no longer lined up with the
+        // rotation angle it lined up with the first time, and the dot
+        // landed somewhere else. Freezing both together keeps the
+        // value<->angle mapping exact no matter how far a drag overshoots
+        // the ends.
         if (!((atMax && delta > 0) || (atMin && delta < 0))) {
           rotation.value += delta;
-        }
-        accum.value += delta * ROTATION_SENSITIVITY;
-        while (accum.value >= DEGREES_PER_STEP) {
-          accum.value -= DEGREES_PER_STEP;
-          runOnJS(bumpValue)(1);
-        }
-        while (accum.value <= -DEGREES_PER_STEP) {
-          accum.value += DEGREES_PER_STEP;
-          runOnJS(bumpValue)(-1);
+          accum.value += delta * ROTATION_SENSITIVITY;
+          while (accum.value >= DEGREES_PER_STEP) {
+            accum.value -= DEGREES_PER_STEP;
+            runOnJS(bumpValue)(1);
+          }
+          while (accum.value <= -DEGREES_PER_STEP) {
+            accum.value += DEGREES_PER_STEP;
+            runOnJS(bumpValue)(-1);
+          }
         }
       }
       lastAngle.value = angle;
@@ -126,11 +136,20 @@ export const BlobDial: React.FC<Props> = ({
   // the dial rather than another ring on it.
   const center = size / 2;
   const hintRadius = dotRadius + size * 0.16;
-  const hintStart = pointOnCircle(center, center, hintRadius, HINT_START_DEG);
-  const hintEnd = pointOnCircle(center, center, hintRadius, HINT_END_DEG);
-  const hintArcPath = `M ${hintStart.x} ${hintStart.y} A ${hintRadius} ${hintRadius} 0 0 1 ${hintEnd.x} ${hintEnd.y}`;
   const hintStrokeWidth = Math.max(5, size * 0.028);
   const arrowSize = size * 0.075;
+  // The arc sits at hintRadius from center, deliberately outside the dial's
+  // own rim (dotRadius) — but hintRadius is already bigger than size/2, and
+  // the arrowhead's diagonal tips (up to arrowSize*sqrt(2) further out
+  // still) reach further yet. Both were being clipped by the size x size
+  // box below, which only has size/2 of room from center. This overlay
+  // gets its own bigger, still-centered box sized to actually contain them.
+  const hintBoxSize = (hintRadius + arrowSize * 2) * 2;
+  const hintCenter = hintBoxSize / 2;
+  const hintBoxOffset = (size - hintBoxSize) / 2;
+  const hintStart = pointOnCircle(hintCenter, hintCenter, hintRadius, HINT_START_DEG);
+  const hintEnd = pointOnCircle(hintCenter, hintCenter, hintRadius, HINT_END_DEG);
+  const hintArcPath = `M ${hintStart.x} ${hintStart.y} A ${hintRadius} ${hintRadius} 0 0 1 ${hintEnd.x} ${hintEnd.y}`;
   // Tangent direction of the arc at its end point (the derivative of
   // pointOnCircle's parametric circle is (cos, sin) of the same angle) —
   // rotating a caret whose tip points along local +x by this angle makes
@@ -149,7 +168,13 @@ export const BlobDial: React.FC<Props> = ({
             <Circle cx={size / 2} cy={size / 2 - dotRadius} r={size * 0.035} fill={Colors.pop} />
           </Svg>
         </Animated.View>
-        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={StyleSheet.absoluteFillObject} pointerEvents="none">
+        <Svg
+          width={hintBoxSize}
+          height={hintBoxSize}
+          viewBox={`0 0 ${hintBoxSize} ${hintBoxSize}`}
+          style={{ position: 'absolute', left: hintBoxOffset, top: hintBoxOffset }}
+          pointerEvents="none"
+        >
           <G opacity={HINT_OPACITY}>
             <Path d={hintArcPath} stroke={Colors.pop} strokeWidth={hintStrokeWidth} fill="none" strokeLinecap="round" />
             <Path
