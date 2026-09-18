@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, memo } from 'react';
 import { View, Animated, StyleSheet, TouchableOpacity, Dimensions, Easing } from 'react-native';
 import { PixelIcon } from './PixelIcon';
+import { Colors } from '../constants/theme';
 
 // Split out and memoized so tapping a new avatar only re-renders the (at
 // most two) cells whose selected state actually flipped, instead of every
@@ -147,10 +148,19 @@ const styles = StyleSheet.create({
     height: '160%',
   },
   row: { flexDirection: 'row', marginBottom: 4 },
+  // Every cell gets its own chip (fill + border) by default now — an icon
+  // sitting directly on the busy scrolling wall with nothing behind it had
+  // no visual separation from the background, especially icons close in
+  // tone to the dark backdrop, and read as decoration rather than a
+  // tappable button. cellSelected layers the orange highlight on top.
   cell: {
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 4,
+    backgroundColor: Colors.surface + 'CC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   cellSelected: {
     backgroundColor: 'rgba(255,106,0,0.22)',
