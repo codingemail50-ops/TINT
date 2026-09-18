@@ -14,7 +14,7 @@ import { ProductivityScreen } from '../screens/ProductivityScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { StorageService, AppState, UserProfile, FutureGoal } from '../utils/storage';
-import { ExamType, CustomExam } from '../data/examPresets';
+import { ExamType, CustomExam, ClassTwelveStream } from '../data/examPresets';
 import { supabase } from '../lib/supabase';
 import { FocusSessionProvider, useFocusSessionStatus } from '../context/FocusSessionContext';
 import { FocusMiniPlayer } from '../components/FocusMiniPlayer';
@@ -97,6 +97,7 @@ interface OnboardingDraft {
   avatar: string;
   examTypes: ExamType[];
   customExam?: CustomExam;
+  classTwelveStream?: ClassTwelveStream;
   dailyFocusGoalMins: number;
   name: string;
   email: string;
@@ -235,18 +236,19 @@ const AppNavigatorInner: React.FC = () => {
   const handleWalkthroughDone = (futureGoal?: FutureGoal) => {
     draftRef.current.futureGoal = futureGoal;
     setScreen('focusGoal');
-    const { avatar, examTypes, customExam, name, email, dailyFocusGoalMins } = draftRef.current;
+    const { avatar, examTypes, customExam, classTwelveStream, name, email, dailyFocusGoalMins } = draftRef.current;
     void saveOnboardingProgress({
-      name, email, examTypes, customExam, avatar, futureGoal: futureGoal ?? null,
+      name, email, examTypes, customExam, classTwelveStream, avatar, futureGoal: futureGoal ?? null,
       createdAt: new Date().toISOString(), dailyFocusGoalMins,
     });
   };
 
   // ── Onboarding flow: avatarExam -> createAccount -> walkthrough -> focusGoal ──
-  const handleAvatarExamComplete = (data: { avatar: string; examTypes: ExamType[]; customExam?: CustomExam }) => {
+  const handleAvatarExamComplete = (data: { avatar: string; examTypes: ExamType[]; customExam?: CustomExam; classTwelveStream?: ClassTwelveStream }) => {
     draftRef.current.avatar = data.avatar;
     draftRef.current.examTypes = data.examTypes;
     draftRef.current.customExam = data.customExam;
+    draftRef.current.classTwelveStream = data.classTwelveStream;
     setScreen('createAccount');
   };
 
@@ -282,9 +284,9 @@ const AppNavigatorInner: React.FC = () => {
   // name/email from signup, the future goal from the walkthrough, and the
   // daily-focus-goal minutes just set here), then lands in the app.
   const handleFocusGoalComplete = (mins: number) => {
-    const { avatar, examTypes, customExam, name, email, futureGoal } = draftRef.current;
+    const { avatar, examTypes, customExam, classTwelveStream, name, email, futureGoal } = draftRef.current;
     finishOnboarding({
-      name, email, examTypes, customExam, avatar, futureGoal: futureGoal ?? null,
+      name, email, examTypes, customExam, classTwelveStream, avatar, futureGoal: futureGoal ?? null,
       createdAt: new Date().toISOString(), dailyFocusGoalMins: mins,
     });
   };
@@ -353,9 +355,9 @@ const AppNavigatorInner: React.FC = () => {
     // profile row at all.
     if (userId) userIdRef.current = userId;
     setScreen('walkthrough');
-    const { avatar, examTypes, customExam, dailyFocusGoalMins } = draftRef.current;
+    const { avatar, examTypes, customExam, classTwelveStream, dailyFocusGoalMins } = draftRef.current;
     void saveOnboardingProgress({
-      name, email, examTypes, customExam, avatar, futureGoal: null,
+      name, email, examTypes, customExam, classTwelveStream, avatar, futureGoal: null,
       createdAt: new Date().toISOString(), dailyFocusGoalMins,
     });
   };

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Task, CustomExam } from '../data/examPresets';
+import { Task, CustomExam, ClassTwelveStream } from '../data/examPresets';
 import { now as devNow } from './devClock';
 
 export interface FutureGoal {
@@ -18,6 +18,9 @@ export interface UserProfile {
   dailyFocusGoalMins: number;
   /** Set instead of (or alongside) examTypes when picked via "Other". */
   customExam?: CustomExam;
+  /** Only meaningful when examTypes includes 'CLASS12' — which stream's
+   *  board exams they're prepping for. */
+  classTwelveStream?: ClassTwelveStream;
   /** Set on the walkthrough's final screen — null for anyone who skipped
    *  the walkthrough or onboarded before this field existed. */
   futureGoal?: FutureGoal | null;

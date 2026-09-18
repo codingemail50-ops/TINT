@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollV
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
-import { EXAM_TYPES, ExamType, AVATARS, CustomExam } from '../data/examPresets';
+import { EXAM_TYPES, ExamType, AVATARS, CustomExam, ClassTwelveStream, CLASS_TWELVE_STREAMS } from '../data/examPresets';
 import { AvatarWall } from '../components/AvatarWall';
 import { PixelIcon } from '../components/PixelIcon';
 import { CustomExamModal } from '../components/CustomExamModal';
@@ -13,7 +13,7 @@ const { width: W } = Dimensions.get('window');
 const WALL_HEIGHT = 260;
 
 interface Props {
-  onComplete: (data: { avatar: string; examTypes: ExamType[]; customExam?: CustomExam }) => void;
+  onComplete: (data: { avatar: string; examTypes: ExamType[]; customExam?: CustomExam; classTwelveStream?: ClassTwelveStream }) => void;
   onLogin: () => void;
 }
 
@@ -29,6 +29,7 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin }) => {
   // screen). "Change avatar" reopens the wall to pick again.
   const [picking, setPicking] = useState(true);
   const [selectedExams, setSelectedExams] = useState<Set<ExamType>>(new Set());
+  const [classTwelveStream, setClassTwelveStream] = useState<ClassTwelveStream | null>(null);
   const [customExam, setCustomExam] = useState<CustomExam | null>(null);
   const [customExamModalOpen, setCustomExamModalOpen] = useState(false);
   const examPunch = useRef(EXAM_TYPES.map(() => new Animated.Value(1))).current;
@@ -81,7 +82,12 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin }) => {
   const handleContinue = () => {
     if (!canProceed) return;
     buttonPress();
-    onComplete({ avatar, examTypes: Array.from(selectedExams), customExam: customExam ?? undefined });
+    onComplete({
+      avatar,
+      examTypes: Array.from(selectedExams),
+      customExam: customExam ?? undefined,
+      classTwelveStream: selectedExams.has('CLASS12') ? (classTwelveStream ?? 'Science') : undefined,
+    });
   };
 
   return (
@@ -128,15 +134,6 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin }) => {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={examS.sectionLabel}>What's Your Exam?</Text>
-        <TouchableOpacity
-          style={[examS.otherBtn, !!customExam && examS.otherBtnActive]}
-          onPress={handleOther}
-          activeOpacity={0.75}
-        >
-          <Text style={[examS.otherText, !!customExam && examS.otherTextActive]} numberOfLines={1}>
-            {customExam ? `✓ ${customExam.name}` : 'Other'}
-          </Text>
-        </TouchableOpacity>
         <View style={examS.grid}>
           {EXAM_TYPES.map((exam, index) => {
             const checked = selectedExams.has(exam.id);
@@ -156,6 +153,43 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin }) => {
             );
           })}
         </View>
+
+        {/* Only shown once Class 12 is actually picked — a sub-choice of
+            that card, not a separate list entry, so the 8-option count
+            above stays the count of exams, not exams-times-streams. */}
+        {selectedExams.has('CLASS12') && (
+          <View style={examS.streamRow}>
+            <Text style={examS.streamLabel}>WHICH STREAM?</Text>
+            <View style={examS.streamChips}>
+              {CLASS_TWELVE_STREAMS.map(stream => {
+                const active = (classTwelveStream ?? 'Science') === stream;
+                return (
+                  <TouchableOpacity
+                    key={stream}
+                    style={[examS.streamChip, active && examS.streamChipActive]}
+                    onPress={() => { buttonPress(); setClassTwelveStream(stream); }}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[examS.streamChipText, active && examS.streamChipTextActive]}>{stream}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* "Other" moved below the grid (was above it) — it's the least
+            common choice, so it shouldn't be the first thing anyone sees. */}
+        <TouchableOpacity
+          style={[examS.otherBtn, !!customExam && examS.otherBtnActive]}
+          onPress={handleOther}
+          activeOpacity={0.75}
+        >
+          <Text style={[examS.otherText, !!customExam && examS.otherTextActive]} numberOfLines={1}>
+            {customExam ? `✓ ${customExam.name}` : 'Other'}
+          </Text>
+        </TouchableOpacity>
+
         {selectedExams.size > 1 && (
           <View style={examS.comboNote}>
             <Text style={examS.comboText}>
@@ -200,12 +234,22 @@ const examS = StyleSheet.create({
     borderColor: Colors.border,
     paddingVertical: 14,
     alignItems: 'center',
-    marginBottom: 10,
+    marginTop: 14,
   },
   otherText: { fontSize: 15, fontFamily: Fonts.bold, color: Colors.textSecondary },
   otherBtnActive: { backgroundColor: Colors.pop, borderColor: Colors.pop },
   otherTextActive: { color: '#000' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  streamRow: { marginTop: 14 },
+  streamLabel: { fontSize: 11, fontFamily: Fonts.bold, color: Colors.textMuted, letterSpacing: 1, marginBottom: 8 },
+  streamChips: { flexDirection: 'row', gap: 8 },
+  streamChip: {
+    flex: 1, paddingVertical: 10, borderRadius: BorderRadius.full,
+    borderWidth: 2, borderColor: Colors.border, alignItems: 'center',
+  },
+  streamChipActive: { backgroundColor: Colors.pop, borderColor: Colors.pop },
+  streamChipText: { fontSize: 13, fontFamily: Fonts.semibold, color: Colors.textSecondary },
+  streamChipTextActive: { color: '#000' },
   card: {
     backgroundColor: Colors.surfaceElevated,
     borderRadius: BorderRadius.lg,

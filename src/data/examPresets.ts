@@ -1,4 +1,7 @@
-export type ExamType = 'JEE' | 'UCEED' | 'NID' | 'NIFT';
+export type ExamType = 'JEE' | 'CLASS12' | 'CLASS10' | 'UCEED' | 'NID' | 'NIFT' | 'IPMAT';
+
+export type ClassTwelveStream = 'Science' | 'Commerce' | 'Arts';
+export const CLASS_TWELVE_STREAMS: ClassTwelveStream[] = ['Science', 'Commerce', 'Arts'];
 
 export interface Task {
   id: string;
@@ -24,11 +27,17 @@ export interface CustomExam {
   tasks: { title: string; duration: number }[];
 }
 
+// Order here is deliberate — JEE first (most common), then the two board
+// exams, then the design entrances, IPMAT, with "Other" rendered separately
+// (and last) by whichever screen renders this list rather than living here.
 export const EXAM_TYPES: { id: ExamType; label: string; icon: string; description: string; color: string }[] = [
-  { id: 'JEE',   label: 'JEE',   icon: 'flash',          description: 'Joint Entrance Exam — Mains & Advanced', color: '#3B82F6' },
-  { id: 'UCEED', label: 'UCEED', icon: 'pencil',         description: 'Undergraduate Common Entrance Exam for Design', color: '#8B5CF6' },
-  { id: 'NID',   label: 'NID',   icon: 'color-palette',  description: 'National Institute of Design Entrance', color: '#EC4899' },
-  { id: 'NIFT',  label: 'NIFT',  icon: 'shirt',          description: 'National Institute of Fashion Technology', color: '#F59E0B' },
+  { id: 'JEE',    label: 'JEE',      icon: 'flash',         description: 'Joint Entrance Exam — Mains & Advanced', color: '#3B82F6' },
+  { id: 'CLASS12', label: 'Class 12', icon: 'school',       description: 'Class 12 board exams', color: '#22C55E' },
+  { id: 'CLASS10', label: 'Class 10', icon: 'school-outline', description: 'Class 10 board exams', color: '#14B8A6' },
+  { id: 'UCEED',  label: 'UCEED',    icon: 'pencil',        description: 'Undergraduate Common Entrance Exam for Design', color: '#8B5CF6' },
+  { id: 'NID',    label: 'NID',      icon: 'color-palette', description: 'National Institute of Design Entrance', color: '#EC4899' },
+  { id: 'NIFT',   label: 'NIFT',     icon: 'shirt',         description: 'National Institute of Fashion Technology', color: '#F59E0B' },
+  { id: 'IPMAT',  label: 'IPMAT',    icon: 'calculator',    description: 'Integrated Program in Management Aptitude Test', color: '#6366F1' },
 ];
 
 const BASE_TASKS: Record<ExamType, Task[]> = {
@@ -60,16 +69,38 @@ const BASE_TASKS: Record<ExamType, Task[]> = {
     { id: 'nift-4', title: 'Design Theory & Trends',             duration: 45, category: 'Theory' },
     { id: 'nift-5', title: 'Situation Test Prep',                duration: 45, category: 'Portfolio' },
   ],
+  // Boards cover a wide range of subject combinations (streams, electives)
+  // that vary a lot per person — deliberately generic and few in number
+  // (rather than a false-precision subject list) so they're quick to
+  // delete/edit down to whatever someone's own subjects actually are.
+  CLASS10: [
+    { id: 'c10-1', title: 'Core Subjects Revision',              duration: 60, category: 'Boards' },
+    { id: 'c10-2', title: 'Practice Paper / Sample Questions',   duration: 45, category: 'Practice' },
+    { id: 'c10-3', title: 'Weak Topics Review',                  duration: 30, category: 'Revision' },
+  ],
+  CLASS12: [
+    { id: 'c12-1', title: 'Core Subjects Study',                 duration: 75, category: 'Boards' },
+    { id: 'c12-2', title: 'Practice Paper / Previous Year Questions', duration: 60, category: 'Practice' },
+    { id: 'c12-3', title: 'Revision & Notes',                    duration: 30, category: 'Revision' },
+  ],
+  IPMAT: [
+    { id: 'ipmat-1', title: 'Quantitative Ability Practice',     duration: 60, category: 'Aptitude' },
+    { id: 'ipmat-2', title: 'Verbal Ability & Reading Comprehension', duration: 60, category: 'Aptitude' },
+    { id: 'ipmat-3', title: 'Logical Reasoning Practice',        duration: 45, category: 'Aptitude' },
+  ],
 };
 
 export function getCombinedPreset(exams: ExamType[]): Task[] {
   if (exams.length === 0) return [];
   if (exams.length === 1) return BASE_TASKS[exams[0]].map(t => ({ ...t }));
 
-  const hasJEE   = exams.includes('JEE');
-  const hasUCEED = exams.includes('UCEED');
-  const hasNID   = exams.includes('NID');
-  const hasNIFT  = exams.includes('NIFT');
+  const hasJEE     = exams.includes('JEE');
+  const hasUCEED   = exams.includes('UCEED');
+  const hasNID     = exams.includes('NID');
+  const hasNIFT    = exams.includes('NIFT');
+  const hasClass10 = exams.includes('CLASS10');
+  const hasClass12 = exams.includes('CLASS12');
+  const hasIPMAT   = exams.includes('IPMAT');
 
   const tasks: Task[] = [];
 
@@ -103,6 +134,18 @@ export function getCombinedPreset(exams: ExamType[]): Task[] {
   // Portfolio — if any design exam
   if (hasUCEED || hasNID || hasNIFT) {
     tasks.push({ id: 'c-port', title: 'Portfolio Development', duration: 45, category: 'Portfolio' });
+  }
+
+  // Boards — common alongside JEE (prepping for both at once) or the
+  // design entrances. Deliberately one generic task, not a subject list —
+  // same reasoning as the standalone CLASS10/CLASS12 presets above.
+  if (hasClass10 || hasClass12) {
+    tasks.push({ id: 'c-board', title: 'Board Exam Revision', duration: 60, category: 'Boards' });
+  }
+
+  // IPMAT's aptitude sections don't overlap with any of the above.
+  if (hasIPMAT) {
+    tasks.push({ id: 'c-ipmat', title: 'Quantitative & Verbal Ability Practice', duration: 60, category: 'Aptitude' });
   }
 
   // Practice paper

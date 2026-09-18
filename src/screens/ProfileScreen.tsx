@@ -8,7 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts, Typography } from '../constants/theme';
 import { PixelIcon } from '../components/PixelIcon';
-import { AVATARS, EXAM_TYPES, ExamType, CustomExam } from '../data/examPresets';
+import { AVATARS, EXAM_TYPES, ExamType, CustomExam, ClassTwelveStream, CLASS_TWELVE_STREAMS } from '../data/examPresets';
 import { AppState, StorageService } from '../utils/storage';
 import { FriendsPanel } from '../components/FriendsPanel';
 import { saveFocusLog, saveBestFlameMins } from '../utils/focusLog';
@@ -38,6 +38,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
   const [editExamOpen, setEditExamOpen] = useState(false);
   const [editExamTypes, setEditExamTypes] = useState<Set<ExamType>>(new Set());
   const [editCustomExam, setEditCustomExam] = useState<CustomExam | null>(null);
+  const [editClassTwelveStream, setEditClassTwelveStream] = useState<ClassTwelveStream>('Science');
   const [customExamModalOpen, setCustomExamModalOpen] = useState(false);
   const { buttonPress } = useHaptics();
 
@@ -62,6 +63,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
   const openEditExam = () => {
     setEditExamTypes(new Set((appState.user?.examTypes ?? []) as ExamType[]));
     setEditCustomExam(appState.user?.customExam ?? null);
+    setEditClassTwelveStream(appState.user?.classTwelveStream ?? 'Science');
     setEditExamOpen(true);
   };
 
@@ -74,10 +76,9 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
     });
   };
 
-  // Only touches this profile's own exam fields — the day's already-
-  // generated task list (see TodoScreen's refreshDay) only regenerates
-  // from these on the next new day, so changing your exam here never
-  // rewrites tasks you already have in progress.
+  // Updates this profile's exam fields — TodoScreen watches appState.user's
+  // examTypes/customExam and regenerates today's (non-custom) task list the
+  // moment they actually change, rather than waiting for the next new day.
   const handleSaveExam = () => {
     if (!appState.user) return;
     if (editExamTypes.size === 0 && !editCustomExam) return;
@@ -87,6 +88,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
         ...appState.user,
         examTypes: Array.from(editExamTypes),
         customExam: editCustomExam ?? undefined,
+        classTwelveStream: editExamTypes.has('CLASS12') ? editClassTwelveStream : undefined,
       },
     });
     setEditExamOpen(false);
@@ -129,7 +131,9 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
   const examLabel = user?.customExam
     ? user.customExam.name
     : (user?.examTypes ?? []).length > 0
-      ? (user!.examTypes as ExamType[]).join(', ')
+      ? (user!.examTypes as ExamType[])
+          .map(id => EXAM_TYPES.find(e => e.id === id)?.label ?? id)
+          .join(', ')
       : 'Not set';
 
   return (
@@ -278,33 +282,57 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
         <View style={styles.editBackdrop}>
           <View style={styles.editCard}>
             <Text style={styles.editTitle}>Studying For</Text>
-            <TouchableOpacity
-              style={[styles.examOtherBtn, !!editCustomExam && styles.examOtherBtnActive]}
-              onPress={() => { buttonPress(); setCustomExamModalOpen(true); }}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.examOtherText, !!editCustomExam && styles.examOtherTextActive]} numberOfLines={1}>
-                {editCustomExam ? `✓ ${editCustomExam.name}` : 'Other'}
-              </Text>
-            </TouchableOpacity>
-            <View style={styles.examGrid}>
-              {EXAM_TYPES.map(exam => {
-                const checked = editExamTypes.has(exam.id);
-                return (
-                  <TouchableOpacity
-                    key={exam.id}
-                    style={[styles.examCard, checked && styles.examCardActive]}
-                    onPress={() => toggleEditExamType(exam.id)}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={[styles.examCardText, checked && styles.examCardTextActive]}>{exam.label}</Text>
-                    <View style={[styles.examCheckbox, checked && styles.examCheckboxActive]}>
-                      {checked && <Text style={styles.examCheckmark}>✓</Text>}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            <ScrollView style={styles.examScroll} keyboardShouldPersistTaps="handled">
+              <View style={styles.examGrid}>
+                {EXAM_TYPES.map(exam => {
+                  const checked = editExamTypes.has(exam.id);
+                  return (
+                    <TouchableOpacity
+                      key={exam.id}
+                      style={[styles.examCard, checked && styles.examCardActive]}
+                      onPress={() => toggleEditExamType(exam.id)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.examCardText, checked && styles.examCardTextActive]}>{exam.label}</Text>
+                      <View style={[styles.examCheckbox, checked && styles.examCheckboxActive]}>
+                        {checked && <Text style={styles.examCheckmark}>✓</Text>}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {editExamTypes.has('CLASS12') && (
+                <View style={styles.streamRow}>
+                  <Text style={styles.streamLabel}>WHICH STREAM?</Text>
+                  <View style={styles.streamChips}>
+                    {CLASS_TWELVE_STREAMS.map(stream => {
+                      const active = editClassTwelveStream === stream;
+                      return (
+                        <TouchableOpacity
+                          key={stream}
+                          style={[styles.streamChip, active && styles.streamChipActive]}
+                          onPress={() => { buttonPress(); setEditClassTwelveStream(stream); }}
+                          activeOpacity={0.75}
+                        >
+                          <Text style={[styles.streamChipText, active && styles.streamChipTextActive]}>{stream}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[styles.examOtherBtn, !!editCustomExam && styles.examOtherBtnActive]}
+                onPress={() => { buttonPress(); setCustomExamModalOpen(true); }}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.examOtherText, !!editCustomExam && styles.examOtherTextActive]} numberOfLines={1}>
+                  {editCustomExam ? `✓ ${editCustomExam.name}` : 'Other'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
             <View style={styles.editActions}>
               <TouchableOpacity style={styles.editCancelBtn} onPress={() => setEditExamOpen(false)} activeOpacity={0.75}>
                 <Text style={styles.editCancelText}>Cancel</Text>
@@ -461,14 +489,26 @@ const styles = StyleSheet.create({
   editSaveBtnDisabled: { backgroundColor: Colors.surfaceElevated },
   editSaveText: { fontSize: 15, fontFamily: Fonts.bold, color: '#000' },
 
+  examScroll: { maxHeight: 360 },
   examOtherBtn: {
     backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.full,
     borderWidth: 2, borderColor: Colors.border, paddingVertical: 12, alignItems: 'center',
+    marginTop: 12,
   },
   examOtherBtnActive: { backgroundColor: Colors.pop, borderColor: Colors.pop },
   examOtherText: { fontSize: 14, fontFamily: Fonts.bold, color: Colors.textSecondary },
   examOtherTextActive: { color: '#000' },
   examGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  streamRow: { marginTop: 12 },
+  streamLabel: { fontSize: 11, fontFamily: Fonts.bold, color: Colors.textMuted, letterSpacing: 1, marginBottom: 8 },
+  streamChips: { flexDirection: 'row', gap: 8 },
+  streamChip: {
+    flex: 1, paddingVertical: 9, borderRadius: BorderRadius.full,
+    borderWidth: 2, borderColor: Colors.border, alignItems: 'center',
+  },
+  streamChipActive: { backgroundColor: Colors.pop, borderColor: Colors.pop },
+  streamChipText: { fontSize: 12, fontFamily: Fonts.semibold, color: Colors.textSecondary },
+  streamChipTextActive: { color: '#000' },
   examCard: {
     width: '47%', backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.md,
     padding: Spacing.sm, borderWidth: 2, borderColor: Colors.border,

@@ -25,6 +25,7 @@ interface UserDataRow {
   focus_alltime_mins?: number;
   future_goal_text?: string | null;
   future_goal_date?: string | null;
+  class_twelve_stream?: string | null;
 }
 
 // ── Save a brand-new user to Supabase (upsert) ───────────────────────────────
@@ -58,6 +59,7 @@ export async function saveNewUserToSupabase(
       daily_focus_goal_mins: profile.dailyFocusGoalMins,
       future_goal_text: profile.futureGoal?.text ?? null,
       future_goal_date: profile.futureGoal?.targetDate ?? null,
+      class_twelve_stream: profile.classTwelveStream ?? null,
     };
 
     const { error } = await supabase
@@ -130,6 +132,7 @@ export async function loadUserFromSupabase(userId: string, resetLocalLogs = fals
       futureGoal: row.future_goal_text && row.future_goal_date
         ? { text: row.future_goal_text, targetDate: row.future_goal_date }
         : null,
+      classTwelveStream: (row.class_twelve_stream as UserProfile['classTwelveStream']) ?? undefined,
     };
 
     const appState: AppState = {
@@ -195,6 +198,7 @@ export async function syncAppStateToSupabase(
         updates.future_goal_text = appState.user.futureGoal?.text ?? null;
         updates.future_goal_date = appState.user.futureGoal?.targetDate ?? null;
       }
+      updates.class_twelve_stream = appState.user.classTwelveStream ?? null;
     }
 
     const { error } = await supabase

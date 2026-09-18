@@ -38,6 +38,9 @@ create table if not exists public.user_data (
   -- using TINT to get to. Private (not on leaderboard_view), same as email.
   future_goal_text text,
   future_goal_date text,
+  -- Only meaningful when 'CLASS12' is in exams — which stream's boards
+  -- they're prepping for. Private, same reasoning as the goal fields above.
+  class_twelve_stream text,
   created_at timestamptz default now()
 );
 
@@ -50,6 +53,7 @@ alter table public.user_data add column if not exists focus_week_mins double pre
 alter table public.user_data add column if not exists focus_alltime_mins double precision not null default 0;
 alter table public.user_data add column if not exists future_goal_text text;
 alter table public.user_data add column if not exists future_goal_date text;
+alter table public.user_data add column if not exists class_twelve_stream text;
 -- In case this file was previously run with the old `int` column type —
 -- widen in place so existing rows keep their data instead of needing a drop.
 -- Guarded on the column's current type: once leaderboard_view exists (i.e.

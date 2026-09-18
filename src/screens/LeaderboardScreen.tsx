@@ -9,6 +9,7 @@ import { FriendsPanel } from '../components/FriendsPanel';
 import { AppState, computeLifetimeConsistency } from '../utils/storage';
 import { loadLeaderboard, loadFriendsLeaderboard, CloudLeaderboardRow } from '../utils/supabaseStorage';
 import { loadFocusLog, computeFocusStats } from '../utils/focusLog';
+import { EXAM_TYPES } from '../data/examPresets';
 
 interface Props { appState: AppState; userId?: string }
 
@@ -159,7 +160,9 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
             </TouchableOpacity>
             {myExams.map(exam => (
               <TouchableOpacity key={exam} onPress={() => setExamFilter(exam)} activeOpacity={0.7}>
-                <Text style={[styles.examTab, examFilter === exam && styles.examTabActive]}>{exam}</Text>
+                <Text style={[styles.examTab, examFilter === exam && styles.examTabActive]}>
+                  {EXAM_TYPES.find(e => e.id === exam)?.label ?? exam}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
