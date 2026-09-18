@@ -69,7 +69,7 @@ const ProblemSlide: React.FC = () => {
   return (
     <View style={styles.slideInner}>
       <View style={styles.flameWrap}>
-        <Bonfire progress={0.5} streak={3} maxHeight={100} />
+        <Bonfire todayMins={45} streak={3} maxHeight={100} />
       </View>
       <Text style={styles.title}>You know what you want to do, but you're not able to do it.</Text>
       <Animated.Text style={[styles.reveal, { opacity: revealOpacity }]}>That's what TINT is for.</Animated.Text>

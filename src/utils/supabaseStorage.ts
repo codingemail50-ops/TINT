@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { AppState, UserProfile, computeLifetimeConsistency } from './storage';
-import { FocusLogEntry, computeFocusStats, saveFocusLog } from './focusLog';
+import { FocusLogEntry, computeFocusStats, saveFocusLog, saveBestFlameMins, bestSingleDayMinutes } from './focusLog';
 import { saveDistractionLog } from './distractionLog';
 
 // ── Types for the user_data row ──────────────────────────────────────────────
@@ -154,8 +154,14 @@ export async function loadUserFromSupabase(userId: string, resetLocalLogs = fals
       // never merged/appended, since a previous account's leftover entries
       // must not survive into this login. No remote copy of the
       // distraction log exists (it's on-device only), so it just resets.
-      await saveFocusLog(Array.isArray(row.focus_log) ? row.focus_log : []);
+      const restoredLog = Array.isArray(row.focus_log) ? row.focus_log : [];
+      await saveFocusLog(restoredLog);
       await saveDistractionLog([]);
+      // Re-derived from the account's own restored history rather than
+      // zeroed -- zeroing would undo the home flame's carry-over floor the
+      // moment someone logs into an existing account on a new/cleared
+      // device, which is exactly the case this is meant to still work for.
+      await saveBestFlameMins(bestSingleDayMinutes(restoredLog));
     }
 
     return appState;

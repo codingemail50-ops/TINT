@@ -19,7 +19,7 @@ import { supabase } from '../lib/supabase';
 import { FocusSessionProvider, useFocusSessionStatus } from '../context/FocusSessionContext';
 import { FocusMiniPlayer } from '../components/FocusMiniPlayer';
 import { loadDevOffset, subscribeDevClock } from '../utils/devClock';
-import { saveFocusLog, loadFocusLog } from '../utils/focusLog';
+import { saveFocusLog, loadFocusLog, saveBestFlameMins } from '../utils/focusLog';
 import { saveDistractionLog } from '../utils/distractionLog';
 import { clearActiveSession } from '../utils/activeFocusSession';
 import { stopAppBlocking } from '../utils/appBlocking';
@@ -298,6 +298,7 @@ const AppNavigatorInner: React.FC = () => {
     void clearActiveSession();
     void saveFocusLog([]);
     void saveDistractionLog([]);
+    void saveBestFlameMins(0);
 
     StorageService.saveUser(user)
       .then(() => StorageService.getAppState())

@@ -11,7 +11,7 @@ import { PixelIcon } from '../components/PixelIcon';
 import { AVATARS, EXAM_TYPES, ExamType, CustomExam } from '../data/examPresets';
 import { AppState, StorageService } from '../utils/storage';
 import { FriendsPanel } from '../components/FriendsPanel';
-import { saveFocusLog } from '../utils/focusLog';
+import { saveFocusLog, saveBestFlameMins } from '../utils/focusLog';
 import { saveDistractionLog } from '../utils/distractionLog';
 import { clearActiveSession } from '../utils/activeFocusSession';
 import { supabase } from '../lib/supabase';
@@ -114,6 +114,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
       StorageService.clearAllUserData(),
       saveFocusLog([]),
       saveDistractionLog([]),
+      saveBestFlameMins(0),
       clearActiveSession(),
     ]);
     onLogout();

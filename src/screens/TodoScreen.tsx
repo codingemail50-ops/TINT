@@ -18,7 +18,7 @@ import { FocusScreen } from './FocusScreen';
 import { UCEEDCountdown, NIDCountdown, NIFTCountdown } from '../components/ExamCountdowns';
 import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog, countIncomingRequests } from '../utils/supabaseStorage';
-import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats, subscribeFocusLog } from '../utils/focusLog';
+import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats, subscribeFocusLog, loadBestFlameMins, saveBestFlameMins } from '../utils/focusLog';
 import { DistractionLogEntry, loadDistractionLog, computeDistractedToday, subscribeDistractionLog } from '../utils/distractionLog';
 import { loadActiveSession } from '../utils/activeFocusSession';
 import { now as devNow, subscribeDevClock } from '../utils/devClock';
@@ -193,6 +193,10 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   const [selectedDate, setSelectedDate] = useState(() => devNow().toDateString());
   const [focusLog, setFocusLog] = useState<FocusLogEntry[]>([]);
   const [distractionLog, setDistractionLog] = useState<DistractionLogEntry[]>([]);
+  // Highest single-day focus total ever reached — the home flame's
+  // carry-over floor (see Bonfire.tsx). Bumped up (and persisted) whenever
+  // today's total sets a new record, never lowered.
+  const [bestFlameMins, setBestFlameMins] = useState(0);
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
 
   // Polled rather than pushed — there's no realtime subscription for
@@ -233,11 +237,15 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   const [newTaskRepeat, setNewTaskRepeat]   = useState(false);
   const [newTaskPriority, setNewTaskPriority] = useState(false);
 
-  // Edit task modal (long press) — title, duration, priority
+  // Edit task modal (opened from the pencil icon, see revealedTaskId below)
+  // — title, duration, priority
   const [editingTask, setEditingTask]     = useState<Task | null>(null);
   const [editTitle, setEditTitle]         = useState('');
   const [editDuration, setEditDuration]   = useState(60);
   const [editPriority, setEditPriority]   = useState(false);
+  // Which task's pencil/cross action icons are showing right now (long
+  // press reveals them; at most one task at a time).
+  const [revealedTaskId, setRevealedTaskId] = useState<string | null>(null);
 
   // Celebration
   const [confettiVisible, setConfettiVisible] = useState(false);
@@ -299,6 +307,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   // but never update Today's Focused/Distracted pills or bonfire progress.
   useEffect(() => subscribeFocusLog(() => { loadFocusLog().then(setFocusLog); }), []);
   useEffect(() => subscribeDistractionLog(() => { loadDistractionLog().then(setDistractionLog); }), []);
+  useEffect(() => { loadBestFlameMins().then(setBestFlameMins); }, []);
 
   const viewingPast = selectedDate !== todayStr;
   const pastRecord  = viewingPast
@@ -311,6 +320,16 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   const focusTodayExact = computeFocusStats(focusLog).today;
   const focusToday = Math.round(focusTodayExact);
   const distractedToday = Math.round(computeDistractedToday(distractionLog));
+
+  // Today setting a new personal-best total is what pushes the flame's
+  // carry-over floor up for good — this only ever raises bestFlameMins,
+  // never lowers it.
+  useEffect(() => {
+    if (focusTodayExact > bestFlameMins) {
+      setBestFlameMins(focusTodayExact);
+      void saveBestFlameMins(focusTodayExact);
+    }
+  }, [focusTodayExact, bestFlameMins]);
 
   const completedCount = displayTasks.filter(t => t.completed).length;
   const totalCount     = displayTasks.length;
@@ -408,6 +427,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     const updated = tasks.filter(t => t.id !== id);
     setTasks(updated);
     await StorageService.saveTodayTasks(updated);
+    setRevealedTaskId(prev => (prev === id ? null : prev));
     buttonPress();
   }, [tasks]);
 
@@ -444,11 +464,20 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     buttonPress();
   };
 
-  // ── Edit task (long press) ────────────────────────────────────────────────────
+  // ── Long press reveals pencil/cross icons on the task itself ──────────────────
   const handleLongPress = (id: string) => {
     if (id === timerTaskId) return; // locked in once a timer is running
+    setRevealedTaskId(id);
+    buttonPress();
+  };
+
+  // Pencil icon — opens the actual edit modal (title/duration/priority),
+  // now one step removed from long-press itself rather than triggered
+  // directly by it.
+  const handleEditTask = (id: string) => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
+    setRevealedTaskId(null);
     setEditingTask(task);
     setEditTitle(task.title);
     setEditDuration(task.duration);
@@ -534,7 +563,8 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                 with streak. */}
             <TouchableOpacity style={styles.heroFlame} onPress={onNavigateFocus} activeOpacity={0.85}>
               <Bonfire
-                progress={focusToday / (appState.user?.dailyFocusGoalMins || 60)}
+                todayMins={focusTodayExact}
+                bestMins={bestFlameMins}
                 streak={appState.streak}
                 maxHeight={175}
               />
@@ -625,8 +655,11 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                     key={task.id}
                     task={task}
                     onToggle={handleTaskPress}
-                    onDelete={task.isCustom ? handleDelete : undefined}
+                    onDelete={handleDelete}
                     onLongPress={handleLongPress}
+                    onEdit={handleEditTask}
+                    actionsVisible={revealedTaskId === task.id}
+                    onDismissActions={() => setRevealedTaskId(null)}
                     onTogglePriority={handleTogglePriority}
                     index={index}
                     variant="priority"
@@ -645,8 +678,11 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                     key={task.id}
                     task={task}
                     onToggle={handleTaskPress}
-                    onDelete={task.isCustom ? handleDelete : undefined}
+                    onDelete={handleDelete}
                     onLongPress={handleLongPress}
+                    onEdit={handleEditTask}
+                    actionsVisible={revealedTaskId === task.id}
+                    onDismissActions={() => setRevealedTaskId(null)}
                     onTogglePriority={handleTogglePriority}
                     index={index}
                   />
@@ -662,6 +698,11 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
                     key={task.id}
                     task={task}
                     onToggle={handleTaskPress}
+                    onDelete={handleDelete}
+                    onLongPress={handleLongPress}
+                    onEdit={handleEditTask}
+                    actionsVisible={revealedTaskId === task.id}
+                    onDismissActions={() => setRevealedTaskId(null)}
                     index={index}
                     variant="done"
                   />

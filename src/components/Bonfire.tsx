@@ -5,8 +5,17 @@ import { buildBonfireStage, BONFIRE_STAGE_COUNT } from './pixelBonfireStages';
 import { FLAME_PALETTES } from './flameShapes';
 
 interface Props {
-  /** Today's focus time / daily goal, as a 0..1+ ratio. */
-  progress: number;
+  /** Today's focus minutes so far (absolute, not a percentage of any
+   *  goal) — the flame's stage is a flat "every 30 minutes" ladder now,
+   *  decoupled from the daily goal entirely. */
+  todayMins: number;
+  /** The highest single-day focus total ever reached (see
+   *  loadBestFlameMins/saveBestFlameMins in focusLog.ts) — the displayed
+   *  stage is never lower than whatever this maps to, so a new day starts
+   *  wherever the best day left off instead of resetting to the bottom.
+   *  Defaults to 0 for callers with no real history (e.g. the walkthrough's
+   *  illustrative mock). */
+  bestMins?: number;
   /** Current streak length in days — shifts the flame's color tier. */
   streak: number;
   /** Total vertical budget. The biggest stage (6, blazing) fills it
@@ -26,15 +35,20 @@ function intensityForStreak(streak: number): keyof typeof FLAME_PALETTES {
   return 'warm';
 }
 
-// Which of the 6 growth stages (ash -> kindling -> small flame -> ... ->
-// biggest blazing flame) today's progress toward the daily goal has reached.
-function stageForProgress(progress: number): number {
-  if (progress <= 0) return 1;
-  if (progress < 0.15) return 2;
-  if (progress < 0.35) return 3;
-  if (progress < 0.6) return 4;
-  if (progress < 1) return 5;
-  return BONFIRE_STAGE_COUNT;
+// The lowest stage anyone ever sees now — stages 1-2 (unlit ash, then
+// kindling with no actual flame yet) used to show up at the start of every
+// single day, which read as "the app thinks I've done nothing" rather than
+// motivating. Stage 3, the first stage with a real (if small) flame, is now
+// the permanent floor.
+const FLOOR_STAGE = 3;
+const MINS_PER_STAGE = 30;
+
+// Flat "every 30 minutes bumps a stage" ladder starting from the floor —
+// replaces the old percent-of-daily-goal curve entirely, since the goal
+// varies per person and per day while a flat minutes ladder doesn't.
+function stageForMinutes(mins: number): number {
+  if (mins <= 0) return FLOOR_STAGE;
+  return Math.min(BONFIRE_STAGE_COUNT, FLOOR_STAGE + Math.floor(mins / MINS_PER_STAGE));
 }
 
 function cropRowsOf(def: ReturnType<typeof buildBonfireStage>): number {
@@ -48,16 +62,15 @@ function cropRowsOf(def: ReturnType<typeof buildBonfireStage>): number {
 const TALLEST_CROP_ROWS = cropRowsOf(buildBonfireStage(BONFIRE_STAGE_COUNT));
 
 // The home flame as a bonfire that visibly grows through distinct stages
-// over the course of the day — unlit ash, kindling with smoke, then a
-// flame that gets bigger and gains logs/licks as focus time climbs toward
-// the goal. Color tier is a separate axis driven by the streak, so "how
-// far into today" and "how hot has the streak made it" read as two
-// different signals layered on the same sprite.
-export const Bonfire: React.FC<Props> = ({ progress, streak, maxHeight = 190 }) => {
-  const clamped = Math.max(0, progress);
-  const stage = stageForProgress(clamped);
+// as focus minutes add up — always at least a small real flame (see
+// FLOOR_STAGE), gaining size and logs/licks every 30 minutes, and never
+// dropping below the best day it's ever reached. Color tier is a separate
+// axis driven by the streak, so "how much I've focused" and "how hot has
+// the streak made it" read as two different signals layered on the same
+// sprite.
+export const Bonfire: React.FC<Props> = ({ todayMins, bestMins = 0, streak, maxHeight = 190 }) => {
+  const stage = Math.max(stageForMinutes(todayMins), stageForMinutes(bestMins));
   const intensity = intensityForStreak(streak);
-  const lit = stage >= 3;
 
   const def = useMemo(() => buildBonfireStage(stage, intensity), [stage, intensity]);
   const minY = useMemo(() => Math.min(...def.cells.map(c => c.y)), [def]);
@@ -70,7 +83,6 @@ export const Bonfire: React.FC<Props> = ({ progress, streak, maxHeight = 190 }) 
   const breathe = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (!lit) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(breathe, { toValue: 1.03, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
@@ -79,11 +91,11 @@ export const Bonfire: React.FC<Props> = ({ progress, streak, maxHeight = 190 }) 
     );
     loop.start();
     return () => loop.stop();
-  }, [lit, breathe]);
+  }, [breathe]);
 
   return (
     <View style={[styles.wrap, { height: maxHeight }]}>
-      <Animated.View style={{ transform: [{ scale: lit ? breathe : 1 }] }}>
+      <Animated.View style={{ transform: [{ scale: breathe }] }}>
         <Svg width={renderedWidth} height={renderedHeight} viewBox={`0 ${minY} ${def.cols} ${cropRows}`}>
           {def.cells.map((c, i) => (
             <Rect key={i} x={c.x} y={c.y} width={1} height={1} fill={c.color} />

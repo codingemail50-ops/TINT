@@ -11,6 +11,34 @@ export interface FocusLogEntry {
 }
 
 const FOCUS_LOG_KEY = 'tint_focus_log';
+const BEST_FLAME_MINS_KEY = 'tint_best_flame_mins';
+
+// The highest single-day focus total ever reached — the home-screen
+// flame's stage never drops below whatever this represents, even at the
+// start of a brand-new day with 0 minutes logged yet (see Bonfire.tsx).
+// Device-local only, same as the focus log itself; purely cosmetic, no
+// need to sync it anywhere.
+export async function loadBestFlameMins(): Promise<number> {
+  try {
+    const raw = await AsyncStorage.getItem(BEST_FLAME_MINS_KEY);
+    return raw ? Number(raw) || 0 : 0;
+  } catch { return 0; }
+}
+
+export async function saveBestFlameMins(mins: number): Promise<void> {
+  try { await AsyncStorage.setItem(BEST_FLAME_MINS_KEY, String(mins)); } catch {}
+}
+
+// Highest total any single calendar date reaches in a log — used to
+// re-derive the flame's carry-over floor from an account's real synced
+// history on login (rather than zeroing it out, which would undo the
+// carry-over the moment someone logs into an existing account on a new or
+// cleared device).
+export function bestSingleDayMinutes(log: FocusLogEntry[]): number {
+  const byDate = new Map<string, number>();
+  for (const entry of log) byDate.set(entry.date, (byDate.get(entry.date) ?? 0) + entry.mins);
+  return Math.max(0, ...byDate.values());
+}
 
 // Today and the Focus tab both stay mounted permanently now (so a running
 // session survives tab switches), which means they each hold their own

@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Reanimated, {
   useSharedValue, useAnimatedStyle, withTiming, withSpring, runOnJS,
 } from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
 import { Task } from '../data/examPresets';
 
@@ -15,7 +16,19 @@ interface Props {
   task: Task;
   onToggle?: (id: string) => void;
   onDelete?: (id: string) => void;
+  /** Fired on long-press — reveals the edit/remove icons (see
+   *  actionsVisible) rather than opening anything directly itself. */
   onLongPress?: (id: string) => void;
+  /** Pencil icon tap, only reachable once actionsVisible is true. */
+  onEdit?: (id: string) => void;
+  /** True while this task's edit/remove icons are showing (set by the
+   *  parent in response to onLongPress) — swaps the whole row over to a
+   *  plain, non-gesture view with the two icons instead of the normal
+   *  tap/drag-enabled one. */
+  actionsVisible?: boolean;
+  /** Tapping the row itself while actionsVisible is true — dismisses the
+   *  icons without editing or deleting anything. */
+  onDismissActions?: () => void;
   /** Double-tap, or a vertical drag past the threshold, toggles this —
    *  same underlying action (Task.priority), two gestures. Omitted for
    *  Done tasks — priority is a To Do / High Priority concept only. */
@@ -27,7 +40,9 @@ interface Props {
   variant?: 'priority' | 'done';
 }
 
-export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPress, onTogglePriority, readOnly, index, variant }) => {
+export const TaskItem: React.FC<Props> = ({
+  task, onToggle, onDelete, onLongPress, onEdit, actionsVisible, onDismissActions, onTogglePriority, readOnly, index, variant,
+}) => {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
@@ -120,6 +135,64 @@ export const TaskItem: React.FC<Props> = ({ task, onToggle, onDelete, onLongPres
     transform: [{ translateX: dragX.value }, { translateY: dragY.value * 0.3 }],
     opacity: removing.value ? withTiming(0, { duration: 180 }) : 1,
   }));
+
+  // Long-press reveals this instead of opening anything directly — a plain
+  // (no gesture-handler) row with the title for context plus pencil/cross
+  // buttons, so editing and removing are both one direct tap away rather
+  // than routed through a modal. Tapping the row itself just dismisses it.
+  if (actionsVisible) {
+    return (
+      <Animated.View style={[
+        styles.container,
+        {
+          opacity: fadeAnim,
+          transform: [
+            { translateX: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [-30, 0] }) },
+            { scale: scaleAnim },
+          ],
+        },
+      ]}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={onDismissActions}
+          style={[styles.inner, variant === 'priority' && styles.innerPriority, task.completed && styles.innerCompleted]}
+        >
+          <View style={[styles.checkbox, { borderColor: task.completed ? Colors.primary : Colors.border, backgroundColor: task.completed ? Colors.primary : 'transparent' }]}>
+            {task.completed && <Text style={styles.checkmark}>✓</Text>}
+          </View>
+          <View style={styles.content}>
+            <Text style={[styles.title, task.completed && styles.titleCompleted]} numberOfLines={2}>{task.title}</Text>
+            <View style={styles.meta}>
+              <View style={styles.categoryBadge}>
+                <Text style={styles.categoryText}>{task.category}</Text>
+              </View>
+              <Text style={styles.duration}>⏱ {durationLabel}</Text>
+            </View>
+          </View>
+          <View style={styles.actionRow}>
+            {onEdit && (
+              <TouchableOpacity
+                onPress={() => onEdit(taskId)}
+                style={styles.actionBtn}
+                hitSlop={{ top: 10, right: 6, bottom: 10, left: 10 }}
+              >
+                <Ionicons name="pencil" size={18} color={Colors.textPrimary} />
+              </TouchableOpacity>
+            )}
+            {onDelete && (
+              <TouchableOpacity
+                onPress={() => onDelete(taskId)}
+                style={[styles.actionBtn, styles.actionBtnDanger]}
+                hitSlop={{ top: 10, right: 10, bottom: 10, left: 6 }}
+              >
+                <Ionicons name="close" size={18} color={Colors.danger} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }
 
   return (
     <Animated.View style={[
@@ -228,4 +301,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   deleteText: { color: Colors.textMuted, fontSize: 18, fontFamily: Fonts.bold, lineHeight: 22 },
+  actionRow: { flexDirection: 'row', gap: Spacing.sm, flexShrink: 0 },
+  actionBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+  },
+  actionBtnDanger: { borderColor: Colors.danger + '55' },
 });
