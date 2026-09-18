@@ -1,7 +1,7 @@
 export type ExamType = 'JEE' | 'CLASS12' | 'CLASS10' | 'UCEED' | 'NID' | 'NIFT' | 'IPMAT';
 
-export type ClassTwelveStream = 'Science' | 'Commerce' | 'Arts';
-export const CLASS_TWELVE_STREAMS: ClassTwelveStream[] = ['Science', 'Commerce', 'Arts'];
+export type ClassTwelveStream = 'Science' | 'Commerce' | 'Humanities';
+export const CLASS_TWELVE_STREAMS: ClassTwelveStream[] = ['Science', 'Commerce', 'Humanities'];
 
 export interface Task {
   id: string;
@@ -69,19 +69,27 @@ const BASE_TASKS: Record<ExamType, Task[]> = {
     { id: 'nift-4', title: 'Design Theory & Trends',             duration: 45, category: 'Theory' },
     { id: 'nift-5', title: 'Situation Test Prep',                duration: 45, category: 'Portfolio' },
   ],
-  // Boards cover a wide range of subject combinations (streams, electives)
-  // that vary a lot per person — deliberately generic and few in number
-  // (rather than a false-precision subject list) so they're quick to
-  // delete/edit down to whatever someone's own subjects actually are.
+  // Class 10 doesn't split by stream — same subject set for everyone.
   CLASS10: [
-    { id: 'c10-1', title: 'Core Subjects Revision',              duration: 60, category: 'Boards' },
-    { id: 'c10-2', title: 'Practice Paper / Sample Questions',   duration: 45, category: 'Practice' },
-    { id: 'c10-3', title: 'Weak Topics Review',                  duration: 30, category: 'Revision' },
+    { id: 'c10-1',  title: 'Physics',          duration: 40, category: 'Boards' },
+    { id: 'c10-2',  title: 'Chemistry',        duration: 40, category: 'Boards' },
+    { id: 'c10-3',  title: 'Biology',          duration: 40, category: 'Boards' },
+    { id: 'c10-4',  title: 'Mathematics',      duration: 45, category: 'Boards' },
+    { id: 'c10-5',  title: 'History',          duration: 30, category: 'Boards' },
+    { id: 'c10-6',  title: 'Geography',        duration: 30, category: 'Boards' },
+    { id: 'c10-7',  title: 'Civics',           duration: 30, category: 'Boards' },
+    { id: 'c10-8',  title: 'Economics',        duration: 30, category: 'Boards' },
+    { id: 'c10-9',  title: 'English',          duration: 30, category: 'Boards' },
+    { id: 'c10-10', title: 'Second Language',  duration: 30, category: 'Boards' },
   ],
+  // Placeholder here — Class 12 actually branches by stream (see
+  // CLASS12_STREAM_TASKS below); this entry only exists to satisfy
+  // Record<ExamType, Task[]> and is never read directly on its own.
   CLASS12: [
-    { id: 'c12-1', title: 'Core Subjects Study',                 duration: 75, category: 'Boards' },
-    { id: 'c12-2', title: 'Practice Paper / Previous Year Questions', duration: 60, category: 'Practice' },
-    { id: 'c12-3', title: 'Revision & Notes',                    duration: 30, category: 'Revision' },
+    { id: 'c12-1', title: 'Physics',            duration: 60, category: 'Boards' },
+    { id: 'c12-2', title: 'Chemistry',          duration: 60, category: 'Boards' },
+    { id: 'c12-3', title: 'Mathematics',        duration: 60, category: 'Boards' },
+    { id: 'c12-4', title: 'Practice Problems',  duration: 45, category: 'Practice' },
   ],
   IPMAT: [
     { id: 'ipmat-1', title: 'Quantitative Ability Practice',     duration: 60, category: 'Aptitude' },
@@ -90,9 +98,31 @@ const BASE_TASKS: Record<ExamType, Task[]> = {
   ],
 };
 
-export function getCombinedPreset(exams: ExamType[]): Task[] {
+// Class 12 boards vary a lot by stream — enough that one generic list
+// doesn't fit anyone well. Kept small and editable, same reasoning as
+// every other preset here.
+const CLASS12_STREAM_TASKS: Record<ClassTwelveStream, Task[]> = {
+  Science: BASE_TASKS.CLASS12, // PCM
+  Commerce: [
+    { id: 'c12-com-1', title: 'Business Studies',      duration: 60, category: 'Boards' },
+    { id: 'c12-com-2', title: 'Accountancy',           duration: 60, category: 'Boards' },
+    { id: 'c12-com-3', title: 'Applied Mathematics',   duration: 60, category: 'Boards' },
+    { id: 'c12-com-4', title: 'Economics',             duration: 45, category: 'Boards' },
+  ],
+  Humanities: [
+    { id: 'c12-hum-1', title: 'Political Science',     duration: 60, category: 'Boards' },
+    { id: 'c12-hum-2', title: 'Entrepreneurship',      duration: 60, category: 'Boards' },
+    { id: 'c12-hum-3', title: 'Accountancy',           duration: 60, category: 'Boards' },
+    { id: 'c12-hum-4', title: 'History',               duration: 45, category: 'Boards' },
+  ],
+};
+
+export function getCombinedPreset(exams: ExamType[], classTwelveStream?: ClassTwelveStream): Task[] {
   if (exams.length === 0) return [];
-  if (exams.length === 1) return BASE_TASKS[exams[0]].map(t => ({ ...t }));
+  if (exams.length === 1) {
+    if (exams[0] === 'CLASS12') return CLASS12_STREAM_TASKS[classTwelveStream ?? 'Science'].map(t => ({ ...t }));
+    return BASE_TASKS[exams[0]].map(t => ({ ...t }));
+  }
 
   const hasJEE     = exams.includes('JEE');
   const hasUCEED   = exams.includes('UCEED');

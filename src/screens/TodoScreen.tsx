@@ -274,7 +274,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
             id: `custom-${i}`, title: t.title, duration: t.duration,
             category: user.customExam!.name, completed: false,
           }))
-        : getCombinedPreset(examTypes).map(t => ({ ...t, completed: false }));
+        : getCombinedPreset(examTypes, user?.classTwelveStream).map(t => ({ ...t, completed: false }));
       await StorageService.saveTodayTasks(loadedTasks);
     }
     setTasks(loadedTasks);
@@ -301,8 +301,10 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   // (user-typed) tasks are untouched — only the exam-generated ones get
   // swapped for a fresh set matching the new exam(s). Sorted for the
   // signature comparison only, so re-toggling the same exams in a
-  // different order isn't mistaken for a real change.
-  const examSignature = [...examTypes].sort().join(',') + '|' + (user?.customExam?.name ?? '');
+  // different order isn't mistaken for a real change. Stream is included
+  // too — switching from Science to Commerce with Class 12 still the only
+  // exam selected is a real change even though examTypes itself doesn't move.
+  const examSignature = [...examTypes].sort().join(',') + '|' + (user?.customExam?.name ?? '') + '|' + (user?.classTwelveStream ?? '');
   const prevExamSignatureRef = useRef(examSignature);
   useEffect(() => {
     if (prevExamSignatureRef.current === examSignature) return;
@@ -312,7 +314,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
           id: `custom-${i}`, title: t.title, duration: t.duration,
           category: user.customExam!.name, completed: false,
         }))
-      : getCombinedPreset(examTypes).map(t => ({ ...t, completed: false }));
+      : getCombinedPreset(examTypes, user?.classTwelveStream).map(t => ({ ...t, completed: false }));
     setTasks(prev => {
       const keepCustom = prev.filter(t => t.isCustom);
       const updated = [...freshPreset, ...keepCustom];

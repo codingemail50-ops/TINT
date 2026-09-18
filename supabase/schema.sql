@@ -243,16 +243,34 @@ grant execute on function public.find_user_by_email(text) to authenticated;
 -- one pass so the leaderboard is correct immediately for everyone,
 -- including people who don't reopen the app right away. Safe to re-run --
 -- once the duplicates are gone there's nothing left to remove.
+--
+-- Defensive on purpose: a real-world focus_log can have rows that aren't a
+-- clean jsonb array, or entries with a non-numeric mins / malformed
+-- timestamp, from older bugs or manual edits over this app's history. An
+-- earlier version of this block cast those fields directly and let a
+-- single bad row throw and abort the whole statement -- which, worse,
+-- rolled back every OTHER statement run in the same paste alongside it
+-- (including plain column additions elsewhere in this file that have
+-- nothing to do with focus_log). Every cast below is guarded with a
+-- jsonb_typeof/regexp check first so a malformed entry is just skipped
+-- (treated as 0 / no timestamp) instead of failing the migration.
 with expanded as (
   select
     u.id,
     t.elem,
     t.ordinality,
-    (t.elem->>'mins')::double precision as mins,
+    case when jsonb_typeof(t.elem->'mins') = 'number'
+      then (t.elem->>'mins')::double precision
+      else null
+    end as mins,
     t.elem->>'date' as date,
-    nullif(t.elem->>'timestamp', '')::timestamptz as ts
+    case when (t.elem->>'timestamp') ~ '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
+      then (t.elem->>'timestamp')::timestamptz
+      else null
+    end as ts
   from public.user_data u,
-    jsonb_array_elements(coalesce(u.focus_log, '[]'::jsonb)) with ordinality as t(elem, ordinality)
+    jsonb_array_elements(u.focus_log) with ordinality as t(elem, ordinality)
+  where jsonb_typeof(u.focus_log) = 'array'
 ),
 flagged as (
   select *,
@@ -265,7 +283,7 @@ deduped as (
   select id, elem, ordinality
   from flagged
   where not (
-    prev_mins is not null
+    prev_mins is not null and mins is not null
     and date = prev_date
     and abs(mins - prev_mins) < 0.01
     and ts is not null and prev_ts is not null
@@ -280,7 +298,9 @@ rebuilt as (
 update public.user_data u
 set focus_log = r.new_log,
     focus_alltime_mins = (
-      select coalesce(sum((e->>'mins')::double precision), 0)
+      select coalesce(sum(
+        case when jsonb_typeof(e->'mins') = 'number' then (e->>'mins')::double precision else 0 end
+      ), 0)
       from jsonb_array_elements(r.new_log) e
     )
 from rebuilt r

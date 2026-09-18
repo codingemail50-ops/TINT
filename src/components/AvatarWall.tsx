@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, memo } from 'react';
 import { View, Animated, StyleSheet, TouchableOpacity, Dimensions, Easing } from 'react-native';
 import { PixelIcon } from './PixelIcon';
-import { Colors } from '../constants/theme';
 
 // Split out and memoized so tapping a new avatar only re-renders the (at
 // most two) cells whose selected state actually flipped, instead of every
@@ -153,17 +152,27 @@ const styles = StyleSheet.create({
   // no visual separation from the background, especially icons close in
   // tone to the dark backdrop, and read as decoration rather than a
   // tappable button. cellSelected layers the orange highlight on top.
+  // White-based (not another dark grey) so it stays visible even under the
+  // dark gradient the screen fades over the top/bottom of this wall —
+  // darkening an already-dark fill just disappears, but a light one still
+  // shows through. Shadow adds a "raised, tappable" read on top of that.
   cell: {
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 4,
-    backgroundColor: Colors.surface + 'CC',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.4)',
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
   },
   cellSelected: {
-    backgroundColor: 'rgba(255,106,0,0.22)',
+    backgroundColor: 'rgba(255,106,0,0.28)',
+    borderColor: 'rgba(255,106,0,0.9)',
     borderRadius: 14,
   },
 });
