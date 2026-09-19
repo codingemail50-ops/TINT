@@ -10,7 +10,6 @@ import { Task } from '../data/examPresets';
 
 const SCREEN_W = Dimensions.get('window').width;
 const DELETE_THRESHOLD = SCREEN_W * 0.32;
-const PRIORITY_DRAG_THRESHOLD = 32;
 
 interface Props {
   task: Task;
@@ -29,9 +28,12 @@ interface Props {
   /** Tapping the row itself while actionsVisible is true — dismisses the
    *  icons without editing or deleting anything. */
   onDismissActions?: () => void;
-  /** Double-tap, or a vertical drag past the threshold, toggles this —
-   *  same underlying action (Task.priority), two gestures. Omitted for
-   *  Done tasks — priority is a To Do / High Priority concept only. */
+  /** Third action-row icon, only reachable once actionsVisible is true —
+   *  moves the task into (or, if it's already there, out of) the High
+   *  Priority group. Used to be a double-tap/vertical-drag gesture on the
+   *  row itself, which kept firing by accident while people were just
+   *  trying to scroll the list. Omitted for Done tasks — priority is a
+   *  To Do / High Priority concept only. */
   onTogglePriority?: (id: string) => void;
   readOnly?: boolean;
   index: number;
@@ -51,7 +53,6 @@ export const TaskItem: React.FC<Props> = ({
   // Gesture-driven position — separate from the entrance Animated.Value
   // above, driven on the UI thread by the pan gesture below.
   const dragX = useSharedValue(0);
-  const dragY = useSharedValue(0);
   const removing = useSharedValue(false);
 
   useEffect(() => {
@@ -66,32 +67,28 @@ export const TaskItem: React.FC<Props> = ({
     Animated.spring(checkAnim, { toValue: task.completed ? 1 : 0, useNativeDriver: true }).start();
   }, [task.completed]);
 
+  // The "held down" feel long-press is going for — grows slightly the
+  // moment the edit/remove/priority icons appear, settles back down if
+  // they're dismissed.
+  const growAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.spring(growAnim, { toValue: actionsVisible ? 1.035 : 1, friction: 7, useNativeDriver: true }).start();
+  }, [actionsVisible]);
+
   const hours = Math.floor(task.duration / 60);
   const mins  = task.duration % 60;
   const durationLabel = hours > 0 ? `${hours}h${mins > 0 ? ` ${mins}m` : ''}` : `${mins}m`;
 
-  const canDrag = !readOnly && !!(onDelete || onTogglePriority);
+  const canDrag = !readOnly && !!onDelete;
   const taskId = task.id;
 
   const finishDelete = () => { if (onDelete) onDelete(taskId); };
-  const firePriorityToggle = () => { if (onTogglePriority) onTogglePriority(taskId); };
   const fireToggle = () => { if (!readOnly) onToggle?.(taskId); };
   const fireLongPress = () => { if (!readOnly) onLongPress?.(taskId); };
 
   const singleTap = Gesture.Tap()
     .maxDuration(250)
     .onEnd((_e, success) => { if (success) runOnJS(fireToggle)(); });
-
-  const doubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .maxDuration(250)
-    // Keeps the single-tap's forced "is a second tap coming?" wait short —
-    // without this it defaults to ~500ms of felt lag on every plain tap.
-    .maxDelay(180)
-    .enabled(!!onTogglePriority && !readOnly)
-    .onEnd((_e, success) => { if (success) runOnJS(firePriorityToggle)(); });
-
-  singleTap.requireExternalGestureToFail(doubleTap);
 
   const longPress = Gesture.LongPress()
     .minDuration(450)
@@ -110,7 +107,6 @@ export const TaskItem: React.FC<Props> = ({
     .minDistance(10)
     .onUpdate(e => {
       dragX.value = e.translationX;
-      dragY.value = onTogglePriority ? e.translationY : 0;
     })
     .onEnd(e => {
       if (onDelete && Math.abs(e.translationX) > DELETE_THRESHOLD) {
@@ -120,19 +116,14 @@ export const TaskItem: React.FC<Props> = ({
         });
         return;
       }
-      if (onTogglePriority && Math.abs(e.translationY) > PRIORITY_DRAG_THRESHOLD) {
-        runOnJS(firePriorityToggle)();
-      }
       dragX.value = withSpring(0, { damping: 18 });
-      dragY.value = withSpring(0, { damping: 18 });
     });
 
   const holdGestures = Gesture.Race(pan, longPress);
-  const tapGestures = Gesture.Exclusive(doubleTap, singleTap);
-  const composed = readOnly ? Gesture.Tap().enabled(false) : Gesture.Race(holdGestures, tapGestures);
+  const composed = readOnly ? Gesture.Tap().enabled(false) : Gesture.Race(holdGestures, singleTap);
 
   const dragStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: dragX.value }, { translateY: dragY.value * 0.3 }],
+    transform: [{ translateX: dragX.value }],
     opacity: removing.value ? withTiming(0, { duration: 180 }) : 1,
   }));
 
@@ -144,18 +135,12 @@ export const TaskItem: React.FC<Props> = ({
     return (
       <Animated.View style={[
         styles.container,
-        {
-          opacity: fadeAnim,
-          transform: [
-            { translateX: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [-30, 0] }) },
-            { scale: scaleAnim },
-          ],
-        },
+        { opacity: fadeAnim, transform: [{ scale: growAnim }] },
       ]}>
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={onDismissActions}
-          style={[styles.inner, variant === 'priority' && styles.innerPriority, task.completed && styles.innerCompleted]}
+          style={[styles.inner, styles.innerActionsVisible, variant === 'priority' && styles.innerPriority, task.completed && styles.innerCompleted]}
         >
           <View style={[styles.checkbox, { borderColor: task.completed ? Colors.primary : Colors.border, backgroundColor: task.completed ? Colors.primary : 'transparent' }]}>
             {task.completed && <Text style={styles.checkmark}>✓</Text>}
@@ -170,11 +155,24 @@ export const TaskItem: React.FC<Props> = ({
             </View>
           </View>
           <View style={styles.actionRow}>
+            {onTogglePriority && (
+              <TouchableOpacity
+                onPress={() => onTogglePriority(taskId)}
+                style={styles.actionBtn}
+                hitSlop={{ top: 10, right: 6, bottom: 10, left: 6 }}
+              >
+                <Ionicons
+                  name={task.priority === 'high' ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'}
+                  size={18}
+                  color={task.priority === 'high' ? Colors.textPrimary : Colors.pop}
+                />
+              </TouchableOpacity>
+            )}
             {onEdit && (
               <TouchableOpacity
                 onPress={() => onEdit(taskId)}
                 style={styles.actionBtn}
-                hitSlop={{ top: 10, right: 6, bottom: 10, left: 10 }}
+                hitSlop={{ top: 10, right: 6, bottom: 10, left: 6 }}
               >
                 <Ionicons name="pencil" size={18} color={Colors.textPrimary} />
               </TouchableOpacity>
@@ -270,6 +268,9 @@ const styles = StyleSheet.create({
   innerPriority: {
     backgroundColor: Colors.ink,
     borderColor: Colors.ink,
+  },
+  innerActionsVisible: {
+    borderColor: Colors.pop,
   },
   innerCompleted: {
     opacity: 0.7,

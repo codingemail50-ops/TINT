@@ -299,12 +299,18 @@ export const FocusScreen: React.FC<Props> = ({
       timeLeft,
       title: externalTask?.title ?? 'Focus Session',
       source: phase === 'active' ? sessionSource : null,
-      // Reuses the same `visible` prop the tab instance already gets
-      // toggled with — task sessions minimize by the parent flipping this
-      // to false while keeping the instance mounted (still ticking), so
-      // the mini-player's "is the full UI already on screen" check has an
-      // accurate answer instead of assuming task+todo always means yes.
-      minimized: !visible,
+      // Only task sessions have a real "minimized" concept (the parent
+      // flips this same `visible` prop to false while keeping the
+      // instance mounted/ticking underneath, via the chevron in topBar).
+      // The tab instance's own `visible` toggles false/true on every
+      // ordinary tab switch too, but AppNavigator's mini-player check
+      // already derives "is the full UI on screen" for a tab session from
+      // `screen === 'focus'` directly — it never needed this flag. Setting
+      // it here anyway meant that switching *back* into the Focus tab
+      // showed a stale `minimized: true` from context for one render
+      // (this effect runs after commit, a tick behind the prop change),
+      // making the mini-player flash back on before disappearing again.
+      minimized: sessionSource === 'task' ? !visible : false,
     });
   }, [phase, paused, timeLeft, externalTask?.title, sessionSource, visible, setStatus]);
 
