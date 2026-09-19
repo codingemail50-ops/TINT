@@ -25,6 +25,9 @@ import { clearActiveSession } from '../utils/activeFocusSession';
 import { stopAppBlocking } from '../utils/appBlocking';
 import { buildYesterdayRecap, hasShownRecapFor, markRecapShown, DailyRecapData } from '../utils/dailyRecap';
 import { DailyRecapCard } from '../components/DailyRecapCard';
+import { getTodaysMotivationalMessage } from '../utils/motivation';
+import { MotivationalMessage } from '../data/motivationalMessages';
+import { MotivationalPostcard } from '../components/MotivationalPostcard';
 import {
   loadUserFromSupabase,
   syncAppStateToSupabase,
@@ -127,10 +130,23 @@ const AppNavigatorInner: React.FC = () => {
   const [loginShortcut, setLoginShortcut] = useState(false);
   const [recapData, setRecapData] = useState<DailyRecapData | null>(null);
   const recapCheckedRef = useRef(false);
+  const [motivationMessage, setMotivationMessage] = useState<MotivationalMessage | null>(null);
+  const motivationCheckedRef = useRef(false);
   const tabFadeAnim = useRef(new Animated.Value(0)).current;
   const userIdRef = useRef<string | null>(null);
   const { status: focusStatus, requestExpand } = useFocusSessionStatus();
   const draftRef = useRef<OnboardingDraft>({ avatar: 'star', examTypes: [], dailyFocusGoalMins: 60, name: '', email: '' });
+
+  // Once per app-open (guarded by the ref, same pattern as the recap check
+  // below), pops today's motivational postcard if it hasn't been shown yet.
+  // Deliberately run AFTER the recap check resolves (either nothing to show,
+  // or once the recap card is dismissed) so the two never stack.
+  const checkMotivation = async () => {
+    if (motivationCheckedRef.current || !appState.user) return;
+    motivationCheckedRef.current = true;
+    const message = await getTodaysMotivationalMessage();
+    if (message) setMotivationMessage(message);
+  };
 
   // Checks once per app-open (guarded by the ref, not just `showTabs`,
   // since appState updates constantly from ordinary task toggles) whether
@@ -143,6 +159,8 @@ const AppNavigatorInner: React.FC = () => {
       const recap = buildYesterdayRecap(appState, focusLog);
       if (recap && !(await hasShownRecapFor(recap.dateKey))) {
         setRecapData(recap);
+      } else {
+        void checkMotivation();
       }
     })();
   }, [showTabs, appState]);
@@ -272,6 +290,8 @@ const AppNavigatorInner: React.FC = () => {
     setLoginShortcut(false);
     setRecapData(null);
     recapCheckedRef.current = false;
+    setMotivationMessage(null);
+    motivationCheckedRef.current = false;
     setAppState({ user: null, streak: 0, longestStreak: 0, lastActiveDate: null, history: [], totalTasksCompleted: 0 });
     tabFadeAnim.setValue(0);
     setScreen('avatarExam');
@@ -619,9 +639,17 @@ const AppNavigatorInner: React.FC = () => {
           onClose={() => {
             void markRecapShown(recapData.dateKey);
             setRecapData(null);
+            void checkMotivation();
           }}
         />
       )}
+
+      <MotivationalPostcard
+        visible={!!motivationMessage}
+        message={motivationMessage}
+        goalText={appState.user?.futureGoal?.text ?? null}
+        onClose={() => setMotivationMessage(null)}
+      />
     </View>
   );
 };
