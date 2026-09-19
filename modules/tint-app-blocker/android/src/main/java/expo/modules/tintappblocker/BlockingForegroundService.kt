@@ -77,6 +77,19 @@ class BlockingForegroundService : Service() {
     // fine trade for the overlay actually feeling instant.
     private const val POLL_INTERVAL_MS = 300L
     private const val LOOKBACK_MS = 10_000L
+    // How many consecutive polls (900ms at the interval above) have to agree
+    // "no blocked app in front" before the overlay actually comes down. Fast
+    // app-switching (recents/gesture nav, split-screen, a share sheet) can
+    // make UsageStatsManager briefly report a transient launcher/system
+    // package as the foreground app for a poll cycle or two even while the
+    // blocked app is what's actually on screen (or about to be again the
+    // instant that transient surface closes) — this was the reported bypass:
+    // switch screens fast enough and the overlay would drop for a beat.
+    // Showing the overlay stays instant (one poll, no debounce) — only
+    // hiding it is debounced, so the only failure mode this can cause is the
+    // overlay lingering an extra beat after a genuine exit, never a gap that
+    // exposes the blocked app.
+    private const val REQUIRED_CLEAR_POLLS = 3
 
     // In-process only (no android:process split in the manifest, confirmed)
     // — a plain static callback is enough to hand a notification-button tap
@@ -335,6 +348,9 @@ class BlockingForegroundService : Service() {
   private var ownPackageName: String = ""
   private var pollRunnable: Runnable? = null
   private val flameBitmap: Bitmap by lazy { buildFlameBitmap() }
+  // See REQUIRED_CLEAR_POLLS — counts consecutive polls in a row that found
+  // no blocked app in front; reset to 0 the moment any poll finds one.
+  private var consecutiveClearPolls = 0
 
   private var audioManager: AudioManager? = null
   private var audioFocusRequest: AudioFocusRequest? = null
@@ -386,6 +402,7 @@ class BlockingForegroundService : Service() {
 
     val packages = intent?.getStringArrayListExtra(EXTRA_PACKAGES) ?: arrayListOf()
     blockedPackages = packages.toSet()
+    consecutiveClearPolls = 0
     endAtMs = intent?.getLongExtra(EXTRA_END_AT_MS, 0L) ?: 0L
     title = intent?.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() } ?: "Focus session active"
     durationMins = intent?.getIntExtra(EXTRA_DURATION_MINS, 0) ?: 0
@@ -553,6 +570,7 @@ class BlockingForegroundService : Service() {
 
   private fun stopBlockingAndSelf() {
     stopPolling()
+    consecutiveClearPolls = 0
     removeOverlay()
     @Suppress("DEPRECATION")
     stopForeground(true)
@@ -570,15 +588,22 @@ class BlockingForegroundService : Service() {
       return
     }
 
+    // No qualifying event in the lookback window (or the query itself
+    // failed) — an inconclusive reading, not a confident "nothing blocked is
+    // in front." Do nothing rather than guess: if a blocked app is genuinely
+    // still up, the overlay (already showing) simply stays; if it's
+    // genuinely gone, one of the next polls will get a real reading and
+    // resolve it through the debounce below.
     val foregroundPackage = currentForegroundPackage() ?: return
-    if (foregroundPackage == ownPackageName) {
-      removeOverlay()
-      return
-    }
+
     if (blockedPackages.contains(foregroundPackage)) {
+      consecutiveClearPolls = 0
       showOverlay()
     } else {
-      removeOverlay()
+      consecutiveClearPolls++
+      if (consecutiveClearPolls >= REQUIRED_CLEAR_POLLS) {
+        removeOverlay()
+      }
     }
   }
 
