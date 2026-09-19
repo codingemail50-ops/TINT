@@ -6,6 +6,8 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
@@ -519,6 +521,20 @@ export const FocusScreen: React.FC<Props> = ({
 
   const stats = computeFocusStats(focusLog);
 
+  // Swipe down (Spotify's full-player-to-mini-player gesture) to jump back
+  // to Today while the session keeps running underneath — works for both
+  // the Focus tab's own session and a task-linked one, wherever onMinimize
+  // is wired up. failOffsetX lets a mostly-horizontal drag fall through to
+  // AppNavigator's own tab-swipe gesture instead of being claimed here.
+  const swipeMinimizeGesture = Gesture.Pan()
+    .enabled(phase === 'active' && !!onMinimize)
+    .activeOffsetY([15, 999])
+    .failOffsetX([-30, 30])
+    .onEnd(e => {
+      'worklet';
+      if (e.translationY > 70 && onMinimize) runOnJS(onMinimize)();
+    });
+
   const totalSeconds = duration * 60;
   const pct = totalSeconds > 0 ? (totalSeconds - timeLeft) / totalSeconds : 0;
   const traceDashoffset = TRACE_LENGTH * (1 - pct);
@@ -637,6 +653,7 @@ export const FocusScreen: React.FC<Props> = ({
       )}
 
       {phase === 'active' && (
+        <GestureDetector gesture={swipeMinimizeGesture}>
         <View style={styles.activeScreen}>
           <View style={styles.topBar}>
             <Text style={styles.wordmark}>There is no tomorrow</Text>
@@ -684,6 +701,7 @@ export const FocusScreen: React.FC<Props> = ({
             </Animated.View>
           </View>
         </View>
+        </GestureDetector>
       )}
 
       {confirmOpen && (

@@ -556,6 +556,7 @@ const AppNavigatorInner: React.FC = () => {
                 userId={userIdRef.current ?? undefined}
                 visible={screen === 'focus'}
                 sessionSource="tab"
+                onMinimize={() => navigateTo('todo')}
               />
             </View>
           )}
