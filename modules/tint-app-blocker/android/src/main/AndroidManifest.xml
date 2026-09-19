@@ -13,10 +13,10 @@
             android:name="expo.modules.tintappblocker.BlockingForegroundService"
             android:exported="false"
             android:foregroundServiceType="specialUse"
-            android:stopWithTask="true">
+            android:stopWithTask="false">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Blocks a small set of user-selected distracting apps while a focus session the user explicitly started in TINT is active. Runs only for the session's duration and stops automatically when the session ends or the user closes TINT." />
+                android:value="Blocks a small set of user-selected distracting apps while a focus session the user explicitly started in TINT is active. Runs only for the session's duration and stops automatically when the session's timer ends or the user explicitly ends it — deliberately keeps running even if the user swipes TINT away mid-session, since the session they started is still active." />
         </service>
     </application>
 

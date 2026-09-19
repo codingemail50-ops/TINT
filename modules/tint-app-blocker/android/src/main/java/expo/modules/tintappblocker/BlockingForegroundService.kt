@@ -43,9 +43,11 @@ private data class FlameCell(val x: Int, val y: Int, val color: Int)
  *    recent usage events is the standard, Play-accepted approach)
  *  - shows a full-screen WindowManager overlay when a blocked package is
  *    in front, with a single "Return to TINT" action
- *  - stops itself (and removes any overlay) the moment it's told to, or
- *    when Android tears down TINT's task (default stopWithTask behavior —
- *    see the manifest fragment)
+ *  - stops itself the moment it's explicitly told to (ACTION_STOP, or its
+ *    own endAtMs safety check firing) — deliberately does NOT stop just
+ *    because TINT's own task was swiped from recents (stopWithTask="false"
+ *    in the manifest): the user hasn't ended their session or taken a
+ *    break, so blocking has to keep working with TINT fully closed.
  *
  * No AccessibilityService, no boot receiver, no persistence beyond the
  * lifetime of one focus session — on purpose, per the approved V1 scope.
@@ -396,13 +398,16 @@ class BlockingForegroundService : Service() {
     super.onDestroy()
   }
 
-  override fun onTaskRemoved(rootIntent: Intent?) {
-    // android:stopWithTask="true" already stops this service when TINT's
-    // task is swiped from recents. This override is just a belt-and-braces
-    // guarantee that the overlay window never outlives the service.
-    removeOverlay()
-    super.onTaskRemoved(rootIntent)
-  }
+  // No onTaskRemoved override — deliberately. It used to call removeOverlay()
+  // as a "belt-and-braces" cleanup, back when stopWithTask="true" meant the
+  // whole service died with TINT's task anyway. Now that the service is
+  // meant to keep blocking after TINT itself is swiped from recents (see
+  // the class doc), clearing the overlay here would do exactly the opposite
+  // of that — it'd expose whatever blocked app the overlay was covering the
+  // moment the user swiped TINT away, which is the bypass this exists to
+  // prevent. The overlay is only ever removed by checkForegroundApp() (the
+  // blocked app is no longer in front) or stopBlockingAndSelf() (the session
+  // actually ended).
 
   private fun buildNotification(): Notification {
     val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

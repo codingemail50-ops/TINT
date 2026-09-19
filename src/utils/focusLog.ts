@@ -8,6 +8,10 @@ export interface FocusLogEntry {
    *  logged before this field existed won't have it. Powers the hour-by-hour
    *  "Day" timeframe; every other timeframe only ever needed `date`. */
   timestamp?: string;
+  /** Ties this entry to one specific run of the focus timer (see
+   *  upsertFocusLogEntry) — undefined for older entries and for anything
+   *  logged outside FocusScreen's own checkpoint/finish/exit paths. */
+  sessionId?: string;
 }
 
 const FOCUS_LOG_KEY = 'tint_focus_log';
@@ -99,6 +103,34 @@ export async function loadFocusLog(): Promise<FocusLogEntry[]> {
 export async function saveFocusLog(log: FocusLogEntry[]): Promise<void> {
   await AsyncStorage.setItem(FOCUS_LOG_KEY, JSON.stringify(log));
   notify();
+}
+
+// Writes this session's progress so far, replacing its own previous entry
+// (matched by sessionId) rather than appending a new one — this is what
+// makes it safe to call repeatedly as a live session ticks along (a
+// real-time checkpoint, so a killed app/process loses at most a few
+// seconds of credit instead of the whole session) and again once from
+// finishSession/exitSession with the final true value. Returns the updated
+// log so callers that also keep local `focusLog` state can set it directly
+// instead of re-reading storage.
+//
+// Never regresses: periodic checkpoints are fire-and-forget (not awaited by
+// tick()), so an earlier checkpoint's read-modify-write could in principle
+// still be in flight when a later one (or the session's own final write)
+// finishes first — if that stale write then resolves, it must not clobber
+// the larger value already saved. Skipping any write that wouldn't increase
+// the stored mins makes the result correct regardless of resolution order.
+export async function upsertFocusLogEntry(
+  sessionId: string,
+  entry: { date: string; mins: number; timestamp: string }
+): Promise<FocusLogEntry[]> {
+  const log = await loadFocusLog();
+  const index = log.findIndex(e => e.sessionId === sessionId);
+  if (index >= 0 && log[index].mins >= entry.mins) return log;
+  const withId: FocusLogEntry = { ...entry, sessionId };
+  const updated = index >= 0 ? log.map((e, i) => (i === index ? withId : e)) : [...log, withId];
+  await saveFocusLog(updated);
+  return updated;
 }
 
 function startOfWeek(d: Date): Date {

@@ -17,8 +17,8 @@ import { Confetti } from '../components/Confetti';
 import { FocusScreen } from './FocusScreen';
 import { UCEEDCountdown, NIDCountdown, NIFTCountdown } from '../components/ExamCountdowns';
 import { useHaptics } from '../hooks/useHaptics';
-import { syncFocusLog, countIncomingRequests } from '../utils/supabaseStorage';
-import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats, subscribeFocusLog, loadBestFlameMins, saveBestFlameMins } from '../utils/focusLog';
+import { countIncomingRequests } from '../utils/supabaseStorage';
+import { FocusLogEntry, loadFocusLog, computeFocusStats, subscribeFocusLog, loadBestFlameMins, saveBestFlameMins } from '../utils/focusLog';
 import { DistractionLogEntry, loadDistractionLog, computeDistractedToday, subscribeDistractionLog } from '../utils/distractionLog';
 import { loadActiveSession } from '../utils/activeFocusSession';
 import { now as devNow, subscribeDevClock } from '../utils/devClock';
@@ -393,15 +393,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   }, [tasks]);
 
   // ── Per-task countdown timer ──────────────────────────────────────────────────
-  const logFocusMinutes = async (mins: number) => {
-    if (mins <= 0) return;
-    const log = await loadFocusLog();
-    const updatedLog = [...log, { date: devNow().toDateString(), mins, timestamp: devNow().toISOString() }];
-    await saveFocusLog(updatedLog);
-    setFocusLog(updatedLog);
-    if (userId) void syncFocusLog(userId, updatedLog);
-  };
-
   // Natural completion of a task-linked Focus session — mark the task done.
   // The focus minutes themselves are NOT logged here: FocusScreen's own
   // finishSession() already appended this exact session to the focus log
@@ -416,15 +407,15 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     void applyCompletion(timerTaskId, true);
   };
 
-  // Leaving a task-linked Focus session: early abandon (task stays
-  // incomplete, but whatever time actually ran gets banked) or dismissing
-  // the "session complete" screen after a natural finish (already logged
-  // by handleTaskSessionFinish, so wasNaturalCompletion skips re-logging).
+  // Leaving a task-linked Focus session: early abandon, or dismissing the
+  // "session complete" screen after a natural finish. Neither branch logs
+  // focus minutes here — FocusScreen's own exitSession()/finishSession()
+  // already banked this exact session (early-abandon and natural-completion
+  // cases alike) before calling this callback; logging it again here was
+  // the same double-counting bug handleTaskSessionFinish's comment above
+  // describes, just on the early-exit path instead of the natural one.
   const handleTaskSessionExit = (actualSeconds: number, wasNaturalCompletion: boolean) => {
     buttonPress();
-    if (!wasNaturalCompletion && actualSeconds > 0) {
-      void logFocusMinutes(actualSeconds / 60);
-    }
     setTimerTaskId(null);
   };
 

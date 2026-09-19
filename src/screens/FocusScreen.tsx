@@ -13,7 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
 import { useHaptics } from '../hooks/useHaptics';
 import { syncFocusLog } from '../utils/supabaseStorage';
-import { FocusLogEntry, loadFocusLog, saveFocusLog, computeFocusStats, subscribeFocusLog } from '../utils/focusLog';
+import { FocusLogEntry, loadFocusLog, computeFocusStats, subscribeFocusLog, upsertFocusLogEntry } from '../utils/focusLog';
 import { loadDistractionLog, saveDistractionLog } from '../utils/distractionLog';
 import { saveActiveSession, loadActiveSession, clearActiveSession } from '../utils/activeFocusSession';
 import { useFocusSessionStatus } from '../context/FocusSessionContext';
@@ -140,6 +140,13 @@ export const FocusScreen: React.FC<Props> = ({
   // module (see distractionLog.ts).
   const distractedSecondsRef = useRef(0);
   const backgroundedAtRef = useRef<number | null>(null);
+  // Identifies the log entry belonging to THIS run of the timer — set once
+  // whenever a session actually begins (fresh start, external-task
+  // auto-start, or resuming one found in storage after the app was killed)
+  // and left untouched by pause/resume in between. Lets periodic checkpoints
+  // and the session's eventual finish/exit both upsert the SAME entry
+  // instead of one appending a duplicate next to the other's.
+  const sessionIdRef = useRef('');
   const phaseRef = useRef<Phase>(phase);
   const pausedRef = useRef(paused);
   phaseRef.current = phase;
@@ -202,9 +209,13 @@ export const FocusScreen: React.FC<Props> = ({
     await clearActiveSession();
     stopAppBlocking();
 
-    const entry: FocusLogEntry = { date: devNow().toDateString(), mins: completedDurationMins, timestamp: devNow().toISOString() };
-    const updatedLog = [...(await loadFocusLog()), entry];
-    await saveFocusLog(updatedLog);
+    // Upsert (not append) — this session may already have a real-time
+    // checkpoint entry sitting in the log from before it reached this point
+    // (see the periodic checkpoint in tick()); this replaces it with the
+    // final true value instead of leaving both.
+    const updatedLog = await upsertFocusLogEntry(sessionIdRef.current, {
+      date: devNow().toDateString(), mins: completedDurationMins, timestamp: devNow().toISOString(),
+    });
     setFocusLog(updatedLog);
 
     // Only worth a notification if the user isn't already looking at the
@@ -236,6 +247,20 @@ export const FocusScreen: React.FC<Props> = ({
     setTimeLeft(remaining);
     if (remaining <= 0) {
       finishSession(duration);
+      return;
+    }
+    // Real-time safety net: a session that's killed mid-way (process
+    // killed, phone dies, force-stopped) and never resumed used to lose
+    // 100% of its progress — nothing ever ran finishSession/exitSession to
+    // log it. Checkpointing the running total every 30s means at most the
+    // last <30s of an unresumed session goes uncredited instead of all of
+    // it. Upserts by sessionId, so this just keeps replacing its own entry
+    // rather than piling up one every 30 seconds.
+    const elapsedSeconds = duration * 60 - remaining;
+    if (elapsedSeconds > 0 && elapsedSeconds % 30 === 0) {
+      void upsertFocusLogEntry(sessionIdRef.current, {
+        date: devNow().toDateString(), mins: elapsedSeconds / 60, timestamp: devNow().toISOString(),
+      });
     }
   }, [finishSession, duration]);
 
@@ -261,6 +286,10 @@ export const FocusScreen: React.FC<Props> = ({
         && (sessionSource === 'tab' || saved.taskId === externalTask?.id);
 
       if (matches && saved) {
+        // Same id this session was already checkpointing under before
+        // whatever killed the app — so both branches below correct that
+        // same log entry instead of leaving it alongside a new one.
+        sessionIdRef.current = String(saved.startedAtMs);
         const plannedEnd = saved.startedAtMs + saved.durationMins * 60 * 1000;
         const remaining = Math.max(0, Math.round((plannedEnd - Date.now()) / 1000));
         if (remaining <= 0) {
@@ -281,11 +310,13 @@ export const FocusScreen: React.FC<Props> = ({
       }
 
       if (externalTask) {
-        endTimeRef.current = Date.now() + externalTask.durationMins * 60 * 1000;
+        const startedAtMs = Date.now();
+        sessionIdRef.current = String(startedAtMs);
+        endTimeRef.current = startedAtMs + externalTask.durationMins * 60 * 1000;
         setTimeLeft(externalTask.durationMins * 60);
         setPhase('active');
         void saveActiveSession({
-          source: sessionSource, startedAtMs: Date.now(), durationMins: externalTask.durationMins,
+          source: sessionSource, startedAtMs, durationMins: externalTask.durationMins,
           title: externalTask.title, taskId: externalTask.id,
         });
         startAppBlocking(packageNamesFor(blockedIds), endTimeRef.current, externalTask.title, externalTask.durationMins);
@@ -374,9 +405,11 @@ export const FocusScreen: React.FC<Props> = ({
         await saveDistractionLog([...distractionLog, { date: devNow().toDateString(), mins: distractedMins, timestamp: devNow().toISOString() }]);
       }
       if (elapsedSeconds > 0) {
-        const entry: FocusLogEntry = { date: devNow().toDateString(), mins: elapsedSeconds / 60, timestamp: devNow().toISOString() };
-        const updatedLog = [...(await loadFocusLog()), entry];
-        await saveFocusLog(updatedLog);
+        // Upsert, same as finishSession — replaces this session's own
+        // periodic checkpoint (see tick()) with the final true value.
+        const updatedLog = await upsertFocusLogEntry(sessionIdRef.current, {
+          date: devNow().toDateString(), mins: elapsedSeconds / 60, timestamp: devNow().toISOString(),
+        });
         setFocusLog(updatedLog);
         if (userId) syncFocusLog(userId, updatedLog);
       }
@@ -407,13 +440,15 @@ export const FocusScreen: React.FC<Props> = ({
       Animated.timing(dialFadeAnim, { toValue: 0.15, duration: 45, useNativeDriver: true }),
       Animated.timing(dialFadeAnim, { toValue: 0, duration: 160, useNativeDriver: true }),
     ]).start(() => {
-      endTimeRef.current = Date.now() + duration * 60 * 1000;
+      const startedAtMs = Date.now();
+      sessionIdRef.current = String(startedAtMs);
+      endTimeRef.current = startedAtMs + duration * 60 * 1000;
       distractedSecondsRef.current = 0;
       backgroundedAtRef.current = null;
       setTimeLeft(duration * 60);
       setPaused(false);
       setPhase('active');
-      void saveActiveSession({ source: sessionSource, startedAtMs: Date.now(), durationMins: duration, title: 'Focus Session' });
+      void saveActiveSession({ source: sessionSource, startedAtMs, durationMins: duration, title: 'Focus Session' });
       startAppBlocking(packageNamesFor(blockedApps), endTimeRef.current, 'Focus Session', duration);
       void ensureNotificationPermission();
       blobEnterAnim.setValue(0);
@@ -450,6 +485,16 @@ export const FocusScreen: React.FC<Props> = ({
       // auto-resume a session that was deliberately paused.
       void clearActiveSession();
       setBlockingPaused(true, endTimeRef.current);
+      // Checkpoint right at the pause instant rather than waiting for the
+      // next 30s tick — otherwise closing the app during a pause (which
+      // clears the resumable descriptor above, by design) could shave up to
+      // 30s off what's actually credited.
+      const elapsedSeconds = duration * 60 - remaining;
+      if (elapsedSeconds > 0) {
+        void upsertFocusLogEntry(sessionIdRef.current, {
+          date: devNow().toDateString(), mins: elapsedSeconds / 60, timestamp: devNow().toISOString(),
+        });
+      }
     }
   };
 
