@@ -49,11 +49,11 @@ export const MOTIVATIONAL_MESSAGES: MotivationalMessage[] = [
   { id: 37, template: "If you want it bad enough, you'll find a {{way}}. If you don't, you'll find an {{excuse}}." },
   { id: 38, template: "Every time you show up, you're getting {{closer}}." },
   { id: 39, template: "You didn't come this far just to {{come this far}}." },
-  { id: 40, template: "Losing sleep for your goals is better than {{dreaming about them}}." },
+  { id: 40, template: "Losing sleep for {{GOAL}} is better than dreaming about it." },
   { id: 41, template: "Show them what you're {{capable of}}." },
   { id: 42, template: "Today is another step toward {{the life you want}}." },
   { id: 43, template: "One day, you'll look back and be {{glad you kept going}}." },
   { id: 44, template: "The days you don't feel like it {{matter the most}}." },
   { id: 45, template: "Give it {{everything you've got}}." },
-  { id: 46, template: "If you were 15 failures away from your goal, would you {{fail 15 times}}?" },
+  { id: 46, template: "If you were 15 failures away from {{GOAL}}, would you fail 15 times?" },
 ];
