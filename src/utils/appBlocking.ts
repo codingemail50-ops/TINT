@@ -79,11 +79,12 @@ export function checkPermission(permission: BlockingPermission): boolean | null 
  *  service for the given Android package names — always shows the
  *  persistent, live-counting-down "focus session active" notification
  *  (using `endAtMs`), even when `packageNames` is empty (no apps to block,
- *  but the timer notification is still useful on its own). No-op off
- *  Android or when the native module isn't linked (Expo Go/web). */
-export function startAppBlocking(packageNames: string[], endAtMs: number): void {
+ *  but the timer notification is still useful on its own). `title` and
+ *  `durationMins` are shown on the notification. No-op off Android or when
+ *  the native module isn't linked (Expo Go/web). */
+export function startAppBlocking(packageNames: string[], endAtMs: number, title: string, durationMins: number): void {
   if (!isNativeBlockingAvailable()) return;
-  TintAppBlocker.startBlocking(packageNames, endAtMs);
+  TintAppBlocker.startBlocking(packageNames, endAtMs, title, durationMins);
 }
 
 /** Stops polling, removes any visible block overlay, and stops the
@@ -91,4 +92,21 @@ export function startAppBlocking(packageNames: string[], endAtMs: number): void 
 export function stopAppBlocking(): void {
   if (!isNativeBlockingAvailable()) return;
   TintAppBlocker.stopBlocking();
+}
+
+/** Reflects a JS-driven pause/resume onto the persistent notification
+ *  (icon, label, chronometer). Purely cosmetic — this doesn't itself pause
+ *  polling or the block overlay. No-op off Android or when unlinked. */
+export function setBlockingPaused(paused: boolean, endAtMs: number): void {
+  if (!isNativeBlockingAvailable()) return;
+  TintAppBlocker.setPaused(paused, endAtMs);
+}
+
+/** Subscribes to Pause/Resume/End taps on the persistent notification.
+ *  Returns an unsubscribe function; a no-op one when unavailable. */
+export function subscribeFocusNotificationAction(
+  callback: (action: 'pause' | 'resume' | 'end') => void
+): () => void {
+  if (!isNativeBlockingAvailable()) return () => {};
+  return TintAppBlocker.subscribeFocusNotificationAction((event) => callback(event.action));
 }

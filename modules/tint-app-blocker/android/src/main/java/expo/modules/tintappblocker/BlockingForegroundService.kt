@@ -9,6 +9,9 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
@@ -26,6 +29,12 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
+
+// Exact pixel data for the bonfire's stage-3 flame (see
+// pixelBonfireStages.ts) — ported once to a Node script and hardcoded here
+// rather than re-deriving the mask math natively. Used to draw a real,
+// full-color bitmap for the notification's large icon.
+private data class FlameCell(val x: Int, val y: Int, val color: Int)
 
 /**
  * V1 app-blocking engine. Deliberately minimal:
@@ -46,8 +55,17 @@ class BlockingForegroundService : Service() {
   companion object {
     const val ACTION_START = "expo.modules.tintappblocker.action.START"
     const val ACTION_STOP = "expo.modules.tintappblocker.action.STOP"
+    const val ACTION_SET_PAUSED = "expo.modules.tintappblocker.action.SET_PAUSED"
+    // Tapped from the notification's own action buttons — these PendingIntents
+    // target this same Service (the only component a notification action can
+    // reliably reach), which forwards the tap to JS via actionListener below.
+    const val ACTION_NOTIF_TOGGLE_PAUSE = "expo.modules.tintappblocker.action.NOTIF_TOGGLE_PAUSE"
+    const val ACTION_NOTIF_END = "expo.modules.tintappblocker.action.NOTIF_END"
     const val EXTRA_PACKAGES = "expo.modules.tintappblocker.extra.PACKAGES"
     const val EXTRA_END_AT_MS = "expo.modules.tintappblocker.extra.END_AT_MS"
+    const val EXTRA_TITLE = "expo.modules.tintappblocker.extra.TITLE"
+    const val EXTRA_DURATION_MINS = "expo.modules.tintappblocker.extra.DURATION_MINS"
+    const val EXTRA_PAUSED = "expo.modules.tintappblocker.extra.PAUSED"
     private const val CHANNEL_ID = "tint_focus_blocking"
     private const val NOTIFICATION_ID = 8421
     // Was 1500ms — a blocked app (YouTube, Instagram, ...) could sit fully
@@ -57,6 +75,233 @@ class BlockingForegroundService : Service() {
     // fine trade for the overlay actually feeling instant.
     private const val POLL_INTERVAL_MS = 300L
     private const val LOOKBACK_MS = 10_000L
+
+    // In-process only (no android:process split in the manifest, confirmed)
+    // — a plain static callback is enough to hand a notification-button tap
+    // to TintAppBlockerModule, which re-emits it as a JS event. Not for any
+    // cross-process use; set by the module's OnCreate, read here.
+    var actionListener: ((String) -> Unit)? = null
+
+    // Exact pixel-cell data for the bonfire's stage-3 flame, cropped to its
+    // bounding box (see pixelBonfireStages.ts / the Node port used to
+    // generate this). Drawn once into a bitmap for the notification's large
+    // icon so the notification carries the app's real pixel-art flame
+    // instead of a generic icon.
+    private const val FLAME_GRID_W = 27
+    private const val FLAME_GRID_H = 14
+    private val FLAME_CELLS: List<FlameCell> = listOf(
+      FlameCell(8, 10, 0xFF5C5A56.toInt()),
+      FlameCell(9, 10, 0xFF5C5A56.toInt()),
+      FlameCell(10, 10, 0xFF5C5A56.toInt()),
+      FlameCell(11, 10, 0xFFFF6A00.toInt()),
+      FlameCell(12, 10, 0xFFFF6A00.toInt()),
+      FlameCell(13, 10, 0xFFFF6A00.toInt()),
+      FlameCell(14, 10, 0xFFFF6A00.toInt()),
+      FlameCell(15, 10, 0xFFFF6A00.toInt()),
+      FlameCell(16, 10, 0xFF5C5A56.toInt()),
+      FlameCell(17, 10, 0xFF5C5A56.toInt()),
+      FlameCell(18, 10, 0xFF5C5A56.toInt()),
+      FlameCell(2, 11, 0xFF0A0908.toInt()),
+      FlameCell(3, 11, 0xFF0A0908.toInt()),
+      FlameCell(4, 11, 0xFF0A0908.toInt()),
+      FlameCell(5, 11, 0xFF0A0908.toInt()),
+      FlameCell(6, 11, 0xFF0A0908.toInt()),
+      FlameCell(7, 11, 0xFF0A0908.toInt()),
+      FlameCell(8, 11, 0xFF0A0908.toInt()),
+      FlameCell(9, 11, 0xFF0A0908.toInt()),
+      FlameCell(10, 11, 0xFF0A0908.toInt()),
+      FlameCell(11, 11, 0xFF0A0908.toInt()),
+      FlameCell(12, 11, 0xFF0A0908.toInt()),
+      FlameCell(13, 11, 0xFF0A0908.toInt()),
+      FlameCell(14, 11, 0xFF0A0908.toInt()),
+      FlameCell(15, 11, 0xFF0A0908.toInt()),
+      FlameCell(16, 11, 0xFF0A0908.toInt()),
+      FlameCell(17, 11, 0xFF0A0908.toInt()),
+      FlameCell(18, 11, 0xFF0A0908.toInt()),
+      FlameCell(19, 11, 0xFF0A0908.toInt()),
+      FlameCell(20, 11, 0xFF0A0908.toInt()),
+      FlameCell(21, 11, 0xFF0A0908.toInt()),
+      FlameCell(22, 11, 0xFF0A0908.toInt()),
+      FlameCell(23, 11, 0xFF0A0908.toInt()),
+      FlameCell(24, 11, 0xFF0A0908.toInt()),
+      FlameCell(0, 12, 0xFF0A0908.toInt()),
+      FlameCell(1, 12, 0xFF0A0908.toInt()),
+      FlameCell(2, 12, 0xFF0A0908.toInt()),
+      FlameCell(3, 12, 0xFF0A0908.toInt()),
+      FlameCell(4, 12, 0xFF0A0908.toInt()),
+      FlameCell(5, 12, 0xFF0A0908.toInt()),
+      FlameCell(6, 12, 0xFF0A0908.toInt()),
+      FlameCell(7, 12, 0xFF0A0908.toInt()),
+      FlameCell(8, 12, 0xFF0A0908.toInt()),
+      FlameCell(9, 12, 0xFF0A0908.toInt()),
+      FlameCell(10, 12, 0xFF0A0908.toInt()),
+      FlameCell(11, 12, 0xFF0A0908.toInt()),
+      FlameCell(12, 12, 0xFF0A0908.toInt()),
+      FlameCell(13, 12, 0xFF0A0908.toInt()),
+      FlameCell(14, 12, 0xFF0A0908.toInt()),
+      FlameCell(15, 12, 0xFF0A0908.toInt()),
+      FlameCell(16, 12, 0xFF0A0908.toInt()),
+      FlameCell(17, 12, 0xFF0A0908.toInt()),
+      FlameCell(18, 12, 0xFF0A0908.toInt()),
+      FlameCell(19, 12, 0xFF0A0908.toInt()),
+      FlameCell(20, 12, 0xFF0A0908.toInt()),
+      FlameCell(21, 12, 0xFF0A0908.toInt()),
+      FlameCell(22, 12, 0xFF0A0908.toInt()),
+      FlameCell(23, 12, 0xFF0A0908.toInt()),
+      FlameCell(24, 12, 0xFF0A0908.toInt()),
+      FlameCell(25, 12, 0xFF0A0908.toInt()),
+      FlameCell(26, 12, 0xFF0A0908.toInt()),
+      FlameCell(2, 13, 0xFF0A0908.toInt()),
+      FlameCell(3, 13, 0xFF0A0908.toInt()),
+      FlameCell(4, 13, 0xFF0A0908.toInt()),
+      FlameCell(5, 13, 0xFF0A0908.toInt()),
+      FlameCell(6, 13, 0xFF0A0908.toInt()),
+      FlameCell(7, 13, 0xFF0A0908.toInt()),
+      FlameCell(8, 13, 0xFF0A0908.toInt()),
+      FlameCell(9, 13, 0xFF0A0908.toInt()),
+      FlameCell(10, 13, 0xFF0A0908.toInt()),
+      FlameCell(11, 13, 0xFF0A0908.toInt()),
+      FlameCell(12, 13, 0xFF0A0908.toInt()),
+      FlameCell(13, 13, 0xFF0A0908.toInt()),
+      FlameCell(14, 13, 0xFF0A0908.toInt()),
+      FlameCell(15, 13, 0xFF0A0908.toInt()),
+      FlameCell(16, 13, 0xFF0A0908.toInt()),
+      FlameCell(17, 13, 0xFF0A0908.toInt()),
+      FlameCell(18, 13, 0xFF0A0908.toInt()),
+      FlameCell(19, 13, 0xFF0A0908.toInt()),
+      FlameCell(20, 13, 0xFF0A0908.toInt()),
+      FlameCell(21, 13, 0xFF0A0908.toInt()),
+      FlameCell(22, 13, 0xFF0A0908.toInt()),
+      FlameCell(23, 13, 0xFF0A0908.toInt()),
+      FlameCell(24, 13, 0xFF0A0908.toInt()),
+      FlameCell(4, 8, 0xFF5C5A56.toInt()),
+      FlameCell(5, 8, 0xFF5C5A56.toInt()),
+      FlameCell(6, 8, 0xFF5C5A56.toInt()),
+      FlameCell(4, 9, 0xFF5C5A56.toInt()),
+      FlameCell(5, 9, 0xFF5C5A56.toInt()),
+      FlameCell(6, 9, 0xFF5C5A56.toInt()),
+      FlameCell(4, 10, 0xFF5C5A56.toInt()),
+      FlameCell(5, 10, 0xFF5C5A56.toInt()),
+      FlameCell(6, 10, 0xFF5C5A56.toInt()),
+      FlameCell(3, 8, 0xFF3A3936.toInt()),
+      FlameCell(4, 7, 0xFF3A3936.toInt()),
+      FlameCell(3, 7, 0xFF3A3936.toInt()),
+      FlameCell(5, 7, 0xFF3A3936.toInt()),
+      FlameCell(3, 9, 0xFF3A3936.toInt()),
+      FlameCell(6, 7, 0xFF3A3936.toInt()),
+      FlameCell(7, 8, 0xFF3A3936.toInt()),
+      FlameCell(7, 7, 0xFF3A3936.toInt()),
+      FlameCell(7, 9, 0xFF3A3936.toInt()),
+      FlameCell(3, 10, 0xFF3A3936.toInt()),
+      FlameCell(7, 10, 0xFF3A3936.toInt()),
+      FlameCell(8, 8, 0xFF5C5A56.toInt()),
+      FlameCell(9, 8, 0xFFFFA352.toInt()),
+      FlameCell(10, 8, 0xFFFFA352.toInt()),
+      FlameCell(8, 9, 0xFF5C5A56.toInt()),
+      FlameCell(9, 9, 0xFFFF6A00.toInt()),
+      FlameCell(10, 9, 0xFFFFA352.toInt()),
+      FlameCell(8, 7, 0xFFFF6A00.toInt()),
+      FlameCell(9, 7, 0xFFFFA352.toInt()),
+      FlameCell(10, 7, 0xFFFFA352.toInt()),
+      FlameCell(11, 8, 0xFFFFA352.toInt()),
+      FlameCell(11, 7, 0xFFFFD9B3.toInt()),
+      FlameCell(11, 9, 0xFFFFA352.toInt()),
+      FlameCell(16, 8, 0xFFFF6A00.toInt()),
+      FlameCell(17, 8, 0xFFFF6A00.toInt()),
+      FlameCell(18, 8, 0xFF5C5A56.toInt()),
+      FlameCell(16, 9, 0xFFFF6A00.toInt()),
+      FlameCell(17, 9, 0xFFFF6A00.toInt()),
+      FlameCell(18, 9, 0xFF5C5A56.toInt()),
+      FlameCell(15, 8, 0xFFFFA352.toInt()),
+      FlameCell(16, 7, 0xFFFF6A00.toInt()),
+      FlameCell(15, 7, 0xFFFFA352.toInt()),
+      FlameCell(17, 7, 0xFFFF6A00.toInt()),
+      FlameCell(15, 9, 0xFFFF6A00.toInt()),
+      FlameCell(18, 7, 0xFFFF6A00.toInt()),
+      FlameCell(19, 8, 0xFF3A3936.toInt()),
+      FlameCell(19, 7, 0xFF3A3936.toInt()),
+      FlameCell(19, 9, 0xFF3A3936.toInt()),
+      FlameCell(19, 10, 0xFF3A3936.toInt()),
+      FlameCell(20, 8, 0xFF5C5A56.toInt()),
+      FlameCell(21, 8, 0xFF5C5A56.toInt()),
+      FlameCell(22, 8, 0xFF5C5A56.toInt()),
+      FlameCell(20, 9, 0xFF5C5A56.toInt()),
+      FlameCell(21, 9, 0xFF5C5A56.toInt()),
+      FlameCell(22, 9, 0xFF5C5A56.toInt()),
+      FlameCell(20, 10, 0xFF5C5A56.toInt()),
+      FlameCell(21, 10, 0xFF5C5A56.toInt()),
+      FlameCell(22, 10, 0xFF5C5A56.toInt()),
+      FlameCell(20, 7, 0xFF3A3936.toInt()),
+      FlameCell(21, 7, 0xFF3A3936.toInt()),
+      FlameCell(22, 7, 0xFF3A3936.toInt()),
+      FlameCell(23, 8, 0xFF3A3936.toInt()),
+      FlameCell(23, 7, 0xFF3A3936.toInt()),
+      FlameCell(23, 9, 0xFF3A3936.toInt()),
+      FlameCell(23, 10, 0xFF3A3936.toInt()),
+      FlameCell(12, 1, 0xFFFF6A00.toInt()),
+      FlameCell(12, 2, 0xFFFF6A00.toInt()),
+      FlameCell(13, 2, 0xFFFF6A00.toInt()),
+      FlameCell(11, 3, 0xFFFFA352.toInt()),
+      FlameCell(12, 3, 0xFFFFA352.toInt()),
+      FlameCell(13, 3, 0xFFFFA352.toInt()),
+      FlameCell(11, 4, 0xFFFFA352.toInt()),
+      FlameCell(12, 4, 0xFFFFA352.toInt()),
+      FlameCell(13, 4, 0xFFFFA352.toInt()),
+      FlameCell(14, 4, 0xFFFFA352.toInt()),
+      FlameCell(15, 4, 0xFFFFA352.toInt()),
+      FlameCell(9, 5, 0xFFFFA352.toInt()),
+      FlameCell(10, 5, 0xFFFFA352.toInt()),
+      FlameCell(11, 5, 0xFFFFD9B3.toInt()),
+      FlameCell(12, 5, 0xFFFFD9B3.toInt()),
+      FlameCell(13, 5, 0xFFFFD9B3.toInt()),
+      FlameCell(14, 5, 0xFFFFA352.toInt()),
+      FlameCell(15, 5, 0xFFFFA352.toInt()),
+      FlameCell(16, 5, 0xFFFF6A00.toInt()),
+      FlameCell(17, 5, 0xFFFF6A00.toInt()),
+      FlameCell(9, 6, 0xFFFFA352.toInt()),
+      FlameCell(10, 6, 0xFFFFA352.toInt()),
+      FlameCell(11, 6, 0xFFFFD9B3.toInt()),
+      FlameCell(12, 6, 0xFFFFD9B3.toInt()),
+      FlameCell(13, 6, 0xFFFFD9B3.toInt()),
+      FlameCell(14, 6, 0xFFFFA352.toInt()),
+      FlameCell(15, 6, 0xFFFFA352.toInt()),
+      FlameCell(16, 6, 0xFFFF6A00.toInt()),
+      FlameCell(17, 6, 0xFFFF6A00.toInt()),
+      FlameCell(12, 7, 0xFFFFD9B3.toInt()),
+      FlameCell(13, 7, 0xFFFFD9B3.toInt()),
+      FlameCell(14, 7, 0xFFFFA352.toInt()),
+      FlameCell(12, 8, 0xFFFFA352.toInt()),
+      FlameCell(13, 8, 0xFFFFA352.toInt()),
+      FlameCell(14, 8, 0xFFFFA352.toInt()),
+      FlameCell(12, 9, 0xFFFFA352.toInt()),
+      FlameCell(13, 9, 0xFFFFA352.toInt()),
+      FlameCell(14, 9, 0xFFFFA352.toInt()),
+      FlameCell(11, 1, 0xFF2B0E00.toInt()),
+      FlameCell(13, 1, 0xFF2B0E00.toInt()),
+      FlameCell(12, 0, 0xFF2B0E00.toInt()),
+      FlameCell(11, 0, 0xFF2B0E00.toInt()),
+      FlameCell(13, 0, 0xFF2B0E00.toInt()),
+      FlameCell(11, 2, 0xFF2B0E00.toInt()),
+      FlameCell(14, 2, 0xFF2B0E00.toInt()),
+      FlameCell(14, 1, 0xFF2B0E00.toInt()),
+      FlameCell(14, 3, 0xFF2B0E00.toInt()),
+      FlameCell(10, 3, 0xFF2B0E00.toInt()),
+      FlameCell(10, 2, 0xFF2B0E00.toInt()),
+      FlameCell(10, 4, 0xFF2B0E00.toInt()),
+      FlameCell(15, 3, 0xFF2B0E00.toInt()),
+      FlameCell(16, 4, 0xFF2B0E00.toInt()),
+      FlameCell(16, 3, 0xFF2B0E00.toInt()),
+      FlameCell(8, 5, 0xFF2B0E00.toInt()),
+      FlameCell(9, 4, 0xFF2B0E00.toInt()),
+      FlameCell(8, 4, 0xFF2B0E00.toInt()),
+      FlameCell(8, 6, 0xFF2B0E00.toInt()),
+      FlameCell(17, 4, 0xFF2B0E00.toInt()),
+      FlameCell(18, 5, 0xFF2B0E00.toInt()),
+      FlameCell(18, 4, 0xFF2B0E00.toInt()),
+      FlameCell(18, 6, 0xFF2B0E00.toInt()),
+      FlameCell(7, 6, 0xFF2B0E00.toInt()),
+      FlameCell(19, 6, 0xFF2B0E00.toInt())
+    )
   }
 
   private val handler = Handler(Looper.getMainLooper())
@@ -64,10 +309,18 @@ class BlockingForegroundService : Service() {
   // Drives the notification's chronometer — 0 means "unknown," in which
   // case the notification falls back to a plain (non-counting) message.
   private var endAtMs: Long = 0L
+  private var title: String = "Focus session active"
+  private var durationMins: Int = 0
+  // Purely a display flag — this service never re-derives session/pause
+  // logic itself. JS remains the source of truth; this only reflects the
+  // current state into the notification (icon/label/chronometer) and
+  // forwards notification-button taps back to JS to act on.
+  private var isPaused: Boolean = false
   private var overlayView: View? = null
   private var windowManager: WindowManager? = null
   private var ownPackageName: String = ""
   private var pollRunnable: Runnable? = null
+  private val flameBitmap: Bitmap by lazy { buildFlameBitmap() }
 
   private var audioManager: AudioManager? = null
   private var audioFocusRequest: AudioFocusRequest? = null
@@ -84,14 +337,45 @@ class BlockingForegroundService : Service() {
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    if (intent?.action == ACTION_STOP) {
-      stopBlockingAndSelf()
-      return START_NOT_STICKY
+    when (intent?.action) {
+      ACTION_STOP -> {
+        stopBlockingAndSelf()
+        return START_NOT_STICKY
+      }
+      // JS-driven pause/resume (from togglePause()) — just refresh what the
+      // notification shows, nothing about polling/blocking changes.
+      ACTION_SET_PAUSED -> {
+        isPaused = intent?.getBooleanExtra(EXTRA_PAUSED, false) ?: false
+        endAtMs = intent?.getLongExtra(EXTRA_END_AT_MS, endAtMs) ?: endAtMs
+        updateNotification()
+        return START_STICKY
+      }
+      // User tapped Pause/Resume ON the notification itself. Flip the local
+      // display flag immediately (so the notification reacts with no visible
+      // lag) and forward the tap to JS, which drives the actual session
+      // pause logic and will confirm back via ACTION_SET_PAUSED.
+      ACTION_NOTIF_TOGGLE_PAUSE -> {
+        isPaused = !isPaused
+        updateNotification()
+        actionListener?.invoke(if (isPaused) "pause" else "resume")
+        return START_STICKY
+      }
+      // User tapped End on the notification — forward to JS (which runs its
+      // normal end-session flow) and tear down the service/notification
+      // right away rather than waiting on the JS round trip.
+      ACTION_NOTIF_END -> {
+        actionListener?.invoke("end")
+        stopBlockingAndSelf()
+        return START_NOT_STICKY
+      }
     }
 
     val packages = intent?.getStringArrayListExtra(EXTRA_PACKAGES) ?: arrayListOf()
     blockedPackages = packages.toSet()
     endAtMs = intent?.getLongExtra(EXTRA_END_AT_MS, 0L) ?: 0L
+    title = intent?.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() } ?: "Focus session active"
+    durationMins = intent?.getIntExtra(EXTRA_DURATION_MINS, 0) ?: 0
+    isPaused = false
     try {
       startForeground(NOTIFICATION_ID, buildNotification())
     } catch (e: Exception) {
@@ -141,27 +425,83 @@ class BlockingForegroundService : Service() {
       )
     }
 
+    val togglePauseIntent = Intent(this, BlockingForegroundService::class.java).apply {
+      action = ACTION_NOTIF_TOGGLE_PAUSE
+    }
+    val togglePausePendingIntent = PendingIntent.getService(
+      this, 1, togglePauseIntent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    val endIntent = Intent(this, BlockingForegroundService::class.java).apply {
+      action = ACTION_NOTIF_END
+    }
+    val endPendingIntent = PendingIntent.getService(
+      this, 2, endIntent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    val sessionSuffix = if (durationMins > 0) " · ${durationMins}m session" else ""
+    val contentText = when {
+      isPaused -> "Session paused$sessionSuffix"
+      blockedPackages.isNotEmpty() -> "Blocking distracting apps until your session ends.$sessionSuffix"
+      else -> "Your TINT focus session is running.$sessionSuffix"
+    }
+
     val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-      .setContentTitle("Focus session active")
-      .setContentText(
-        if (blockedPackages.isNotEmpty()) "TINT is blocking distracting apps until your session ends."
-        else "Your TINT focus session is running."
-      )
+      .setContentTitle(title)
+      .setContentText(contentText)
       .setSmallIcon(applicationInfo.icon)
+      .setLargeIcon(flameBitmap)
       .setOngoing(true)
       .setContentIntent(contentIntent)
       .setPriority(NotificationCompat.PRIORITY_LOW)
+      .addAction(
+        if (isPaused) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause,
+        if (isPaused) "Resume" else "Pause",
+        togglePausePendingIntent
+      )
+      .addAction(android.R.drawable.ic_menu_close_clear_cancel, "End", endPendingIntent)
 
     // A live-counting-down chronometer, driven by the OS itself — no need
-    // for the app to keep re-posting this every second. Falls back to the
-    // plain content text above if the caller didn't supply a real end time.
-    if (endAtMs > 0L) {
+    // for the app to keep re-posting this every second. Only shown while
+    // actively running with a real end time; paused sessions fall back to
+    // the plain "Session paused" text above rather than a chronometer that
+    // would keep counting down time the session isn't actually spending
+    // (endAtMs itself isn't adjusted on pause — a pre-existing, accepted gap).
+    if (!isPaused && endAtMs > 0L) {
       builder.setUsesChronometer(true)
         .setChronometerCountDown(true)
         .setWhen(endAtMs)
+    } else {
+      builder.setUsesChronometer(false)
     }
 
     return builder.build()
+  }
+
+  private fun updateNotification() {
+    val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    manager.notify(NOTIFICATION_ID, buildNotification())
+  }
+
+  // Draws FLAME_CELLS (the real bonfire's stage-3 pixel data) into a small
+  // bitmap once per service instance, for use as the notification's large
+  // icon — a real, full-color rendering of the app's own pixel-art flame
+  // rather than a generic icon.
+  private fun buildFlameBitmap(): Bitmap {
+    val cellSize = 8
+    val bitmap = Bitmap.createBitmap(
+      FLAME_GRID_W * cellSize, FLAME_GRID_H * cellSize, Bitmap.Config.ARGB_8888
+    )
+    val canvas = Canvas(bitmap)
+    val paint = Paint().apply { isAntiAlias = false }
+    for (cell in FLAME_CELLS) {
+      paint.color = cell.color
+      val left = (cell.x * cellSize).toFloat()
+      val top = (cell.y * cellSize).toFloat()
+      canvas.drawRect(left, top, left + cellSize, top + cellSize, paint)
+    }
+    return bitmap
   }
 
   private fun startPolling() {

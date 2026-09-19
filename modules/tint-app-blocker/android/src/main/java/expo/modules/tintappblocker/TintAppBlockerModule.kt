@@ -17,17 +17,35 @@ class TintAppBlockerModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("TintAppBlocker")
 
+    Events("onFocusNotificationAction")
+
+    // The notification's Pause/Resume/End buttons can't call back into JS
+    // directly — they PendingIntent back into this same Service (the only
+    // component the OS will actually deliver a notification-action tap to).
+    // The service forwards each tap through this in-process static callback
+    // (safe: confirmed no android:process split in the manifest, so this is
+    // a same-process, same-classloader call) and this module re-emits it as
+    // a normal JS event.
+    OnCreate {
+      BlockingForegroundService.actionListener = { action ->
+        sendEvent("onFocusNotificationAction", mapOf("action" to action))
+      }
+    }
+
     // Fire-and-forget: starts (or updates) the foreground service, which
     // always shows a persistent, live-counting-down notification for the
     // session (endAtMs drives it) and additionally polls+blocks anything in
     // packageNames when that list isn't empty. Safe to call repeatedly —
-    // e.g. on every focus-session resume.
-    Function("startBlocking") { packageNames: List<String>, endAtMs: Double ->
+    // e.g. on every focus-session resume. title/durationMins are shown on
+    // the notification itself.
+    Function("startBlocking") { packageNames: List<String>, endAtMs: Double, title: String, durationMins: Double ->
       val context = appContext.reactContext ?: return@Function Unit
       val intent = Intent(context, BlockingForegroundService::class.java).apply {
         action = BlockingForegroundService.ACTION_START
         putStringArrayListExtra(BlockingForegroundService.EXTRA_PACKAGES, ArrayList(packageNames))
         putExtra(BlockingForegroundService.EXTRA_END_AT_MS, endAtMs.toLong())
+        putExtra(BlockingForegroundService.EXTRA_TITLE, title)
+        putExtra(BlockingForegroundService.EXTRA_DURATION_MINS, durationMins.toInt())
       }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         context.startForegroundService(intent)
@@ -50,6 +68,24 @@ class TintAppBlockerModule : Module() {
         context.startService(intent)
       } catch (e: Exception) {
         // Service already gone (process killed, task swiped) — nothing to stop.
+      }
+      Unit
+    }
+
+    // Reflects a JS-driven pause/resume into the notification (icon, label,
+    // chronometer) — the JS side remains the source of truth for session
+    // state, this just forwards it to update what's on-screen.
+    Function("setPaused") { paused: Boolean, endAtMs: Double ->
+      val context = appContext.reactContext ?: return@Function Unit
+      val intent = Intent(context, BlockingForegroundService::class.java).apply {
+        action = BlockingForegroundService.ACTION_SET_PAUSED
+        putExtra(BlockingForegroundService.EXTRA_PAUSED, paused)
+        putExtra(BlockingForegroundService.EXTRA_END_AT_MS, endAtMs.toLong())
+      }
+      try {
+        context.startService(intent)
+      } catch (e: Exception) {
+        // Service not running — nothing to update.
       }
       Unit
     }

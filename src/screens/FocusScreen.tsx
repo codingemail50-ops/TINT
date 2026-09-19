@@ -23,7 +23,8 @@ import { BlobDial } from '../components/BlobDial';
 import { scallopPath } from '../utils/scallopPath';
 import {
   openPermissionSettings, getSelfReportedGrants, setSelfReportedGrant, checkPermission,
-  isNativeBlockingAvailable, startAppBlocking, stopAppBlocking, BlockingPermission,
+  isNativeBlockingAvailable, startAppBlocking, stopAppBlocking, setBlockingPaused,
+  subscribeFocusNotificationAction, BlockingPermission,
 } from '../utils/appBlocking';
 import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY, packageNamesFor } from '../data/blockableApps';
 import { ensureNotificationPermission, notifySessionComplete } from '../utils/sessionNotifications';
@@ -274,7 +275,7 @@ export const FocusScreen: React.FC<Props> = ({
           // The native blocker doesn't survive a process kill — re-arm it
           // for whatever's left of this session (e.g. app was force-closed
           // and reopened mid-session).
-          startAppBlocking(packageNamesFor(blockedIds), plannedEnd);
+          startAppBlocking(packageNamesFor(blockedIds), plannedEnd, saved.title, saved.durationMins);
         }
         return;
       }
@@ -287,7 +288,7 @@ export const FocusScreen: React.FC<Props> = ({
           source: sessionSource, startedAtMs: Date.now(), durationMins: externalTask.durationMins,
           title: externalTask.title, taskId: externalTask.id,
         });
-        startAppBlocking(packageNamesFor(blockedIds), endTimeRef.current);
+        startAppBlocking(packageNamesFor(blockedIds), endTimeRef.current, externalTask.title, externalTask.durationMins);
         void ensureNotificationPermission();
       }
     })();
@@ -413,7 +414,7 @@ export const FocusScreen: React.FC<Props> = ({
       setPaused(false);
       setPhase('active');
       void saveActiveSession({ source: sessionSource, startedAtMs: Date.now(), durationMins: duration, title: 'Focus Session' });
-      startAppBlocking(packageNamesFor(blockedApps), endTimeRef.current);
+      startAppBlocking(packageNamesFor(blockedApps), endTimeRef.current, 'Focus Session', duration);
       void ensureNotificationPermission();
       blobEnterAnim.setValue(0);
       Animated.timing(blobEnterAnim, { toValue: 1, duration: 320, useNativeDriver: true }).start();
@@ -439,6 +440,7 @@ export const FocusScreen: React.FC<Props> = ({
         title: externalTask?.title ?? 'Focus Session',
         taskId: externalTask?.id,
       });
+      setBlockingPaused(false, endTimeRef.current);
     } else {
       const remaining = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
       setTimeLeft(remaining);
@@ -447,6 +449,7 @@ export const FocusScreen: React.FC<Props> = ({
       // the descriptor so an app-kill mid-pause doesn't auto-complete or
       // auto-resume a session that was deliberately paused.
       void clearActiveSession();
+      setBlockingPaused(true, endTimeRef.current);
     }
   };
 
@@ -462,6 +465,29 @@ export const FocusScreen: React.FC<Props> = ({
     setConfirmOpen(false);
     setPaused(wasPausedBeforeConfirm.current);
   };
+
+  // Refs so the mount-only subscription below always calls the *current*
+  // render's togglePause/exitSession (neither is stable across renders —
+  // togglePause reads paused/duration/timeLeft directly, and re-subscribing
+  // the native event listener on every render would be wasteful).
+  const togglePauseRef = useRef(togglePause);
+  togglePauseRef.current = togglePause;
+  const exitSessionRef = useRef(exitSession);
+  exitSessionRef.current = exitSession;
+
+  // Pause/Resume/End tapped on the persistent notification. Both 'pause' and
+  // 'resume' just mean "the toggle button was tapped" — togglePause() itself
+  // already reads the true current `paused` state and flips it, so there's
+  // no need to branch on which label native sent.
+  useEffect(() => {
+    return subscribeFocusNotificationAction((action) => {
+      if (action === 'end') {
+        void exitSessionRef.current('early');
+      } else {
+        void togglePauseRef.current();
+      }
+    });
+  }, []);
 
   // Driven by Animated (not per-frame setState) so the color build-up runs
   // on its own timing loop instead of forcing a full component re-render
