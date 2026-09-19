@@ -84,6 +84,18 @@ class BlockingForegroundService : Service() {
     // cross-process use; set by the module's OnCreate, read here.
     var actionListener: ((String) -> Unit)? = null
 
+    // One picked at random each time the block overlay is shown (see
+    // showOverlay()) — deliberately friendlier than a rigid "blocked"
+    // notice, per the approved copy.
+    private val BLOCK_SCREEN_LINES = listOf(
+      "Stay locked in. You're making progress.",
+      "You don't need this right now. Keep going.",
+      "Keep going. You're closer than you think.",
+      "The urge will pass. The progress stays.",
+      "You didn't come this far to scroll now.",
+      "You didn't come this far just to come this far."
+    )
+
     // Exact pixel-cell data for the bonfire's stage-3 flame, cropped to its
     // bounding box (see pixelBonfireStages.ts / the Node port used to
     // generate this). Drawn once into a bitmap for the notification's large
@@ -660,13 +672,13 @@ class BlockingForegroundService : Service() {
       setPadding(64, 64, 64, 64)
     }
     layout.addView(TextView(this).apply {
-      text = "Blocked during your focus session"
+      text = BLOCK_SCREEN_LINES.random()
       textSize = 20f
       setTextColor(0xFFF5F5F5.toInt())
       gravity = Gravity.CENTER
     })
     layout.addView(TextView(this).apply {
-      text = "This app is off-limits until your TINT session ends."
+      text = "This app is paused until your session ends."
       textSize = 14f
       setTextColor(0xFFAAAAAA.toInt())
       gravity = Gravity.CENTER
