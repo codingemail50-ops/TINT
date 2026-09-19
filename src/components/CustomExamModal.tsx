@@ -67,7 +67,7 @@ export const CustomExamModal: React.FC<Props> = ({ visible, initial, onClose, on
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.container}>
           <View style={styles.header}>
             <Text style={styles.title}>Your Exam</Text>

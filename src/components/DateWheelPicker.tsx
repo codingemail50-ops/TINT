@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, NativeSyntheticEvent, NativeScrollEvent, Modal } from 'react-native';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { useHaptics } from '../hooks/useHaptics';
@@ -25,6 +25,19 @@ const Wheel: React.FC<WheelProps> = ({ values, index, onChange }) => {
   const scrollRef = useRef<ScrollView>(null);
   const { dialTick } = useHaptics();
   const lastIndex = useRef(index);
+
+  // Reacts to `index` changing for reasons other than the user's own
+  // scroll (e.g. the day wheel getting auto-bumped forward past today when
+  // the month wheel changes) by physically scrolling to match — without
+  // this, a parent-driven correction would update which value counts as
+  // "selected" while the wheel visually kept sitting wherever the user
+  // last left it.
+  useEffect(() => {
+    if (index !== lastIndex.current) {
+      lastIndex.current = index;
+      scrollRef.current?.scrollTo({ y: index * ITEM_H, animated: true });
+    }
+  }, [index]);
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const i = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
@@ -79,19 +92,71 @@ interface Props {
 // that silently fails a format check) with three scroll wheels that can
 // only ever produce a valid, correctly-formatted date.
 export const DateWheelPicker: React.FC<Props> = ({ visible, initialDate, onClose, onConfirm, title = 'Exam Date' }) => {
-  const seed = initialDate ? new Date(initialDate + 'T00:00:00') : new Date();
-  const validSeed = isNaN(seed.getTime()) ? new Date() : seed;
-  const currentYear = new Date().getFullYear();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const currentYear = today.getFullYear();
+  const todayMonth = today.getMonth();
+  const todayDate = today.getDate();
 
-  const [day, setDay] = useState(validSeed.getDate() - 1);
-  const [month, setMonth] = useState(validSeed.getMonth());
-  const [yearIndex, setYearIndex] = useState(Math.max(0, validSeed.getFullYear() - currentYear));
+  // Never seed into an already-past date -- if initialDate is behind today
+  // (or missing/invalid), start on today instead, so the picker never opens
+  // into a state its own "no past dates" rule would immediately reject.
+  const parsedSeed = initialDate ? new Date(initialDate + 'T00:00:00') : today;
+  const seed = isNaN(parsedSeed.getTime()) || parsedSeed < today ? today : parsedSeed;
+
+  // day/month state are always the ACTUAL calendar values (0-based day
+  // index, 0-11 month) regardless of what's currently visible in each
+  // wheel -- only the rendering below truncates the displayed list to
+  // exclude the past; the state itself is never lied to.
+  const [day, setDay] = useState(seed.getDate() - 1);
+  const [month, setMonth] = useState(seed.getMonth());
+  const [yearIndex, setYearIndex] = useState(Math.max(0, seed.getFullYear() - currentYear));
   const { buttonPress } = useHaptics();
 
-  const years = Array.from({ length: 8 }, (_, i) => String(currentYear + i));
+  const isCurrentYear = yearIndex === 0;
+  // This year, months before the current one are entirely in the past --
+  // every day in them would be too -- so they're dropped from the wheel
+  // instead of being scrollable to and then having nothing valid in them.
+  const displayedMonths = isCurrentYear ? MONTHS.slice(todayMonth) : MONTHS;
+  const monthIndex = isCurrentYear ? month - todayMonth : month;
+
+  const isCurrentMonth = isCurrentYear && month === todayMonth;
   const dim = daysInMonth(month, currentYear + yearIndex);
-  const days = Array.from({ length: dim }, (_, i) => String(i + 1));
-  const dayClamped = Math.min(day, dim - 1);
+  // 1-indexed lower bound: today's date if we're looking at the current
+  // month, otherwise the 1st -- this is what makes "today" the first row
+  // in the day wheel instead of one more scrollable-past entry above it.
+  const minDay = isCurrentMonth ? todayDate : 1;
+  const dayClamped = Math.max(minDay - 1, Math.min(day, dim - 1));
+  const days = Array.from({ length: dim - minDay + 1 }, (_, i) => String(minDay + i));
+  const dayIndex = dayClamped - (minDay - 1);
+
+  const years = Array.from({ length: 8 }, (_, i) => String(currentYear + i));
+
+  const handleDayChange = (displayIndex: number) => {
+    setDay(minDay - 1 + displayIndex);
+  };
+
+  const handleMonthChange = (displayIndex: number) => {
+    const actualMonth = isCurrentYear ? displayIndex + todayMonth : displayIndex;
+    setMonth(actualMonth);
+    // Switching month can invalidate the current day (e.g. landing back on
+    // the current month should never leave a past day selected, and a
+    // shorter month needs the day pulled back in).
+    const newIsCurrentMonth = isCurrentYear && actualMonth === todayMonth;
+    const newMinDay = newIsCurrentMonth ? todayDate : 1;
+    const newDim = daysInMonth(actualMonth, currentYear + yearIndex);
+    setDay(prev => Math.max(newMinDay - 1, Math.min(prev, newDim - 1)));
+  };
+
+  const handleYearChange = (newYearIndex: number) => {
+    setYearIndex(newYearIndex);
+    if (newYearIndex === 0 && month < todayMonth) {
+      // Was parked on a month that only made sense in a future year --
+      // landing back on the current year makes that month entirely past.
+      setMonth(todayMonth);
+      setDay(todayDate - 1);
+    }
+  };
 
   const handleConfirm = () => {
     void buttonPress();
@@ -108,9 +173,9 @@ export const DateWheelPicker: React.FC<Props> = ({ visible, initialDate, onClose
 
           <View style={styles.wheelRow}>
             <View style={styles.highlightBox} pointerEvents="none" />
-            <Wheel values={days} index={dayClamped} onChange={setDay} />
-            <Wheel values={MONTHS} index={month} onChange={setMonth} />
-            <Wheel values={years} index={yearIndex} onChange={setYearIndex} />
+            <Wheel values={days} index={dayIndex} onChange={handleDayChange} />
+            <Wheel values={displayedMonths} index={monthIndex} onChange={handleMonthChange} />
+            <Wheel values={years} index={yearIndex} onChange={handleYearChange} />
           </View>
 
           <View style={styles.actions}>
