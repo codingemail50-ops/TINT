@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +28,7 @@ import { DailyRecapCard } from '../components/DailyRecapCard';
 import { getTodaysMotivationalMessage } from '../utils/motivation';
 import { MotivationalMessage } from '../data/motivationalMessages';
 import { MotivationalPostcard } from '../components/MotivationalPostcard';
+import { SplashAnimation } from '../components/SplashAnimation';
 import {
   loadUserFromSupabase,
   syncAppStateToSupabase,
@@ -124,6 +125,13 @@ const AppNavigatorInner: React.FC = () => {
     totalTasksCompleted: 0,
   });
   const [showTabs, setShowTabs] = useState(false);
+  // The boot screen's splash animation and the async session/data resolution
+  // below run in parallel — the actual transition away from 'boot' waits for
+  // BOTH (see the effect further down), so the animation always gets to play
+  // its full length even when the network is fast, and a slow network just
+  // holds on the animation's final frame instead of an extra loading state.
+  const [bootTargetScreen, setBootTargetScreen] = useState<Screen | null>(null);
+  const [splashAnimDone, setSplashAnimDone] = useState(false);
   // The "Already have an account? Log in" shortcut on step 1 skips straight
   // to createAccount in login mode, without collecting avatar/exam/goal —
   // this flag is what tells createAccount which mode to open in.
@@ -165,7 +173,10 @@ const AppNavigatorInner: React.FC = () => {
     })();
   }, [showTabs, appState]);
 
-  // No splash animation — resolve session/local state directly on mount.
+  // Resolves session/local state in the background while the boot screen's
+  // splash animation plays — sets bootTargetScreen (not screen directly) so
+  // the gating effect below can hold off actually navigating until the
+  // animation has ALSO finished playing (see that effect for why).
   useEffect(() => {
     void (async () => {
       // Must resolve before anything below reads "today" — otherwise a
@@ -189,8 +200,7 @@ const AppNavigatorInner: React.FC = () => {
           if (loaded) {
             setAppState(loaded);
             setShowTabs(true);
-            setScreen('todo');
-            Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+            setBootTargetScreen('todo');
             return;
           }
         }
@@ -203,8 +213,7 @@ const AppNavigatorInner: React.FC = () => {
           // Existing local user with no cloud row yet (e.g. was offline before) — push it up now
           if (userId) void saveNewUserToSupabase(userId, '', user);
           setShowTabs(true);
-          setScreen('todo');
-          Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+          setBootTargetScreen('todo');
           return;
         }
       }
@@ -212,9 +221,22 @@ const AppNavigatorInner: React.FC = () => {
       // The one genuinely "first launch" branch — no cloud profile, no local
       // user either. Onboarding now starts with avatar/exam, then account
       // creation, then the walkthrough right before landing in the app.
-      setScreen('avatarExam');
+      setBootTargetScreen('avatarExam');
     })();
   }, []);
+
+  // Actually leaves the boot screen once BOTH the async resolution above and
+  // the splash animation have finished — whichever takes longer wins. Fast
+  // network: the animation still plays out in full instead of getting cut
+  // short. Slow network: the animation just holds on its final frame (see
+  // SplashAnimation) instead of an extra bare loading state after it.
+  useEffect(() => {
+    if (!bootTargetScreen || !splashAnimDone) return;
+    setScreen(bootTargetScreen);
+    if (bootTargetScreen === 'todo') {
+      Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    }
+  }, [bootTargetScreen, splashAnimDone, tabFadeAnim]);
 
   // Tab screens stay mounted now, so the dev-mode day-skip tool needs an
   // explicit nudge to refresh appState (streak/history are date-dependent) —
@@ -517,7 +539,7 @@ const AppNavigatorInner: React.FC = () => {
         <View style={styles.swipeArea}>
           {screen === 'boot' && (
             <View style={styles.bootScreen}>
-              <ActivityIndicator color={Colors.pop} size="small" />
+              <SplashAnimation onFinish={() => setSplashAnimDone(true)} />
             </View>
           )}
           {screen === 'walkthrough' && (

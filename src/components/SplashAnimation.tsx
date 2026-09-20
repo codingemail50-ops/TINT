@@ -5,6 +5,12 @@ import { buildBonfireStage } from './pixelBonfireStages';
 import { Colors, Fonts } from '../constants/theme';
 
 interface Props {
+  /** Fires once, right when the intro sequence lands (flame blazing,
+   *  wordmark settled) — NOT after some fixed total duration. The caller
+   *  decides when to actually navigate away (see AppNavigator's boot
+   *  screen); this component just holds on that final frame for as long
+   *  as it stays mounted, so a slow network never exposes a blank gap
+   *  behind a self-timed fade-out. */
   onFinish: () => void;
 }
 
@@ -41,8 +47,9 @@ function StageLayer({ def, opacity }: { def: typeof ASH; opacity: Animated.Value
 // (grey) catches into a small flame, jumps to a full blaze (orange), then
 // the wordmark lands — black -> grey -> orange, matching TINT's own
 // bonfire-grows-with-focus mechanic instead of inventing separate splash
-// art. Runs once, then fades itself out and calls onFinish — the screen
-// underneath (already mounted, loading in the background) is what's left.
+// art. Plays once (~1.7s), then holds on the final frame (blaze + wordmark,
+// still gently breathing) until whoever mounted this unmounts it — see
+// onFinish above for why it doesn't time its own exit.
 export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
   const ashOpacity = useRef(new Animated.Value(0)).current;
   const catchesOpacity = useRef(new Animated.Value(0)).current;
@@ -50,8 +57,6 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
   const wordScale = useRef(new Animated.Value(0.8)).current;
   const wordOpacity = useRef(new Animated.Value(0)).current;
   const breathe = useRef(new Animated.Value(1)).current;
-  const rootOpacity = useRef(new Animated.Value(1)).current;
-
   useEffect(() => {
     Animated.sequence([
       // Ignition: ash fades in, holds, then the flame catches.
@@ -66,9 +71,6 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
         Animated.timing(wordOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
         Animated.spring(wordScale, { toValue: 1, friction: 5, tension: 140, useNativeDriver: true }),
       ]),
-      Animated.delay(700),
-      // Hand off to whatever's already mounted underneath.
-      Animated.timing(rootOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
     ]).start(({ finished }) => {
       if (finished) onFinish();
     });
@@ -85,7 +87,7 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
   }, []);
 
   return (
-    <Animated.View style={[styles.root, { opacity: rootOpacity }]} pointerEvents="none">
+    <View style={styles.root} pointerEvents="none">
       <Animated.View style={[styles.flameWrap, { transform: [{ scale: breathe }] }]}>
         <StageLayer def={ASH} opacity={ashOpacity} />
         <StageLayer def={CATCHES} opacity={catchesOpacity} />
@@ -94,7 +96,7 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
       <Animated.Text style={[styles.wordmark, { opacity: wordOpacity, transform: [{ scale: wordScale }] }]}>
         TINT
       </Animated.Text>
-    </Animated.View>
+    </View>
   );
 };
 
