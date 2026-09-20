@@ -133,17 +133,22 @@ export async function upsertFocusLogEntry(
   return updated;
 }
 
-function startOfWeek(d: Date): Date {
-  const day = d.getDay();
+// Rolling 7-day window (today plus the 6 days before it), matching
+// getLast7DaysFocus/getFocusSummary's 'week' bucket — NOT the calendar week
+// (Sun-Sat). Was previously computed as "since this calendar week's Sunday,"
+// which on, say, a Tuesday only covered 3 days and reset to near-zero every
+// Sunday instead of rolling smoothly, showing a much smaller "week" total
+// than Insights' own week view of the same data.
+function startOfRollingWeek(d: Date): Date {
   const result = new Date(d);
-  result.setDate(d.getDate() - day);
   result.setHours(0, 0, 0, 0);
+  result.setDate(result.getDate() - 6);
   return result;
 }
 
 export function computeFocusStats(log: FocusLogEntry[]): { today: number; week: number; allTime: number } {
   const todayStr = devNow().toDateString();
-  const weekStart = startOfWeek(devNow());
+  const weekStart = startOfRollingWeek(devNow());
 
   let today = 0, week = 0, allTime = 0;
   for (const entry of log) {

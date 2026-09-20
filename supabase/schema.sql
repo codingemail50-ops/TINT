@@ -102,9 +102,70 @@ create policy "user can update own row"
 -- No delete policy: users can't delete their own row from the client.
 -- (Add one deliberately later if you want a "delete my account" feature.)
 
+-- ── focus_stats_from_log ─────────────────────────────────────────────────
+-- Computes today/week/all-time focus minutes live from a user's raw
+-- focus_log, instead of trusting the stored focus_today_mins/
+-- focus_week_mins/focus_alltime_mins columns. Those are only refreshed
+-- when that specific person's own device happens to sync (see
+-- syncFocusLog in supabaseStorage.ts) — so anyone who stops opening the
+-- app keeps showing whatever "today"/"week" total their last sync
+-- happened to compute, indefinitely, on everyone else's leaderboard.
+-- "Today" in particular never reset at midnight this way, which is what
+-- looked like leftover residue piling up. Computing live from focus_log
+-- fixes that (and the equivalent staleness in "week" and "all-time") at
+-- the cost of a bit of query-time work per row.
+--
+-- "Today"/"week" are necessarily approximate across timezones: each
+-- entry's `date` was written as that device's own local calendar day
+-- (JS's Date.toDateString(), e.g. "Thu Sep 09 2026"), but this function's
+-- notion of "today" is the database's own current_date (UTC on Supabase).
+-- For someone whose local timezone is well offset from UTC, entries
+-- logged within a few hours of midnight can land a day off from what
+-- their own device would call "today." That's still far more correct
+-- than staying wrong for days at a time, and is the same tradeoff most
+-- apps without per-user timezone tracking make.
+--
+-- Defensive per the repair block further down, and then some: a malformed
+-- `mins` (not a JSON number) contributes 0. `date` is only ever handed to
+-- to_date() once it's been validated as EXACTLY a "Www Mon DD YYYY" shape
+-- (regex) with a real weekday and a real month abbreviation (explicit
+-- membership checks below) — to_date() throwing on one garbled row would
+-- break this function, and therefore the whole leaderboard, for everyone,
+-- the same failure mode the repair block's own comment describes. A `date`
+-- that doesn't pass all three checks is excluded from today/week, but its
+-- mins still count toward all-time, which needs no date parsing at all.
+create or replace function public.focus_stats_from_log(p_log jsonb)
+returns table (today_mins double precision, week_mins double precision, alltime_mins double precision)
+language sql
+stable
+as $$
+  with entries as (
+    select
+      case when jsonb_typeof(e->'mins') = 'number' then (e->>'mins')::double precision else 0 end as mins,
+      case
+        when (e->>'date') ~ '^[A-Za-z]{3} [A-Za-z]{3} \d{2} \d{4}$'
+          and upper(substring(e->>'date' from 1 for 3)) in ('SUN','MON','TUE','WED','THU','FRI','SAT')
+          and upper(substring(e->>'date' from 5 for 3)) in
+            ('JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC')
+        then to_date(e->>'date', 'Dy Mon DD YYYY')
+        else null
+      end as parsed_date
+    from jsonb_array_elements(case when jsonb_typeof(p_log) = 'array' then p_log else '[]'::jsonb end) e
+  )
+  select
+    coalesce(sum(case when parsed_date = current_date then mins else 0 end), 0) as today_mins,
+    coalesce(sum(case when parsed_date >= current_date - 6 then mins else 0 end), 0) as week_mins,
+    coalesce(sum(mins), 0) as alltime_mins
+  from entries;
+$$;
+
+grant execute on function public.focus_stats_from_log(jsonb) to authenticated;
+
 -- ── leaderboard_view ─────────────────────────────────────────────────────
 -- Public read-only view exposing ONLY the non-sensitive columns needed for
--- the leaderboard — never email, today_tasks, or focus_log.
+-- the leaderboard — never email, today_tasks, or focus_log itself (the
+-- live-computed sums below are fine to expose; the raw log with individual
+-- session timestamps is not).
 --
 -- This is a plain view with NO `security_invoker`, so it runs as its owner
 -- (the role that executes this script — `postgres` on Supabase, which has
@@ -113,9 +174,12 @@ create policy "user can update own row"
 -- base table to owner-only access. The view's column list is the entire
 -- privacy boundary here — never add email/today_tasks/focus_log to it.
 create or replace view public.leaderboard_view as
-select id, name, avatar, exams, streak, history, total_tasks_completed,
-       focus_today_mins, focus_week_mins, focus_alltime_mins
-from public.user_data;
+select u.id, u.name, u.avatar, u.exams, u.streak, u.history, u.total_tasks_completed,
+       fs.today_mins as focus_today_mins,
+       fs.week_mins as focus_week_mins,
+       fs.alltime_mins as focus_alltime_mins
+from public.user_data u
+cross join lateral public.focus_stats_from_log(u.focus_log) fs;
 
 grant select on public.leaderboard_view to authenticated;
 
@@ -196,9 +260,10 @@ security definer
 set search_path = public
 as $$
   select u.id, u.name, u.avatar, u.exams, u.streak, u.history, u.total_tasks_completed,
-         u.focus_today_mins, u.focus_week_mins, u.focus_alltime_mins
+         fs.today_mins, fs.week_mins, fs.alltime_mins
   from public.user_data u
   join public.friendships f on f.friend_id = u.id
+  cross join lateral public.focus_stats_from_log(u.focus_log) fs
   where f.user_id = auth.uid();
 $$;
 
@@ -221,8 +286,9 @@ security definer
 set search_path = public
 as $$
   select u.id, u.name, u.avatar, u.exams, u.streak, u.history, u.total_tasks_completed,
-         u.focus_today_mins, u.focus_week_mins, u.focus_alltime_mins
+         fs.today_mins, fs.week_mins, fs.alltime_mins
   from public.user_data u
+  cross join lateral public.focus_stats_from_log(u.focus_log) fs
   where lower(u.email) = lower(trim(p_email))
   limit 1;
 $$;
