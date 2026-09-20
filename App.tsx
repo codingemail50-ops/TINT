@@ -8,6 +8,7 @@ import { VT323_400Regular } from '@expo-google-fonts/vt323';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { Colors } from './src/constants/theme';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { SplashAnimation } from './src/components/SplashAnimation';
 
 // Font loading is a nice-to-have, not a hard requirement — if it fails or
 // hangs (seen on some devices), the app must still render with system
@@ -17,6 +18,12 @@ const FONT_LOAD_TIMEOUT_MS = 8000;
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, VT323_400Regular });
   const [timedOut, setTimedOut] = useState(false);
+  // AppNavigator mounts immediately underneath (so its own session/data
+  // loading starts right away, in the background) — this just overlays the
+  // brand animation on top for a fixed, predictable duration, then fades
+  // itself out to reveal whatever's already loaded. Not a gate on readiness:
+  // that would just add the animation's length as extra serial boot time.
+  const [showSplashAnim, setShowSplashAnim] = useState(true);
 
   useEffect(() => {
     console.log('[App] font load state:', { fontsLoaded, fontError });
@@ -39,6 +46,7 @@ export default function App() {
       <GestureHandlerRootView style={styles.root}>
         <SafeAreaProvider>
           <AppNavigator />
+          {showSplashAnim && <SplashAnimation onFinish={() => setShowSplashAnim(false)} />}
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
