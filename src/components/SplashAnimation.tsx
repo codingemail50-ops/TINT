@@ -13,41 +13,51 @@ interface Props {
 }
 
 // ── Grid ─────────────────────────────────────────────────────────────────
-// ~30 cells across at roughly 1/6 the lettering's cap height, matching the
+// 36 cells across at roughly 1/6 the lettering's cap height, matching the
 // reference frames: chunky enough to read as sprite art, fine enough to
 // actually form tongues instead of a blocky skyline.
 const CELL = 8;
-const COLS = 30;
-const ROWS = 30;
-const GRID = CELL * COLS;
+const COLS = 36;
+const ROWS = 33;
+const GRID_W = CELL * COLS; // 288 — comfortably wider than "NO TOMORROW", so
+const GRID_H = CELL * ROWS; // the phrase can never poke out past the flame's sides
 
-const STAGE_W = 260;
-const STAGE_H = 420;
-const GRID_LEFT = (STAGE_W - GRID) / 2;
-const GRID_TOP = 8; // puts the grid's bottom edge just under the text baseline
+const STAGE_W = 320;
+const STAGE_H = 300;
+const GRID_LEFT = (STAGE_W - GRID_W) / 2;
+
+// The lettering is placed by hand rather than centred in the stage, and sized
+// against the base band rather than for its own sake. The band's final height
+// is BASE_ROWS*CELL; the glyphs are set to span from ~50% to ~89% of it, so the
+// rising coverage front crosses them over the second half of the rise (readable
+// at 60% grown, half gone at 70%, clear only in the last beat) and the band
+// still closes over them completely with room to spare.
+const TEXT_MID = GRID_H - 78;
 
 const PALETTE = FLAME_PALETTES.pop; // deep orange -> orange -> light orange -> pale
 
-// Solid band under the tongues. This is what guarantees the lettering is
-// covered at full height (9 rows = 72px, clearing the top of the glyphs
-// with ~18px to spare), which is precisely why the silhouette above it is
-// free to stay as ragged as the reference — coverage never depends on the
-// top edge flattening out.
-const BASE_ROWS = 9;
+// Solid band under the tongues. Sized so the *shortest* column of the full
+// flame (base + the smallest tongue value, minus a row of flicker) still
+// clears the top of the glyphs by ~10px — which is precisely why the
+// silhouette above it is free to stay as ragged as the reference: coverage
+// never depends on the top edge flattening out. Raising it further would
+// only make the flame swallow the wordmark earlier in the rise.
+const BASE_ROWS = 12;
 const PEAK_ROWS = 13;
 
-// Eight tongues, deliberately uneven: tallest is ~1.8x the shortest, and
+// Nine tongues, deliberately uneven: tallest is ~1.9x the shortest, and
 // they're narrow enough not to blend into one dome, so the valleys between
 // them fall to ~40% of peak height.
 const TONGUES = [
-  { pos: 0.07, w: 0.075, h: 0.55 },
-  { pos: 0.19, w: 0.085, h: 0.82 },
-  { pos: 0.31, w: 0.070, h: 0.60 },
-  { pos: 0.43, w: 0.090, h: 1.00 },
-  { pos: 0.55, w: 0.075, h: 0.70 },
-  { pos: 0.67, w: 0.090, h: 0.90 },
-  { pos: 0.79, w: 0.070, h: 0.56 },
-  { pos: 0.90, w: 0.080, h: 0.78 },
+  { pos: 0.06, w: 0.065, h: 0.52 },
+  { pos: 0.17, w: 0.070, h: 0.80 },
+  { pos: 0.28, w: 0.060, h: 0.58 },
+  { pos: 0.39, w: 0.075, h: 1.00 },
+  { pos: 0.50, w: 0.062, h: 0.68 },
+  { pos: 0.61, w: 0.072, h: 0.90 },
+  { pos: 0.72, w: 0.058, h: 0.55 },
+  { pos: 0.83, w: 0.068, h: 0.82 },
+  { pos: 0.93, w: 0.062, h: 0.60 },
 ];
 
 // Parabolic falloff per tongue, max-combined: gives each one a 1-2 cell tip
@@ -68,7 +78,7 @@ const TONGUE_AT: number[] = Array.from({ length: COLS }, (_, i) => {
 // two straight verticals. Only touches columns well outside the text.
 const SIDE_TAPER: number[] = Array.from({ length: COLS }, (_, i) => {
   const edge = Math.min(i, COLS - 1 - i);
-  return edge === 0 ? 0.55 : edge === 1 ? 0.8 : 1;
+  return edge === 0 ? 0.45 : edge === 1 ? 0.68 : edge === 2 ? 0.86 : 1;
 });
 
 // Fixed (not per-frame random) ignition order, so frame 2 reads as a broken
@@ -89,62 +99,61 @@ function columnHeights(growth: number, shift: number, flicker: number[]): number
   });
 }
 
-function buildFrame(heights: number[], embers: [number, number][]): Frame {
-  // Below the grid counts as solid so the base isn't rimmed like a tip.
-  const filled = (c: number, r: number): boolean => {
-    if (c < 0 || c >= COLS) return false;
-    if (r >= ROWS) return true;
-    if (r < 0) return false;
-    return r >= ROWS - heights[c];
-  };
+/** Each hotter shade is the whole silhouette shrunk — vertically by a
+ *  fraction of each column's own height, horizontally by taking the minimum
+ *  over a window of neighbours. Shrinking proportionally (rather than insetting
+ *  by a fixed number of cells, which is what depth-from-edge does) is what
+ *  makes the distribution match the reference: a narrow tongue's neighbours are
+ *  short, so the min wipes its inner shades out and it stays deep orange all
+ *  the way up, while only the broad lower mass is wide and tall enough to carry
+ *  the pale core. */
+const NARROW_BIAS = 0.6; // how much a column defers to its shorter neighbours
 
-  const depth: number[][] = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
-  const queue: [number, number][] = [];
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      if (!filled(c, r)) continue;
-      if (!filled(c - 1, r) || !filled(c + 1, r) || !filled(c, r - 1) || !filled(c, r + 1)) {
-        depth[r][c] = 0;
-        queue.push([c, r]);
-      }
+function shrink(heights: number[], k: number, scale: number, drop: number): number[] {
+  const out: number[] = [];
+  for (let c = 0; c < COLS; c++) {
+    let m = Infinity;
+    for (let d = -k; d <= k; d++) {
+      const i = c + d;
+      m = Math.min(m, i < 0 || i >= COLS ? 0 : heights[i]);
     }
+    // Pure min flattens every inner band into a horizontal plateau (the whole
+    // flame reads as a layer cake). Blending it back toward the column's own
+    // height keeps the bands undulating with the tongues while still starving
+    // a lone tall spike of its inner shades.
+    const v = NARROW_BIAS * m + (1 - NARROW_BIAS) * heights[c];
+    out.push(Math.max(0, Math.round(v * scale - drop)));
   }
-  for (let qi = 0; qi < queue.length; qi++) {
-    const [c, r] = queue[qi];
-    const next = Math.min(6, depth[r][c] + 1);
-    const around: [number, number][] = [[c - 1, r], [c + 1, r], [c, r - 1], [c, r + 1]];
-    for (const [nc, nr] of around) {
-      if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) continue;
-      if (!filled(nc, nr) || depth[nr][nc] !== -1) continue;
-      depth[nr][nc] = next;
-      queue.push([nc, nr]);
-    }
-  }
+  return out;
+}
+
+function buildFrame(heights: number[], embers: [number, number][]): Frame {
+  const layers = [
+    heights,
+    shrink(heights, 1, 0.80, 1),
+    shrink(heights, 1, 0.55, 1),
+    shrink(heights, 2, 0.32, 1),
+  ];
 
   const parts = ['', '', '', ''];
   const square = (c: number, r: number) => `M${c * CELL} ${r * CELL}h${CELL}v${CELL}h-${CELL}z`;
 
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const d = depth[r][c];
-      if (d < 0) continue;
-      // Cools with height as well as proximity to the edge: a fat lower body
-      // goes pale, a narrow tongue stays deep orange all the way up, and
-      // only the wider tongues carry light orange up their middle — which is
-      // the distribution the reference frames actually show.
-      const h = heights[c];
-      const heightFrac = h > 1 ? (ROWS - 1 - r) / (h - 1) : 0;
-      const score = d - 2.8 * heightFrac;
-      const shade = score >= 3 ? 3 : score >= 1.6 ? 2 : score >= 0.6 ? 1 : 0;
+  for (let c = 0; c < COLS; c++) {
+    for (let r = ROWS - heights[c]; r < ROWS; r++) {
+      let shade = 0;
+      for (let k = 3; k >= 1; k--) {
+        if (r >= ROWS - layers[k][c]) { shade = k; break; }
+      }
       parts[shade] += square(c, r);
     }
   }
 
   for (const [c, r] of embers) {
-    if (c < 0 || c >= COLS || r < 0 || r >= ROWS || filled(c, r)) continue;
+    if (c < 0 || c >= COLS || r < 0 || r >= ROWS) continue;
+    if (r >= ROWS - heights[c]) continue;
     // Higher embers are cooler.
     const tip = ROWS - heights[c];
-    parts[tip - r > 4 ? 0 : 1] += square(c, r);
+    parts[tip - r > 3 ? 0 : 1] += square(c, r);
   }
 
   return { d0: parts[0], d1: parts[1], d2: parts[2], d3: parts[3] };
@@ -159,12 +168,12 @@ function randomFlicker(): number[] {
 // height instead of scattering evenly.
 function randomEmbers(heights: number[], intensity: number): [number, number][] {
   const out: [number, number][] = [];
-  const count = Math.round(2 + 11 * intensity);
+  const count = Math.round(2 + 9 * intensity);
   for (let i = 0; i < count; i++) {
     const c = Math.floor(Math.random() * COLS);
     if (heights[c] <= 0) continue;
     const tip = ROWS - heights[c];
-    const rise = 1 + Math.floor(Math.random() * Math.random() * 10);
+    const rise = 1 + Math.floor(Math.random() * Math.random() * 6);
     out.push([c, tip - rise]);
   }
   // A couple out at the shoulders rather than straight above the tall
@@ -296,7 +305,7 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
           <Text style={[styles.phraseLine, styles.phraseAccent]}>NO TOMORROW</Text>
         </Animated.View>
 
-        <Svg width={GRID} height={GRID} viewBox={`0 0 ${GRID} ${GRID}`} style={styles.flame}>
+        <Svg width={GRID_W} height={GRID_H} viewBox={`0 0 ${GRID_W} ${GRID_H}`} style={styles.flame}>
           <Path d={frame.d0} fill={PALETTE.shades[0]} />
           <Path d={frame.d1} fill={PALETTE.shades[1]} />
           <Path d={frame.d2} fill={PALETTE.shades[2]} />
@@ -314,27 +323,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stage: { width: STAGE_W, height: STAGE_H, alignItems: 'center', justifyContent: 'center' },
+  stage: { width: STAGE_W, height: STAGE_H },
 
   tint: {
     position: 'absolute',
+    top: TEXT_MID - 30,
+    width: STAGE_W,
+    textAlign: 'center',
     fontFamily: Fonts.bold,
-    fontSize: 68,
+    fontSize: 60,
+    lineHeight: 60,
     letterSpacing: 1,
     color: Colors.textPrimary,
   },
-  phraseWrap: { position: 'absolute', width: STAGE_W, alignItems: 'center' },
+  phraseWrap: { position: 'absolute', top: TEXT_MID - 26, width: STAGE_W, alignItems: 'center' },
   phraseLine: {
     fontFamily: Fonts.bold,
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 22,
+    lineHeight: 26,
     letterSpacing: 0.5,
     textAlign: 'center',
     color: Colors.textPrimary,
   },
   phraseAccent: { color: Colors.pop },
 
-  flame: { position: 'absolute', top: GRID_TOP, left: GRID_LEFT },
+  flame: { position: 'absolute', top: 0, left: GRID_LEFT },
 
   starSlot: { position: 'absolute', width: 24, height: 24 },
   star: { width: 24, height: 24 },
