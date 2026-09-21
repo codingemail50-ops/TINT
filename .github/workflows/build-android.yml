@@ -87,6 +87,19 @@ jobs:
         timeout-minutes: 5
         run: npx expo prebuild --platform android --clean
 
+      # The build genuinely got this far -- past licenses, well into real
+      # compilation of ~15+ modules including Reanimated's native C++ build --
+      # before dying to repeated `java.lang.OutOfMemoryError: Metaspace` and
+      # degrading until the 20-minute timeout caught it. Expo's default
+      # gradle.properties allows only 512 MiB of Metaspace and a 2 GiB heap
+      # for the whole Gradle JVM, which this many native/Kotlin modules
+      # compiling at once outgrows. Appending a second `org.gradle.jvmargs`
+      # line overrides the first -- Java properties files take the last
+      # occurrence of a repeated key -- so this doesn't need to touch
+      # anything prebuild already wrote, just add to it.
+      - name: Increase Gradle JVM memory (fixes Metaspace OOM)
+        run: echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
+
       # Decodes the real upload keystore from a repo secret into a file on
       # the runner. Nothing here is written to the repo or to a log — GitHub
       # masks any line containing a secret's value automatically. Always
