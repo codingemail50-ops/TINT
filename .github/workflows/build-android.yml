@@ -98,16 +98,20 @@ jobs:
       # occurrence of a repeated key -- so this doesn't need to touch
       # anything prebuild already wrote, just add to it.
       #
-      # NOTE: this alone did NOT fix it on the first attempt -- confirmed by
-      # re-reading the log after adding this step, which still reported the
-      # exact old 2 GiB / 512 MiB defaults. org.gradle.jvmargs only ever
-      # configures the Gradle *Daemon's* JVM, and the build step below runs
-      # with --no-daemon, so no daemon is ever spawned to read it -- this
-      # line was being silently ignored. See the --no-daemon removal below,
-      # which is the actual fix; this step is what the removed flag now lets
-      # take effect.
+      # NOTE: this took two attempts to actually land. First attempt removed
+      # --no-daemon from the build step below (org.gradle.jvmargs only
+      # configures the Gradle *daemon's* JVM, and the build was running
+      # without one) -- correct, but not sufficient. The next run still
+      # reported the exact old 2 GiB / 512 MiB defaults, because Expo's
+      # generated gradle.properties has no trailing newline at the end of
+      # the file, and `echo "..." >> file` appends starting immediately
+      # after the last existing character -- it landed as
+      # `...enableBundleCompression=trueorg.gradle.jvmargs=...`, one garbled
+      # line, never parsed as its own property at all. `printf '\n...\n'`
+      # forces our line onto a fresh line of its own regardless of whether
+      # the file already ended in a newline.
       - name: Increase Gradle JVM memory (fixes Metaspace OOM)
-        run: echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
+        run: printf '\norg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m\n' >> android/gradle.properties
 
       # Decodes the real upload keystore from a repo secret into a file on
       # the runner. Nothing here is written to the repo or to a log — GitHub
