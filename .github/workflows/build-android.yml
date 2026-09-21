@@ -55,27 +55,66 @@ jobs:
       # module listed in package.json (including tint-app-blocker, autolinked
       # from modules/) — this repo never commits android/, so this step is
       # what turns "the JS project" into something Gradle can build at all.
+      # plugins/withAndroidReleaseSigning.js runs as part of this and is what
+      # wires the real keystore (decoded below) into the generated
+      # build.gradle in place of Expo's default debug-signs-everything setup.
       - name: Prebuild native Android project
         run: npx expo prebuild --platform android --clean
 
+      # Decodes the real upload keystore from a repo secret into a file on
+      # the runner. Nothing here is written to the repo or to a log — GitHub
+      # masks any line containing a secret's value automatically. Always
+      # runs, even before the secret exists: an empty secret decodes to an
+      # empty file, which is harmless because the Build step below only
+      # points at this file at all once the secret is actually set (see the
+      # TINT_UPLOAD_STORE_FILE ternary there) — an empty *path* is what
+      # triggers the plugin's debug-keystore fallback, not an empty file.
+      - name: Decode signing keystore
+        run: echo "${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}" | base64 -d > android/app/tint-upload.keystore
+
       # assembleRelease, not assembleDebug: a debug-variant APK expects a
       # live Metro server and is useless once you walk away from a laptop,
-      # which is the whole point of testing a schedule that fires overnight
-      # or across a locked screen. Release bundles the JS in and applies the
-      # minify/shrink settings from app.json's expo-build-properties, so this
-      # is the same code path production will use.
+      # which is the whole point of testing something like a schedule that
+      # has to keep working overnight or across a locked screen. Release
+      # bundles the JS in and applies the minify/shrink settings from
+      # app.json's expo-build-properties, so this is the same code path
+      # production will use.
       #
-      # It is NOT signed for the Play Store. Expo's generated build.gradle
-      # falls back to the auto-generated debug keystore for the release
-      # signing config when no real one is configured (which is the case
-      # here) — fine and expected for sideloading onto a test device, not
-      # something to ever upload to Play Console. That needs a real keystore,
-      # set up separately when we're actually ready to submit.
+      # TINT_UPLOAD_STORE_FILE etc. are what withAndroidReleaseSigning reads
+      # (see plugins/withAndroidReleaseSigning.js) — when the keystore secret
+      # above is set, this signs with the real, permanent upload key, so
+      # Google Sign-In and everything else behaves exactly as the actual
+      # Play Store submission will. When it isn't set, these env vars point
+      # at a file that doesn't exist and the plugin's fallback silently signs
+      # with the debug keystore instead — good enough for a UI/logic check,
+      # just don't expect Google Sign-In to work in that build.
       - name: Build release APK
         working-directory: android
+        env:
+          # Empty string, not just unset, when the secret isn't configured
+          # yet -- Groovy's `if (System.getenv(...))` treats "" the same as
+          # null (both falsy), so this is what actually triggers the
+          # plugin's fallback to the debug keystore rather than trying (and
+          # failing) to sign with a keystore file that's empty or missing.
+          TINT_UPLOAD_STORE_FILE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 != '' && 'tint-upload.keystore' || '' }}
+          TINT_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          TINT_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          TINT_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
+
+      # Prints the SHA-1 of whatever certificate actually signed this APK,
+      # straight from the built file rather than trusting which branch of
+      # the fallback ran. Not sensitive — a certificate's fingerprint is
+      # exactly what gets shared with Google, never masked or secret — so
+      # this is safe to leave visible in the log for both of us to check.
+      - name: Print signing certificate fingerprint
+        run: |
+          keytool -printcert -jarfile android/app/build/outputs/apk/release/app-release.apk \
+            | grep -A1 "^Certificate fingerprints" || true
+          keytool -printcert -jarfile android/app/build/outputs/apk/release/app-release.apk \
+            | grep "SHA1:" || true
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
