@@ -188,6 +188,12 @@ const LAYER_SPREAD = [0, 1, 1, 2, 2, 3, 4];
 
 type Spark = { x: number; y: number; vx: number; vy: number; age: number; life: number };
 
+// How many sparks the flame throws off at the instant it starts descending,
+// and how often it throws one the rest of the time. The ambient rate is kept
+// low deliberately: the burst is what should read as the moment.
+const BURST_COUNT = 12;
+const AMBIENT_RATE = 0.3;
+
 function buildFrame(top: number[], lift: number[], shift: number, sparks: Spark[]): Frame {
   const thick = top.map((t, i) => Math.max(0, t - lift[i]));
   const inner: number[][] = [thick];
@@ -249,10 +255,9 @@ function randomFlicker(): number[] {
 /** Throws a spark off the flame's top edge. Most drift more or less straight
  *  up and burn out quickly; a minority get real lateral speed and a longer
  *  life, and those few are the ones still streaking once the fire has gone. */
-function spawnSpark(top: number[], lift: number[]): Spark | null {
+function spawnSpark(top: number[], lift: number[], flyer = Math.random() < 0.3): Spark | null {
   const c = Math.floor(Math.random() * COLS);
   if (top[c] <= lift[c]) return null;
-  const flyer = Math.random() < 0.3;
   return {
     x: c,
     y: FOOT - top[c],
@@ -261,6 +266,28 @@ function spawnSpark(top: number[], lift: number[]): Spark | null {
     age: 0,
     life: flyer ? 20 + Math.random() * 14 : 8 + Math.random() * 10,
   };
+}
+
+/** The release that reads as the fire throwing off sparks as it lets go.
+ *  It fires on the tick the descent starts: spread along the flame's top edge
+ *  rather than at random columns, and all long-lived, so the outflow is an
+ *  event the eye ties to the flame moving rather than something that only
+ *  becomes visible later as slow stragglers accumulate. */
+function burstSparks(top: number[], lift: number[]): Spark[] {
+  const out: Spark[] = [];
+  for (let i = 0; i < BURST_COUNT; i++) {
+    const c = Math.round(((i + 0.5) / BURST_COUNT) * (COLS - 1));
+    if (top[c] <= lift[c]) continue;
+    out.push({
+      x: c,
+      y: FOOT - top[c],
+      vx: (Math.random() - 0.5) * 1.0,
+      vy: -(0.35 + Math.random() * 0.45),
+      age: 0,
+      life: 18 + Math.random() * 14,
+    });
+  }
+  return out;
 }
 
 function stepSparks(sparks: Spark[]): Spark[] {
@@ -305,6 +332,7 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
     let sparks: Spark[] = [];
     let swapped = false;
     let zoomed = false;
+    let burst = false;
     const started = Date.now();
 
     const tick = () => {
@@ -337,11 +365,19 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
       if (alight) {
         const { top, lift } = silhouette(growth, randomFlicker());
         sparks = stepSparks(sparks);
-        // Keep throwing sparks into the descent — those come off a flame
+        if (t >= T_DESCEND && !burst) {
+          // On the very tick the flame starts moving down, so the outflow
+          // reads as caused by it. Everything before this is a low ambient
+          // trickle; without the burst the sparks only became noticeable
+          // later, as slow ones piled up, which is the lag.
+          burst = true;
+          sparks.push(...burstSparks(top, lift));
+        }
+        // Keep a trickle going into the descent — those come off a flame
         // already below the lettering, so they fly up through and around it.
         // Only the last stretch stops, so the tail end isn't dragged off the
         // bottom with the flame.
-        if (shift < MAX_SHIFT * 0.75 && Math.random() < 0.6) {
+        if (shift < MAX_SHIFT * 0.75 && Math.random() < AMBIENT_RATE) {
           const s = spawnSpark(top, lift);
           if (s) sparks.push(s);
         }
