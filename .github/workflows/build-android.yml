@@ -30,6 +30,20 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # Every run so far has hung indefinitely (multiple hours, no output,
+      # not even responding cleanly to a cancel) at exactly the Gradle build
+      # step below -- a silent hang with zero error is the classic symptom of
+      # Gradle blocking on an interactive Android SDK license prompt that a
+      # non-interactive CI shell can never answer. GitHub-hosted runners ship
+      # with a preinstalled SDK whose licenses are accepted for exactly the
+      # components that shipped with it; the first time the Android Gradle
+      # Plugin needs to auto-download anything outside that set (a specific
+      # platform or build-tools version this project's dependencies ask for),
+      # it can hit a license it was never told to accept. This step accepts
+      # every license non-interactively up front, so that can't happen.
+      - name: Accept Android SDK licenses
+        uses: android-actions/setup-android@v3
+
       - name: Install JS dependencies
         run: npm ci
 
@@ -59,6 +73,7 @@ jobs:
       # wires the real keystore (decoded below) into the generated
       # build.gradle in place of Expo's default debug-signs-everything setup.
       - name: Prebuild native Android project
+        timeout-minutes: 5
         run: npx expo prebuild --platform android --clean
 
       # Decodes the real upload keystore from a repo secret into a file on
@@ -88,8 +103,15 @@ jobs:
       # at a file that doesn't exist and the plugin's fallback silently signs
       # with the debug keystore instead — good enough for a UI/logic check,
       # just don't expect Google Sign-In to work in that build.
+      # timeout-minutes turns "hangs silently for hours" into "fails clearly
+      # within 20 minutes" if the license fix above isn't the whole story --
+      # every run before this one sat in_progress until manually cancelled,
+      # with no error and no way to tell it apart from a build that was just
+      # slow. A bounded failure is strictly more debuggable than that, no
+      # matter what the underlying cause turns out to be.
       - name: Build release APK
         working-directory: android
+        timeout-minutes: 20
         env:
           # Empty string, not just unset, when the secret isn't configured
           # yet -- Groovy's `if (System.getenv(...))` treats "" the same as
