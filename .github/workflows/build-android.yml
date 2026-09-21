@@ -30,19 +30,30 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Every run so far has hung indefinitely (multiple hours, no output,
-      # not even responding cleanly to a cancel) at exactly the Gradle build
-      # step below -- a silent hang with zero error is the classic symptom of
+      # Every run so far had hung indefinitely (multiple hours, no output, not
+      # even responding cleanly to a cancel) at exactly the Gradle build step
+      # below -- a silent hang with zero error is the classic symptom of
       # Gradle blocking on an interactive Android SDK license prompt that a
       # non-interactive CI shell can never answer. GitHub-hosted runners ship
       # with a preinstalled SDK whose licenses are accepted for exactly the
       # components that shipped with it; the first time the Android Gradle
-      # Plugin needs to auto-download anything outside that set (a specific
-      # platform or build-tools version this project's dependencies ask for),
-      # it can hit a license it was never told to accept. This step accepts
-      # every license non-interactively up front, so that can't happen.
+      # Plugin needs to auto-download anything outside that set, it can hit a
+      # license it was never told to accept, then wait forever for a yes/no
+      # that will never come. Piping `yes` into sdkmanager --licenses answers
+      # every one of those prompts up front, confirmed working directly
+      # against this runner's own SDK (the earlier attempt at this used
+      # android-actions/setup-android@v3, which accepts licenses the same way
+      # but then crashes trying to additionally install a package called
+      # "tools" that Google discontinued years ago and no longer serves --
+      # replaced with this direct call to avoid depending on it).
+      # `|| true`: sdkmanager can exit non-zero even after successfully
+      # working through every prompt; the actual goal here is answering the
+      # prompts, not its exit code.
       - name: Accept Android SDK licenses
-        uses: android-actions/setup-android@v3
+        run: |
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 2 -type f -name sdkmanager | sort -V | tail -1)
+          echo "Using sdkmanager at: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
 
       - name: Install JS dependencies
         run: npm ci
