@@ -97,6 +97,15 @@ jobs:
       # line overrides the first -- Java properties files take the last
       # occurrence of a repeated key -- so this doesn't need to touch
       # anything prebuild already wrote, just add to it.
+      #
+      # NOTE: this alone did NOT fix it on the first attempt -- confirmed by
+      # re-reading the log after adding this step, which still reported the
+      # exact old 2 GiB / 512 MiB defaults. org.gradle.jvmargs only ever
+      # configures the Gradle *Daemon's* JVM, and the build step below runs
+      # with --no-daemon, so no daemon is ever spawned to read it -- this
+      # line was being silently ignored. See the --no-daemon removal below,
+      # which is the actual fix; this step is what the removed flag now lets
+      # take effect.
       - name: Increase Gradle JVM memory (fixes Metaspace OOM)
         run: echo "org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m" >> android/gradle.properties
 
@@ -148,7 +157,7 @@ jobs:
           TINT_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease
 
       # Prints the SHA-1 of whatever certificate actually signed this APK,
       # straight from the built file rather than trusting which branch of
