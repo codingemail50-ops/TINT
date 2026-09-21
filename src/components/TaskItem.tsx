@@ -28,12 +28,12 @@ interface Props {
   /** Tapping the row itself while actionsVisible is true — dismisses the
    *  icons without editing or deleting anything. */
   onDismissActions?: () => void;
-  /** Third action-row icon, only reachable once actionsVisible is true —
-   *  moves the task into (or, if it's already there, out of) the High
-   *  Priority group. Used to be a double-tap/vertical-drag gesture on the
-   *  row itself, which kept firing by accident while people were just
-   *  trying to scroll the list. Omitted for Done tasks — priority is a
-   *  To Do / High Priority concept only. */
+  /** Double-tap on the row itself moves the task into (or, if it's already
+   *  there, out of) the High Priority group — double-tap again to send it
+   *  back. Guarded with requireExternalGestureToFail below so the first tap
+   *  of a double-tap doesn't also fire onToggle (mark-complete) before the
+   *  second tap arrives. Omitted for Done tasks — priority is a To Do /
+   *  High Priority concept only. */
   onTogglePriority?: (id: string) => void;
   readOnly?: boolean;
   index: number;
@@ -85,9 +85,21 @@ export const TaskItem: React.FC<Props> = ({
   const finishDelete = () => { if (onDelete) onDelete(taskId); };
   const fireToggle = () => { if (!readOnly) onToggle?.(taskId); };
   const fireLongPress = () => { if (!readOnly) onLongPress?.(taskId); };
+  const fireTogglePriority = () => { if (!readOnly) onTogglePriority?.(taskId); };
+
+  // Two quick taps toggle High Priority; the same two taps again send it
+  // back. requireExternalGestureToFail makes singleTap wait to see whether
+  // a second tap is coming before it commits to mark-complete — otherwise
+  // the first tap of every double-tap would complete the task an instant
+  // before the priority toggle also fired.
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .maxDuration(250)
+    .onEnd((_e, success) => { if (success) runOnJS(fireTogglePriority)(); });
 
   const singleTap = Gesture.Tap()
     .maxDuration(250)
+    .requireExternalGestureToFail(doubleTap)
     .onEnd((_e, success) => { if (success) runOnJS(fireToggle)(); });
 
   const longPress = Gesture.LongPress()
@@ -120,7 +132,7 @@ export const TaskItem: React.FC<Props> = ({
     });
 
   const holdGestures = Gesture.Race(pan, longPress);
-  const composed = readOnly ? Gesture.Tap().enabled(false) : Gesture.Race(holdGestures, singleTap);
+  const composed = readOnly ? Gesture.Tap().enabled(false) : Gesture.Race(holdGestures, doubleTap, singleTap);
 
   const dragStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: dragX.value }],
@@ -155,19 +167,6 @@ export const TaskItem: React.FC<Props> = ({
             </View>
           </View>
           <View style={styles.actionRow}>
-            {onTogglePriority && (
-              <TouchableOpacity
-                onPress={() => onTogglePriority(taskId)}
-                style={styles.actionBtn}
-                hitSlop={{ top: 10, right: 6, bottom: 10, left: 6 }}
-              >
-                <Ionicons
-                  name={task.priority === 'high' ? 'arrow-down-circle-outline' : 'arrow-up-circle-outline'}
-                  size={18}
-                  color={task.priority === 'high' ? Colors.textPrimary : Colors.pop}
-                />
-              </TouchableOpacity>
-            )}
             {onEdit && (
               <TouchableOpacity
                 onPress={() => onEdit(taskId)}

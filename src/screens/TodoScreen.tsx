@@ -463,15 +463,11 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     buttonPress();
   }, [tasks]);
 
-  // ── Toggle High Priority (arrow icon in a task's long-press action row) ──
+  // ── Toggle High Priority (double-tap on the task itself) ────────────────
   const handleTogglePriority = useCallback(async (id: string) => {
     const updated = tasks.map(t => (t.id === id ? { ...t, priority: t.priority === 'high' ? undefined : 'high' as const } : t));
     setTasks(updated);
     await StorageService.saveTodayTasks(updated);
-    // The task moves to a different group's list (To Do <-> High Priority)
-    // right under it, so holding onto the revealed state would leave the
-    // icons pointed at wherever it used to render.
-    setRevealedTaskId(prev => (prev === id ? null : prev));
     buttonPress();
   }, [tasks]);
 
@@ -683,7 +679,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
               <Text style={[styles.blobLabel, styles.blobLabelPriority]}>High priority</Text>
               {priorityGroup.length === 0 ? (
                 <Text style={[styles.blobEmpty, styles.blobEmptyPriority]}>
-                  Long-press a task and use the arrow icon to prioritize it.
+                  Double-tap a task to make it high priority.
                 </Text>
               ) : (
                 priorityGroup.map((task, index) => (

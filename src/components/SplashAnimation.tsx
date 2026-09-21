@@ -194,6 +194,11 @@ type Spark = { x: number; y: number; vx: number; vy: number; age: number; life: 
 const BURST_COUNT = 12;
 const AMBIENT_RATE = 0.3;
 
+// `shift` moves the flame's body down the screen every tick as it descends.
+// Sparks must NOT ride along with it after they're released — a released
+// ember floats free of the fire, it doesn't keep sinking with it — so their
+// `y` is absolute screen space, with `shift` baked in once at spawn (see
+// spawnSpark/burstSparks) rather than re-added here on every render.
 function buildFrame(top: number[], lift: number[], shift: number, sparks: Spark[]): Frame {
   const thick = top.map((t, i) => Math.max(0, t - lift[i]));
   const inner: number[][] = [thick];
@@ -232,11 +237,16 @@ function buildFrame(top: number[], lift: number[], shift: number, sparks: Spark[
     // Head plus two dimmer cells trailing back along -velocity. The streak is
     // what makes them read as sparks thrown off the fire rather than
     // unrelated floating dots — a lone pixel has no direction.
+    // s.y is already an absolute screen row (the descent's shift was baked
+    // in once, at spawn) — it must NOT also have the current tick's `shift`
+    // added here, or every spark still in flight gets dragged down again on
+    // every subsequent tick as the flame keeps sinking, fighting its own
+    // upward vy instead of floating free of the flame once released.
     let pc = -99;
     let pr = -99;
     for (let step = 0; step < 3; step++) {
       const c = Math.round(s.x - s.vx * step * 1.4);
-      const r = Math.round(s.y - s.vy * step * 1.4) + shift;
+      const r = Math.round(s.y - s.vy * step * 1.4);
       if (c === pc && r === pr) continue;
       pc = c;
       pr = r;
@@ -252,10 +262,15 @@ function randomFlicker(): number[] {
   return Array.from({ length: COLS }, () => Math.round(Math.random() * 2 - 1));
 }
 
-/** Throws a spark off the flame's top edge. Most drift more or less straight
- *  up and burn out quickly; a minority get real lateral speed and a longer
- *  life, and those few are the ones still streaking once the fire has gone. */
-function spawnSpark(top: number[], lift: number[], flyer = Math.random() < 0.3): Spark | null {
+/** Throws a spark off the flame's top edge — at its CURRENT on-screen
+ *  position, `shift` cells down from where it started, not from the fixed
+ *  spot the flame occupied before it began descending. Without `shift` baked
+ *  in here, every spark would spawn back up at the top of the frame no
+ *  matter how far the fire had already sunk, instead of coming from the
+ *  tip's actual position. Most drift more or less straight up and burn out
+ *  quickly; a minority get real lateral speed and a longer life, and those
+ *  few are the ones still streaking once the fire has gone. */
+function spawnSpark(top: number[], lift: number[], shift: number, flyer = Math.random() < 0.3): Spark | null {
   const c = Math.floor(Math.random() * COLS);
   if (top[c] <= lift[c]) return null;
   return {
@@ -264,8 +279,10 @@ function spawnSpark(top: number[], lift: number[], flyer = Math.random() < 0.3):
     // spark spawned AT that coordinate overlaps the flame's own tip
     // highlighting (which is already near-pale there) and reads as part of
     // the fire's own texture until it has drifted away — a gap the eye
-    // reads as a delay even though it spawned on the right tick.
-    y: FOOT - top[c] - 1,
+    // reads as a delay even though it spawned on the right tick. `shift` is
+    // baked in once, here, at spawn — see the note in buildFrame for why it
+    // must not be added again on every later render.
+    y: FOOT - top[c] - 1 + shift,
     vx: (Math.random() - 0.5) * (flyer ? 0.9 : 0.3),
     vy: -(0.18 + Math.random() * (flyer ? 0.45 : 0.28)),
     age: 0,
@@ -278,14 +295,14 @@ function spawnSpark(top: number[], lift: number[], flyer = Math.random() < 0.3):
  *  rather than at random columns, and all long-lived, so the outflow is an
  *  event the eye ties to the flame moving rather than something that only
  *  becomes visible later as slow stragglers accumulate. */
-function burstSparks(top: number[], lift: number[]): Spark[] {
+function burstSparks(top: number[], lift: number[], shift: number): Spark[] {
   const out: Spark[] = [];
   for (let i = 0; i < BURST_COUNT; i++) {
     const c = Math.round(((i + 0.5) / BURST_COUNT) * (COLS - 1));
     if (top[c] <= lift[c]) continue;
     out.push({
       x: c,
-      y: FOOT - top[c] - 1, // same clearance as spawnSpark, see there
+      y: FOOT - top[c] - 1 + shift, // same clearance + shift as spawnSpark, see there
       vx: (Math.random() - 0.5) * 1.0,
       vy: -(0.35 + Math.random() * 0.45),
       age: 0,
@@ -376,14 +393,16 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
           // trickle; without the burst the sparks only became noticeable
           // later, as slow ones piled up, which is the lag.
           burst = true;
-          sparks.push(...burstSparks(top, lift));
+          sparks.push(...burstSparks(top, lift, shift));
         }
-        // Keep a trickle going into the descent — those come off a flame
-        // already below the lettering, so they fly up through and around it.
-        // Only the last stretch stops, so the tail end isn't dragged off the
-        // bottom with the flame.
+        // Keep a trickle going into the descent — those spawn at the fire's
+        // CURRENT position (shift baked in below), so as the tip keeps
+        // sinking, newly released sparks keep originating from wherever it
+        // actually is now rather than from where it started. Only the last
+        // stretch stops, so the tail end isn't dragged off the bottom with
+        // the flame.
         if (shift < MAX_SHIFT * 0.75 && Math.random() < AMBIENT_RATE) {
-          const s = spawnSpark(top, lift);
+          const s = spawnSpark(top, lift, shift);
           if (s) sparks.push(s);
         }
         setFrame(buildFrame(top, lift, shift, sparks));
