@@ -260,7 +260,12 @@ function spawnSpark(top: number[], lift: number[], flyer = Math.random() < 0.3):
   if (top[c] <= lift[c]) return null;
   return {
     x: c,
-    y: FOOT - top[c],
+    // One cell clear of the flame's own topmost filled pixel, not on it. A
+    // spark spawned AT that coordinate overlaps the flame's own tip
+    // highlighting (which is already near-pale there) and reads as part of
+    // the fire's own texture until it has drifted away — a gap the eye
+    // reads as a delay even though it spawned on the right tick.
+    y: FOOT - top[c] - 1,
     vx: (Math.random() - 0.5) * (flyer ? 0.9 : 0.3),
     vy: -(0.18 + Math.random() * (flyer ? 0.45 : 0.28)),
     age: 0,
@@ -280,7 +285,7 @@ function burstSparks(top: number[], lift: number[]): Spark[] {
     if (top[c] <= lift[c]) continue;
     out.push({
       x: c,
-      y: FOOT - top[c],
+      y: FOOT - top[c] - 1, // same clearance as spawnSpark, see there
       vx: (Math.random() - 0.5) * 1.0,
       vy: -(0.35 + Math.random() * 0.45),
       age: 0,
