@@ -13,147 +13,185 @@ interface Props {
 }
 
 // ── Grid ─────────────────────────────────────────────────────────────────
-// 36 cells across at roughly 1/6 the lettering's cap height, matching the
-// reference frames: chunky enough to read as sprite art, fine enough to
-// actually form tongues instead of a blocky skyline.
+// 36 cells across at roughly 1/6 the lettering's cap height: chunky enough to
+// read as sprite art, fine enough to form licks instead of a blocky skyline.
 const CELL = 8;
 const COLS = 36;
-const ROWS = 33;
-const GRID_W = CELL * COLS; // 288 — comfortably wider than "NO TOMORROW", so
-const GRID_H = CELL * ROWS; // the phrase can never poke out past the flame's sides
+
+// FOOT is the row the flame rests on. RUNWAY is dead grid below it, there so
+// the flame has somewhere to travel when it descends — the reference has it
+// slide down and out of frame, not shrink away on the spot.
+const FOOT = 33;
+const RUNWAY = 14;
+const ROWS = FOOT + RUNWAY;
+
+const GRID_W = CELL * COLS; // 288 — wider than "NO TOMORROW", so the phrase
+const GRID_H = CELL * ROWS; // can never poke out past the flame's sides
+const FOOT_Y = FOOT * CELL;
 
 const STAGE_W = 320;
-const STAGE_H = 300;
+const STAGE_H = GRID_H + 16;
 const GRID_LEFT = (STAGE_W - GRID_W) / 2;
 
 // The lettering is placed by hand rather than centred in the stage, and sized
-// against the base band rather than for its own sake. The band's final height
-// is BASE_ROWS*CELL; the glyphs are set to span from ~50% to ~89% of it, so the
-// rising coverage front crosses them over the second half of the rise (readable
-// at 60% grown, half gone at 70%, clear only in the last beat) and the band
-// still closes over them completely with room to spare.
-const TEXT_MID = GRID_H - 78;
+// against the flame rather than for its own sake: the glyphs span roughly
+// 55%-95% of the flame's thinnest column, so the rising fire crosses them over
+// the second half of the rise (readable at 50% grown, half gone at 70%, clear
+// only on the last beat) and still closes over them completely.
+const TEXT_MID = FOOT_Y - 78;
 
 const PALETTE = FLAME_PALETTES.pop; // deep orange -> orange -> light orange -> pale
 
-// Solid band under the tongues. Sized so the *shortest* column of the full
-// flame (base + the smallest tongue value, minus a row of flicker) still
-// clears the top of the glyphs by ~10px — which is precisely why the
-// silhouette above it is free to stay as ragged as the reference: coverage
-// never depends on the top edge flattening out. Raising it further would
-// only make the flame swallow the wordmark earlier in the rise.
-const BASE_ROWS = 12;
+// ── Silhouette ───────────────────────────────────────────────────────────
+// The reference flame is a wave, not a row of even tongues: two dominant
+// peaks with a deep notch between them and lower shoulders falling away at
+// the sides. MAJOR carries that shape; MINOR roughens the top edge into licks.
+const BASE_ROWS = 10;
 const PEAK_ROWS = 13;
+const MINOR_ROWS = 3;
 
-// Nine tongues, deliberately uneven: tallest is ~1.9x the shortest, and
-// they're narrow enough not to blend into one dome, so the valleys between
-// them fall to ~40% of peak height.
-const TONGUES = [
-  { pos: 0.06, w: 0.065, h: 0.52 },
-  { pos: 0.17, w: 0.070, h: 0.80 },
-  { pos: 0.28, w: 0.060, h: 0.58 },
-  { pos: 0.39, w: 0.075, h: 1.00 },
-  { pos: 0.50, w: 0.062, h: 0.68 },
-  { pos: 0.61, w: 0.072, h: 0.90 },
-  { pos: 0.72, w: 0.058, h: 0.55 },
-  { pos: 0.83, w: 0.068, h: 0.82 },
-  { pos: 0.93, w: 0.062, h: 0.60 },
+const MAJOR = [
+  { pos: 0.10, w: 0.14, h: 0.55 },
+  { pos: 0.29, w: 0.16, h: 1.00 },
+  { pos: 0.50, w: 0.14, h: 0.52 },
+  { pos: 0.71, w: 0.16, h: 0.94 },
+  { pos: 0.90, w: 0.14, h: 0.60 },
 ];
 
-// Parabolic falloff per tongue, max-combined: gives each one a 1-2 cell tip
-// that widens as it descends — a tongue, not a bar.
-const TONGUE_AT: number[] = Array.from({ length: COLS }, (_, i) => {
+// Parabolic falloff per lobe, max-combined: each peak narrows to a 1-2 cell
+// tip and widens as it descends, so they read as licks rather than bars.
+const MAJOR_AT: number[] = Array.from({ length: COLS }, (_, i) => {
   const frac = i / (COLS - 1);
   let best = 0;
-  for (const t of TONGUES) {
-    const d = Math.abs(frac - t.pos) / t.w;
+  for (const m of MAJOR) {
+    const d = Math.abs(frac - m.pos) / m.w;
     if (d >= 1) continue;
-    const v = t.h * (1 - d * d);
+    const v = m.h * (1 - d * d);
     if (v > best) best = v;
   }
   return best;
 });
 
-// Steps the outer columns in so the mass's sides are notched rather than
-// two straight verticals. Only touches columns well outside the text.
-const SIDE_TAPER: number[] = Array.from({ length: COLS }, (_, i) => {
-  const edge = Math.min(i, COLS - 1 - i);
-  return edge === 0 ? 0.45 : edge === 1 ? 0.68 : edge === 2 ? 0.86 : 1;
+// Fixed (not per-frame random) roughness, so the silhouette has a stable
+// character frame to frame and only flickers around it.
+const MINOR_AT: number[] = Array.from({ length: COLS }, (_, i) =>
+  (((i * 7) % 5) / 5) * 0.62 + (((i * 13) % 3) / 3) * 0.38,
+);
+
+// ── The flame's underside ────────────────────────────────────────────────
+// This is the "whoosh": the flame does NOT sit on a straight line. Its belly
+// arcs up hard at the shoulders and is notched all the way across, so it reads
+// as a body of fire sweeping through frame rather than a bar rising out of the
+// floor. LIFT is capped in the middle — the stretch that has to stay under the
+// lettering — and only opens up past the ends of the text.
+const LIFT_RAGGED: number[] = Array.from({ length: COLS }, (_, i) =>
+  0.62 + (((i * 11) % 7) / 7) * 0.58,
+);
+
+// ...but only outside the lettering. Across the stretch the glyphs occupy, the
+// belly is capped low enough to stay under them (checked against the glyph box,
+// not eyeballed — at 0 margin the text bleeds through the notches); past the
+// ends of the text the cap opens up and the flame can lift away freely.
+const LIFT_CAP: number[] = Array.from({ length: COLS }, (_, i) => {
+  const edge = Math.abs(i / (COLS - 1) - 0.5) * 2;
+  return 5 + 12 * Math.max(0, Math.min(1, (edge - 0.78) / 0.22));
 });
 
-// Fixed (not per-frame random) ignition order, so frame 2 reads as a broken
-// scatter of clusters that fills in — an authored burn-in rather than noise
-// flickering columns on and off.
+const LIFT_AT: number[] = Array.from({ length: COLS }, (_, i) => {
+  const edge = Math.abs(i / (COLS - 1) - 0.5) * 2;
+  const raw = (1.2 + 9 * Math.pow(edge, 2.2)) * LIFT_RAGGED[i];
+  return Math.min(raw, LIFT_CAP[i]);
+});
+
+// Fixed ignition order, so the flame catches as a broken scatter of clusters
+// that fills in — an authored burn-in rather than noise flickering columns on
+// and off. This is keyframe 2.
 const IGNITE: number[] = Array.from({ length: COLS }, (_, i) => (((i * 37) % 11) / 11) * 0.34);
 
 type Frame = { d0: string; d1: string; d2: string; d3: string };
 const EMPTY_FRAME: Frame = { d0: '', d1: '', d2: '', d3: '' };
+const NO_FLAME: number[] = Array(COLS).fill(0);
 
-function columnHeights(growth: number, shift: number, flicker: number[]): number[] {
-  return TONGUE_AT.map((tv, i) => {
-    if (growth <= IGNITE[i]) return 0;
+/** Top edge and underside of every column, in rows above FOOT. */
+function silhouette(growth: number, flicker: number[]): { top: number[]; lift: number[] } {
+  const top: number[] = [];
+  const lift: number[] = [];
+  for (let i = 0; i < COLS; i++) {
+    if (growth <= IGNITE[i]) { top.push(0); lift.push(0); continue; }
     const g = Math.min(1, (growth - IGNITE[i]) / (1 - IGNITE[i]));
-    const base = BASE_ROWS * g * SIDE_TAPER[i];
-    const peak = (PEAK_ROWS * tv + flicker[i]) * g;
-    return Math.max(0, Math.min(ROWS, Math.round(base + peak - shift)));
-  });
+    const t = (BASE_ROWS + PEAK_ROWS * MAJOR_AT[i] + MINOR_ROWS * MINOR_AT[i] + flicker[i]) * g;
+    const l = LIFT_AT[i] * g;
+    top.push(Math.max(0, Math.round(t)));
+    lift.push(Math.round(l));
+  }
+  return { top, lift };
 }
 
-/** Each hotter shade is the whole silhouette shrunk — vertically by a
- *  fraction of each column's own height, horizontally by taking the minimum
- *  over a window of neighbours. Shrinking proportionally (rather than insetting
- *  by a fixed number of cells, which is what depth-from-edge does) is what
- *  makes the distribution match the reference: a narrow tongue's neighbours are
- *  short, so the min wipes its inner shades out and it stays deep orange all
- *  the way up, while only the broad lower mass is wide and tall enough to carry
- *  the pale core. */
 const NARROW_BIAS = 0.6; // how much a column defers to its shorter neighbours
 
-function shrink(heights: number[], k: number, scale: number, drop: number): number[] {
+/** Each hotter shade is the body shrunk — vertically by a fraction of the
+ *  column's own thickness, horizontally by a minimum over neighbours. Pure min
+ *  flattens every inner band into a plateau (the flame reads as a layer cake);
+ *  blending it back toward the column's own thickness keeps the bands
+ *  undulating with the licks while still starving a lone tall spike of its
+ *  inner shades, so narrow licks stay deep orange all the way up. */
+function shrink(thick: number[], k: number, scale: number, drop: number): number[] {
   const out: number[] = [];
   for (let c = 0; c < COLS; c++) {
     let m = Infinity;
     for (let d = -k; d <= k; d++) {
       const i = c + d;
-      m = Math.min(m, i < 0 || i >= COLS ? 0 : heights[i]);
+      m = Math.min(m, i < 0 || i >= COLS ? 0 : thick[i]);
     }
-    // Pure min flattens every inner band into a horizontal plateau (the whole
-    // flame reads as a layer cake). Blending it back toward the column's own
-    // height keeps the bands undulating with the tongues while still starving
-    // a lone tall spike of its inner shades.
-    const v = NARROW_BIAS * m + (1 - NARROW_BIAS) * heights[c];
+    const v = NARROW_BIAS * m + (1 - NARROW_BIAS) * thick[c];
     out.push(Math.max(0, Math.round(v * scale - drop)));
   }
   return out;
 }
 
-function buildFrame(heights: number[], embers: [number, number][]): Frame {
-  const layers = [
-    heights,
-    shrink(heights, 1, 0.80, 1),
-    shrink(heights, 1, 0.55, 1),
-    shrink(heights, 2, 0.32, 1),
-  ];
+type Spark = { x: number; y: number; vx: number; vy: number; age: number; life: number };
+
+function buildFrame(top: number[], lift: number[], shift: number, sparks: Spark[]): Frame {
+  const thick = top.map((t, i) => Math.max(0, t - lift[i]));
+  const inner = [thick, shrink(thick, 1, 0.8, 1), shrink(thick, 1, 0.55, 1), shrink(thick, 2, 0.32, 1)];
 
   const parts = ['', '', '', ''];
   const square = (c: number, r: number) => `M${c * CELL} ${r * CELL}h${CELL}v${CELL}h-${CELL}z`;
 
   for (let c = 0; c < COLS; c++) {
-    for (let r = ROWS - heights[c]; r < ROWS; r++) {
+    const t0 = top[c];
+    const b0 = lift[c];
+    for (let above = b0 + 1; above <= t0; above++) {
+      const r = FOOT - above + shift;
+      if (r < 0 || r >= ROWS) continue;
       let shade = 0;
       for (let k = 3; k >= 1; k--) {
-        if (r >= ROWS - layers[k][c]) { shade = k; break; }
+        // Inset from the underside too, so the belly carries a rim rather
+        // than showing a pale edge where it lifts off.
+        if (above > b0 + k && above <= b0 + inner[k][c]) { shade = k; break; }
       }
       parts[shade] += square(c, r);
     }
   }
 
-  for (const [c, r] of embers) {
-    if (c < 0 || c >= COLS || r < 0 || r >= ROWS) continue;
-    if (r >= ROWS - heights[c]) continue;
-    // Higher embers are cooler.
-    const tip = ROWS - heights[c];
-    parts[tip - r > 3 ? 0 : 1] += square(c, r);
+  for (const s of sparks) {
+    const frac = s.age / s.life;
+    // Sparks cool as they travel: pale at the tip, deep orange by the end.
+    const head = frac < 0.25 ? 3 : frac < 0.55 ? 2 : frac < 0.8 ? 1 : 0;
+    // Head, plus two dimmer cells trailing back along -velocity. The streak is
+    // what makes them read as sparks thrown off the fire rather than unrelated
+    // floating dots — a lone pixel has no direction.
+    let pc = -99;
+    let pr = -99;
+    for (let step = 0; step < 3; step++) {
+      const c = Math.round(s.x - s.vx * step * 1.4);
+      const r = Math.round(s.y - s.vy * step * 1.4) + shift;
+      if (c === pc && r === pr) continue;
+      pc = c;
+      pr = r;
+      if (c < 0 || c >= COLS || r < 0 || r >= ROWS) continue;
+      parts[Math.max(0, head - step)] += square(c, r);
+    }
   }
 
   return { d0: parts[0], d1: parts[1], d2: parts[2], d3: parts[3] };
@@ -163,140 +201,143 @@ function randomFlicker(): number[] {
   return Array.from({ length: COLS }, () => Math.round(Math.random() * 2 - 1));
 }
 
-// Loose pixels riding above the tips: count scales with the flame, and the
-// squared random biases them toward the tips so density thins out with
-// height instead of scattering evenly.
-function randomEmbers(heights: number[], intensity: number): [number, number][] {
-  const out: [number, number][] = [];
-  const count = Math.round(2 + 9 * intensity);
-  for (let i = 0; i < count; i++) {
-    const c = Math.floor(Math.random() * COLS);
-    if (heights[c] <= 0) continue;
-    const tip = ROWS - heights[c];
-    const rise = 1 + Math.floor(Math.random() * Math.random() * 6);
-    out.push([c, tip - rise]);
-  }
-  // A couple out at the shoulders rather than straight above the tall
-  // middle tongues, so the ember field isn't a column of sparks.
-  for (let i = 0; i < 2; i++) {
-    const c = Math.random() < 0.5 ? Math.floor(Math.random() * 3) : COLS - 1 - Math.floor(Math.random() * 3);
-    if (heights[c] <= 0) continue;
-    out.push([c, ROWS - heights[c] - 1 - Math.floor(Math.random() * 4)]);
+/** Throws a spark off the flame's top edge. Most drift more or less straight
+ *  up; a minority get real lateral speed and a long life, and those are the
+ *  ones still streaking diagonally across the frame after the fire has gone. */
+function spawnSpark(top: number[], lift: number[]): Spark | null {
+  const c = Math.floor(Math.random() * COLS);
+  if (top[c] <= lift[c]) return null;
+  const flyer = Math.random() < 0.3;
+  return {
+    x: c,
+    y: FOOT - top[c],
+    vx: (Math.random() - 0.5) * (flyer ? 0.9 : 0.3),
+    vy: -(0.18 + Math.random() * (flyer ? 0.45 : 0.28)),
+    age: 0,
+    life: flyer ? 26 + Math.random() * 16 : 10 + Math.random() * 10,
+  };
+}
+
+function stepSparks(sparks: Spark[]): Spark[] {
+  const out: Spark[] = [];
+  for (const s of sparks) {
+    const next: Spark = {
+      ...s,
+      x: s.x + s.vx,
+      y: s.y + s.vy,
+      vy: s.vy * 0.985,
+      age: s.age + 1,
+    };
+    if (next.age > next.life) continue;
+    if (next.y < -2 || next.x < -2 || next.x > COLS + 2) continue;
+    out.push(next);
   }
   return out;
 }
-
-// ── Pixel shooting stars (final beat only) ───────────────────────────────
-const STARS: { top: `${number}%`; left: `${number}%`; dir: 1 | -1 }[] = [
-  { top: '24%', left: '16%', dir: 1 },
-  { top: '31%', left: '78%', dir: -1 },
-  { top: '70%', left: '22%', dir: 1 },
-  { top: '76%', left: '72%', dir: -1 },
-];
-
-const StarStreak: React.FC<{ dir: 1 | -1 }> = ({ dir }) => (
-  <View style={styles.star}>
-    {[0, 1, 2, 3].map(i => (
-      <View
-        key={i}
-        style={{
-          position: 'absolute',
-          left: 10 + dir * i * 6,
-          top: i * 6,
-          width: 4 - i * 0.6,
-          height: 4 - i * 0.6,
-          backgroundColor: i === 0 ? Colors.orange.light : Colors.orange.DEFAULT,
-          opacity: 0.85 - i * 0.2,
-        }}
-      />
-    ))}
-  </View>
-);
 
 // ── Timing (from the keyframe captions) ──────────────────────────────────
 const PHASE1_MS = 600;  // 0.0-0.6  TINT alone
 const RISE_MS = 400;    // 0.6-1.0  ignite + rise
 const HOLD_MS = 200;    // 1.0-1.2  full cover, text swaps behind
-const DESCEND_MS = 600; // 1.2-1.8  drops away, revealing top-down
-const SETTLE_MS = 200;  // 1.8-2.0  text alone
-const ZOOM_MS = 500;    // 2.0-2.5  subtle zoom + stars
+const DESCEND_MS = 600; // 1.2-1.8  flame travels down and out of frame
+const SETTLE_MS = 200;  // 1.8-2.0  text alone, last sparks still flying
+const ZOOM_MS = 500;    // 2.0-2.5  subtle zoom
 const STEP_MS = 45;
-const MAX_SHIFT = BASE_ROWS + PEAK_ROWS + 2;
+
+const T_RISE = PHASE1_MS;
+const T_HOLD = T_RISE + RISE_MS;
+const T_DESCEND = T_HOLD + HOLD_MS;
+const T_SETTLE = T_DESCEND + DESCEND_MS;
+const T_ZOOM = T_SETTLE + SETTLE_MS;
+const T_END = T_ZOOM + ZOOM_MS;
+
+// Far enough that the tallest lick clears the bottom of the grid.
+const MAX_SHIFT = RUNWAY + BASE_ROWS + PEAK_ROWS + MINOR_ROWS + 2;
 
 export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
   const [frame, setFrame] = useState<Frame>(EMPTY_FRAME);
   const tintOpacity = useRef(new Animated.Value(1)).current;
   const phraseOpacity = useRef(new Animated.Value(0)).current;
   const phraseScale = useRef(new Animated.Value(1)).current;
-  const starsOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let cancelled = false;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const schedule = (fn: () => void, ms: number) => {
-      const id = setTimeout(() => { if (!cancelled) fn(); }, ms);
-      timers.push(id);
-    };
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let sparks: Spark[] = [];
+    let swapped = false;
+    let zoomed = false;
+    const started = Date.now();
 
-    const draw = (growth: number, shift: number) => {
-      const heights = columnHeights(growth, shift, randomFlicker());
-      setFrame(buildFrame(heights, randomEmbers(heights, growth)));
-    };
+    const tick = () => {
+      if (cancelled) return;
+      const t = Date.now() - started;
 
-    const riseSteps = Math.round(RISE_MS / STEP_MS);
-    const holdSteps = Math.round(HOLD_MS / STEP_MS);
-    const descendSteps = Math.round(DESCEND_MS / STEP_MS);
-    let step = 0;
+      let growth = 0;
+      let shift = 0;
+      let alight = false;
+      if (t >= T_RISE && t < T_HOLD) {
+        growth = (t - T_RISE) / RISE_MS;
+        alight = true;
+      } else if (t >= T_HOLD && t < T_DESCEND) {
+        growth = 1;
+        alight = true;
+      } else if (t >= T_DESCEND && t < T_SETTLE) {
+        growth = 1;
+        shift = Math.round((MAX_SHIFT * (t - T_DESCEND)) / DESCEND_MS);
+        alight = true;
+      }
 
-    const rise = () => {
-      step += 1;
-      draw(step / riseSteps, 0);
-      if (step >= riseSteps) { step = 0; schedule(hold, STEP_MS); }
-      else schedule(rise, STEP_MS);
-    };
-
-    const hold = () => {
-      step += 1;
-      draw(1, 0);
-      if (step === 1) {
-        // Swapped while completely hidden, so the phrase is genuinely
-        // already behind the flame when it starts dropping.
+      if (t >= T_HOLD && !swapped) {
+        // Swapped while completely hidden, so the phrase is genuinely already
+        // behind the flame when it starts moving.
+        swapped = true;
         tintOpacity.setValue(0);
         phraseOpacity.setValue(1);
       }
-      if (step >= holdSteps) { step = 0; schedule(descend, STEP_MS); }
-      else schedule(hold, STEP_MS);
+
+      if (alight) {
+        const { top, lift } = silhouette(growth, randomFlicker());
+        sparks = stepSparks(sparks);
+        // Keep throwing sparks well into the descent — those come off a flame
+        // that is already below the lettering, so they fly up through and
+        // around it, which is what the reference shows once the fire has gone.
+        // Only the last stretch stops, so the tail end isn't dragged off the
+        // bottom with the flame.
+        if (shift < MAX_SHIFT * 0.75) {
+          const n = Math.random() < 0.75 ? 1 : 2;
+          for (let i = 0; i < n; i++) {
+            const s = spawnSpark(top, lift);
+            if (s) sparks.push(s);
+          }
+        }
+        setFrame(buildFrame(top, lift, shift, sparks));
+      } else {
+        // Flame gone; the sparks it threw are still in the air.
+        sparks = stepSparks(sparks);
+        setFrame(sparks.length ? buildFrame(NO_FLAME, NO_FLAME, 0, sparks) : EMPTY_FRAME);
+      }
+
+      if (t >= T_ZOOM && !zoomed) {
+        zoomed = true;
+        Animated.timing(phraseScale, {
+          toValue: 1.06,
+          duration: ZOOM_MS,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }).start();
+      }
+
+      if (t >= T_END) { onFinish(); return; }
+      timer = setTimeout(tick, STEP_MS);
     };
 
-    const descend = () => {
-      step += 1;
-      draw(1, (MAX_SHIFT * step) / descendSteps);
-      if (step >= descendSteps) {
-        setFrame(EMPTY_FRAME);
-        schedule(finalBeat, SETTLE_MS);
-      } else schedule(descend, STEP_MS);
-    };
-
-    const finalBeat = () => {
-      Animated.parallel([
-        Animated.timing(phraseScale, { toValue: 1.06, duration: ZOOM_MS, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-        Animated.timing(starsOpacity, { toValue: 1, duration: ZOOM_MS, useNativeDriver: true }),
-      ]).start(({ finished }) => { if (finished) onFinish(); });
-    };
-
-    schedule(rise, PHASE1_MS);
-    return () => { cancelled = true; timers.forEach(clearTimeout); };
+    timer = setTimeout(tick, STEP_MS);
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <View style={styles.root} pointerEvents="none">
-      {STARS.map((s, i) => (
-        <Animated.View key={i} style={[styles.starSlot, { top: s.top, left: s.left, opacity: starsOpacity }]}>
-          <StarStreak dir={s.dir} />
-        </Animated.View>
-      ))}
-
       <View style={styles.stage}>
         <Animated.Text style={[styles.tint, { opacity: tintOpacity }]}>TINT</Animated.Text>
 
@@ -348,7 +389,4 @@ const styles = StyleSheet.create({
   phraseAccent: { color: Colors.pop },
 
   flame: { position: 'absolute', top: 0, left: GRID_LEFT },
-
-  starSlot: { position: 'absolute', width: 24, height: 24 },
-  star: { width: 24, height: 24 },
 });
