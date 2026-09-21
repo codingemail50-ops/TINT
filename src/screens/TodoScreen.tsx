@@ -269,12 +269,18 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     if (saved) {
       loadedTasks = saved;
     } else {
-      loadedTasks = user?.customExam
-        ? user.customExam.tasks.map((t, i) => ({
-            id: `custom-${i}`, title: t.title, duration: t.duration,
-            category: user.customExam!.name, completed: false,
-          }))
-        : getCombinedPreset(examTypes, user?.classTwelveStream).map(t => ({ ...t, completed: false }));
+      // seedTasks reapplies what the user set on these tasks before (high
+      // priority) and adds back their repeating custom ones — without it a
+      // new calendar day hands them a pristine preset and silently throws
+      // both away.
+      loadedTasks = await StorageService.seedTasks(
+        user?.customExam
+          ? user.customExam.tasks.map((t, i) => ({
+              id: `custom-${i}`, title: t.title, duration: t.duration,
+              category: user.customExam!.name, completed: false,
+            }))
+          : getCombinedPreset(examTypes, user?.classTwelveStream).map(t => ({ ...t, completed: false })),
+      );
       await StorageService.saveTodayTasks(loadedTasks);
     }
     setTasks(loadedTasks);
@@ -309,18 +315,24 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   useEffect(() => {
     if (prevExamSignatureRef.current === examSignature) return;
     prevExamSignatureRef.current = examSignature;
-    const freshPreset = user?.customExam
-      ? user.customExam.tasks.map((t, i) => ({
-          id: `custom-${i}`, title: t.title, duration: t.duration,
-          category: user.customExam!.name, completed: false,
-        }))
-      : getCombinedPreset(examTypes, user?.classTwelveStream).map(t => ({ ...t, completed: false }));
-    setTasks(prev => {
-      const keepCustom = prev.filter(t => t.isCustom);
-      const updated = [...freshPreset, ...keepCustom];
-      void StorageService.saveTodayTasks(updated);
-      return updated;
-    });
+    void (async () => {
+      const base = user?.customExam
+        ? user.customExam.tasks.map((t, i) => ({
+            id: `custom-${i}`, title: t.title, duration: t.duration,
+            category: user.customExam!.name, completed: false,
+          }))
+        : getCombinedPreset(examTypes, user?.classTwelveStream).map(t => ({ ...t, completed: false }));
+      // Same reapplication as a fresh day: swapping exams shouldn't quietly
+      // clear the priorities they set on whatever carries over.
+      const freshPreset = await StorageService.seedTasks(base);
+      setTasks(prev => {
+        const seen = new Set(freshPreset.map(t => t.id));
+        const keepCustom = prev.filter(t => t.isCustom && !seen.has(t.id));
+        const updated = [...freshPreset, ...keepCustom];
+        void StorageService.saveTodayTasks(updated);
+        return updated;
+      });
+    })();
   }, [examSignature]);
 
   useEffect(() => subscribeDevClock(() => {

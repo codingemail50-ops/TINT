@@ -47,7 +47,20 @@ const KEYS = {
   USER: 'tint_user',
   APP_STATE: 'tint_app_state',
   TODAY_TASKS: 'tint_today_tasks_v2',
+  // Today's list is thrown away and reseeded from the exam preset every
+  // calendar day, so anything the user changed about a task used to die with
+  // it at midnight. These two outlive the day: what they set on a task, and
+  // the custom tasks they asked to repeat.
+  TASK_PREFS: 'tint_task_prefs_v1',
+  CARRY_TASKS: 'tint_carry_tasks_v1',
 };
+
+/** The per-task settings that belong to the task itself rather than to one
+ *  day of it — keyed by task id, which is stable for preset tasks
+ *  ('c-math', 'c-phys', ...) and for custom ones ('custom-<timestamp>'). */
+export interface TaskPrefs {
+  priority?: 'high';
+}
 
 export const StorageService = {
   async getUser(): Promise<UserProfile | null> {
@@ -84,6 +97,50 @@ export const StorageService = {
 
   async saveTodayTasks(tasks: Task[]): Promise<void> {
     await AsyncStorage.setItem(KEYS.TODAY_TASKS, JSON.stringify({ date: devNow().toDateString(), tasks }));
+    // Derived from the list on every write rather than updated at each call
+    // site, so there is no way to change a task and forget to carry it.
+    await this.saveTaskPrefs(tasks);
+  },
+
+  /** Mirrors the day's list into the two day-independent stores. Both are
+   *  rebuilt from scratch each time, so clearing a priority or turning off
+   *  Repeat daily drops the entry rather than leaving it stuck on. */
+  async saveTaskPrefs(tasks: Task[]): Promise<void> {
+    const prefs: Record<string, TaskPrefs> = {};
+    for (const t of tasks) {
+      if (t.priority) prefs[t.id] = { priority: t.priority };
+    }
+    const carry = tasks
+      .filter(t => t.isCustom && t.repeat)
+      .map(({ completedAt, ...t }) => ({ ...t, completed: false }));
+    await AsyncStorage.multiSet([
+      [KEYS.TASK_PREFS, JSON.stringify(prefs)],
+      [KEYS.CARRY_TASKS, JSON.stringify(carry)],
+    ]);
+  },
+
+  async getTaskPrefs(): Promise<Record<string, TaskPrefs>> {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.TASK_PREFS);
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  },
+
+  async getCarriedTasks(): Promise<Task[]> {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.CARRY_TASKS);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  },
+
+  /** Turns a freshly generated preset into the list the user should actually
+   *  see: their saved priorities reapplied, and their repeating custom tasks
+   *  added back. Call this anywhere a day's list is built from a preset. */
+  async seedTasks(base: Task[]): Promise<Task[]> {
+    const [prefs, carried] = await Promise.all([this.getTaskPrefs(), this.getCarriedTasks()]);
+    const withPrefs = base.map(t => (prefs[t.id]?.priority ? { ...t, priority: prefs[t.id].priority } : t));
+    const seen = new Set(withPrefs.map(t => t.id));
+    return [...withPrefs, ...carried.filter(t => !seen.has(t.id))];
   },
 
   async recordDayCompletion(tasks: Task[]): Promise<AppState> {
@@ -111,7 +168,9 @@ export const StorageService = {
   // (streak, history, today's tasks) would keep showing under whichever
   // account signs in next, since none of this is namespaced per-user.
   async clearAllUserData(): Promise<void> {
-    await AsyncStorage.multiRemove([KEYS.USER, KEYS.APP_STATE, KEYS.TODAY_TASKS]);
+    await AsyncStorage.multiRemove([
+      KEYS.USER, KEYS.APP_STATE, KEYS.TODAY_TASKS, KEYS.TASK_PREFS, KEYS.CARRY_TASKS,
+    ]);
   },
 };
 
