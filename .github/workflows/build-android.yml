@@ -1,0 +1,85 @@
+name: Build Android APK
+
+# Manual only — clicking "Run workflow" on GitHub (Actions tab -> Build
+# Android APK -> Run workflow, pick your branch) is what starts a build.
+# It does not run on every push: most commits are JS/UI-only and don't need
+# a native rebuild to check, and this repo has no committed android/ folder
+# (Expo generates it fresh every run — "prebuild" below) so a build here
+# takes several minutes, not seconds. Trigger it only when there's a native
+# change (this module, permissions in app.json, a new native dependency) you
+# actually need to test on a real device.
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      # These three are EXPO_PUBLIC_* values — inlined into the JS bundle at
+      # build time, not read at runtime, so they have to exist as a .env file
+      # (or shell env vars) before the bundling step further down, not just
+      # somewhere in the app's config. None of the three are secret in the
+      # sense of needing to stay hidden (the Supabase anon key is meant to be
+      # public and is safe under RLS; the Google client id is a public OAuth
+      # client id) — they're kept as repo secrets anyway so they don't have
+      # to live in the workflow file or be typed in by hand on every change.
+      # Missing/blank values won't fail this build — Supabase/Google Sign-In
+      # just won't work in the resulting APK, everything else will.
+      - name: Write build-time env file
+        run: |
+          cat > .env <<EOF
+          EXPO_PUBLIC_SUPABASE_URL=${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+          EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+          EOF
+
+      # Generates the android/ project fresh from app.json plus every native
+      # module listed in package.json (including tint-app-blocker, autolinked
+      # from modules/) — this repo never commits android/, so this step is
+      # what turns "the JS project" into something Gradle can build at all.
+      - name: Prebuild native Android project
+        run: npx expo prebuild --platform android --clean
+
+      # assembleRelease, not assembleDebug: a debug-variant APK expects a
+      # live Metro server and is useless once you walk away from a laptop,
+      # which is the whole point of testing a schedule that fires overnight
+      # or across a locked screen. Release bundles the JS in and applies the
+      # minify/shrink settings from app.json's expo-build-properties, so this
+      # is the same code path production will use.
+      #
+      # It is NOT signed for the Play Store. Expo's generated build.gradle
+      # falls back to the auto-generated debug keystore for the release
+      # signing config when no real one is configured (which is the case
+      # here) — fine and expected for sideloading onto a test device, not
+      # something to ever upload to Play Console. That needs a real keystore,
+      # set up separately when we're actually ready to submit.
+      - name: Build release APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: tint-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
