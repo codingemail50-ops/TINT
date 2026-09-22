@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Alert, AppState as RNAppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -7,7 +7,7 @@ import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { BlobDial } from '../components/BlobDial';
 import { MeditatingFlame } from '../components/MeditatingFlame';
 import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY } from '../data/blockableApps';
-import { openPermissionSettings } from '../utils/appBlocking';
+import { openPermissionSettings, checkPermission, BlockingPermission } from '../utils/appBlocking';
 import { useHaptics } from '../hooks/useHaptics';
 
 const MIN_MINS = 15;
@@ -44,6 +44,11 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
   const [mins, setMins] = useState(initialMins);
   const [blockedApps, setBlockedApps] = useState<string[]>(DEFAULT_BLOCKED_APPS);
   const [locking, setLocking] = useState(false);
+  // null = native module not linked (Expo Go/web) — no real answer to show,
+  // so the row still opens the "not available" alert instead of claiming
+  // granted/not-granted either way.
+  const [overlayGranted, setOverlayGranted] = useState<boolean | null>(null);
+  const [usageGranted, setUsageGranted] = useState<boolean | null>(null);
   const { buttonPress } = useHaptics();
 
   const dialScale = useRef(new Animated.Value(1)).current;
@@ -58,10 +63,29 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
     })();
   }, []);
 
-  const handleBlockApps = async () => {
+  // Settings opens as a separate activity on top of this one — the app
+  // itself never unmounts, so there's no navigation to redo once the user
+  // backs out of it. All that's actually missing is noticing they came
+  // back: re-checking both permissions the moment the app becomes active
+  // again picks up whatever they just granted immediately, with no extra
+  // tap needed on this screen.
+  const refreshPermissions = () => {
+    setOverlayGranted(checkPermission('overlay'));
+    setUsageGranted(checkPermission('usageAccess'));
+  };
+
+  useEffect(() => {
+    refreshPermissions();
+    const sub = RNAppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshPermissions();
+    });
+    return () => sub.remove();
+  }, []);
+
+  const handlePermissionPress = async (permission: BlockingPermission) => {
     await buttonPress();
     try {
-      await openPermissionSettings('usageAccess');
+      await openPermissionSettings(permission);
     } catch {
       Alert.alert('Not available', 'App blocking can only be set up on an Android build outside Expo Go.');
     }
@@ -125,9 +149,34 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
       <View style={styles.divider} />
 
       <View style={styles.blockSection}>
-        <TouchableOpacity style={styles.blockAppsBtn} onPress={handleBlockApps} activeOpacity={0.8}>
+        <Text style={styles.permissionsHeading}>Needed to block distracting apps</Text>
+        <TouchableOpacity
+          style={styles.permissionRow}
+          onPress={() => handlePermissionPress('overlay')}
+          activeOpacity={0.8}
+          disabled={overlayGranted === true}
+        >
+          <Ionicons name="layers-outline" size={16} color={Colors.textPrimary} />
+          <Text style={styles.permissionText}>Display over other apps</Text>
+          {overlayGranted === true ? (
+            <Ionicons name="checkmark-circle" size={18} color={Colors.pop} />
+          ) : (
+            <Text style={styles.permissionAction}>Allow</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.permissionRow}
+          onPress={() => handlePermissionPress('usageAccess')}
+          activeOpacity={0.8}
+          disabled={usageGranted === true}
+        >
           <Ionicons name="shield-outline" size={16} color={Colors.textPrimary} />
-          <Text style={styles.blockAppsText}>Block Apps</Text>
+          <Text style={styles.permissionText}>Usage access</Text>
+          {usageGranted === true ? (
+            <Ionicons name="checkmark-circle" size={18} color={Colors.pop} />
+          ) : (
+            <Text style={styles.permissionAction}>Allow</Text>
+          )}
         </TouchableOpacity>
         <View style={styles.appIconsRow}>
           {blockedApps.map(id => {
@@ -178,12 +227,17 @@ const styles = StyleSheet.create({
   },
   divider: { height: 1, backgroundColor: Colors.border, marginHorizontal: Spacing.xl, marginBottom: Spacing.lg },
   blockSection: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.md, gap: Spacing.sm },
-  blockAppsBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.full,
-    borderWidth: 2, borderColor: Colors.border, paddingVertical: 14,
+  permissionsHeading: {
+    fontSize: 12, fontFamily: Fonts.semibold, color: Colors.textMuted,
+    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2,
   },
-  blockAppsText: { fontSize: 15, fontFamily: Fonts.bold, color: Colors.textPrimary },
+  permissionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.full,
+    borderWidth: 2, borderColor: Colors.border, paddingVertical: 12, paddingHorizontal: 16,
+  },
+  permissionText: { flex: 1, fontSize: 15, fontFamily: Fonts.bold, color: Colors.textPrimary },
+  permissionAction: { fontSize: 13, fontFamily: Fonts.semibold, color: Colors.pop },
   appIconsRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
   appChip: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   footer: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl, paddingTop: Spacing.sm, gap: Spacing.sm },
