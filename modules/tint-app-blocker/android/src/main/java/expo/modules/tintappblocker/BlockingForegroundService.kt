@@ -566,7 +566,21 @@ class BlockingForegroundService : Service() {
           stopBlockingAndSelf()
           return
         }
-        checkForegroundApp()
+        // A single bad poll must never kill the whole loop. checkForegroundApp()
+        // reads a live UsageEvents cursor, and a burst of foreground-transition
+        // events in quick succession (e.g. home -> recents -> straight back
+        // into a blocked app, all within about a second) is exactly the kind
+        // of rapid churn that can make that read throw mid-iteration. Before
+        // this try/catch, an uncaught exception here aborted this Runnable
+        // before it reached the postDelayed call below -- permanently
+        // stopping polling for the rest of the session, silently, with no
+        // crash and no way to notice short of ending and restarting the
+        // session. This was the real cause behind "block the app once, then
+        // it never blocks again this session" reports.
+        try {
+          checkForegroundApp()
+        } catch (e: Exception) {
+        }
         handler.postDelayed(this, POLL_INTERVAL_MS)
       }
     }
