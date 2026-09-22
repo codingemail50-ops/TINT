@@ -419,7 +419,23 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
           duration: ZOOM_MS,
           easing: Easing.out(Easing.ease),
           useNativeDriver: true,
-        }).start();
+        }).start(() => {
+          // The screen only actually switches once boot's own async user/
+          // session check also resolves (see the comment on bootTargetScreen
+          // in AppNavigator) -- on a slow network that can run past T_END,
+          // and this animation was leaving the zoomed phrase sitting
+          // completely still for however long that took, which read as the
+          // splash having frozen/hung rather than still working. A slow
+          // breathing loop keeps it visibly alive for however long the wait
+          // turns out to be, instead of a dead frame.
+          if (cancelled) return;
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(phraseScale, { toValue: 1.09, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+              Animated.timing(phraseScale, { toValue: 1.06, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            ])
+          ).start();
+        });
       }
 
       if (t >= T_END) { onFinish(); return; }
