@@ -17,6 +17,14 @@ const WallCell: React.FC<{
     <Wrapper
       style={[
         styles.cell,
+        // The shadow/elevation "raised, tappable" treatment only earns its
+        // (real, per-view) Android rendering cost when a cell is actually
+        // tappable (the avatar-picker usage, onPick set) — a purely
+        // decorative wallpaper usage (no onPick) has no interaction to hint
+        // at, and can have hundreds of cells on screen at once (see rows
+        // doc comment above), where that cost is exactly what turned a
+        // signup-screen background into a visibly laggy screen.
+        !!onPick && styles.cellRaised,
         { width: cellSize, height: cellSize },
         isSelected && styles.cellSelected,
       ]}
@@ -155,7 +163,7 @@ const styles = StyleSheet.create({
   // White-based (not another dark grey) so it stays visible even under the
   // dark gradient the screen fades over the top/bottom of this wall —
   // darkening an already-dark fill just disappears, but a light one still
-  // shows through. Shadow adds a "raised, tappable" read on top of that.
+  // shows through.
   cell: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -164,6 +172,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.4)',
+  },
+  // "Raised, tappable" read for the interactive picker usage only — see
+  // the onPick check in WallCell above.
+  cellRaised: {
     shadowColor: '#000',
     shadowOpacity: 0.5,
     shadowRadius: 4,
