@@ -235,10 +235,17 @@ export const CreateAccountScreen: React.FC<Props> = ({
         {/* Tiled the whole screen height on purpose (not just a header band) —
             the wall stays faintly visible above AND below the form instead
             of fading to solid black by the bottom. */}
-        {/* rows must be enough to fill the full screen height (see the rows
-            doc comment in AvatarWall.tsx) -- 20 fell short on taller phones,
-            leaving a plain black gap below the tiled wall. */}
-        {!!avatar && <AvatarWall icons={[avatar]} alternateDirection rows={30} cellSize={52} angleDeg={-8} durationMs={22000} />}
+        {/* rows*cellSize must be enough to fill the full screen height (see
+            the rows doc comment in AvatarWall.tsx) -- 20 rows at cellSize 52
+            fell short on taller phones, leaving a plain black gap below the
+            tiled wall; 30 rows at that same cellSize closed it but meant
+            ~600 simultaneously-animating icon views, a real (reported
+            laggy) rendering cost on this screen specifically. Covering the
+            same height with fewer, larger cells needs far fewer views
+            (~336 here) for the same coverage -- each row spans more
+            vertical space, so it takes fewer rows, and each cell is wider,
+            so fewer repeats are needed to span the screen's width too. */}
+        {!!avatar && <AvatarWall icons={[avatar]} alternateDirection rows={24} cellSize={78} angleDeg={-8} durationMs={22000} />}
         <LinearGradient
           colors={['rgba(6,6,8,0.45)', 'rgba(6,6,8,0.75)', 'rgba(6,6,8,0.75)', 'rgba(6,6,8,0.45)']}
           locations={[0, 0.35, 0.75, 1]}
