@@ -4,10 +4,10 @@
     BlockingForegroundService.buildNotification, used via
     NotificationCompat.Builder.setCustomContentView/setCustomBigContentView
     + DecoratedCustomViewStyle). Deliberately minimal, per design: brand
-    name + task name in white, a live orange countdown, nothing else --
-    the previous default-template notification carried a full descriptive
-    sentence that made it read as a generic system notice rather than
-    Tint's own thing.
+    name + task name in white, a live orange countdown, nothing else,
+    since the previous default-template notification carried a full
+    descriptive sentence that made it read as a generic system notice
+    rather than Tint's own thing.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
