@@ -493,6 +493,23 @@ const AppNavigatorInner: React.FC = () => {
         Alert.alert('Couldn\'t log in', `Your account exists, but loading its data failed: ${lastLoadUserError}. Check your connection and try again.`);
         return;
       }
+      // No profile row, and this wasn't a Google sign-in (googleEmail is
+      // only ever passed from that path) -- so this is the plain email/
+      // password Log In form succeeding at authentication for an account
+      // that never actually finished signing up (e.g. signup was
+      // interrupted before its profile row got written). Silently routing
+      // that into onboarding looked identical to a real brand-new signup,
+      // with no indication anything was wrong — send them back to the
+      // login screen with a clear explanation instead. Google sign-in
+      // genuinely can be a real first-time user with no profile row yet,
+      // so that path still correctly falls through to onboarding below.
+      if (!googleEmail) {
+        Alert.alert(
+          'Account not fully set up',
+          'This account was never finished signing up, so there\'s no profile to log into. Please sign up instead.'
+        );
+        return;
+      }
     }
     // Logged in but no cloud profile row yet — run through the same
     // onboarding a brand-new signup goes through, starting from avatar/exam.
