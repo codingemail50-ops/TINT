@@ -22,7 +22,7 @@ const EXAM_ALL = 'all';
 const PERIOD_TABS: { id: LeaderboardPeriod; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'week', label: 'This Week' },
-  { id: 'overall', label: 'Overall' },
+  { id: 'overall', label: 'Hall of Fame' },
 ];
 
 export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
@@ -116,7 +116,15 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
         <View style={styles.periodRow}>
           {PERIOD_TABS.map(tab => (
             <TouchableOpacity key={tab.id} onPress={() => setPeriod(tab.id)} activeOpacity={0.7}>
-              <Text style={[styles.periodTab, period === tab.id && styles.periodTabActive]}>{tab.label}</Text>
+              <Text
+                style={[
+                  styles.periodTab,
+                  tab.id === 'overall' && styles.periodTabHallOfFame,
+                  period === tab.id && (tab.id === 'overall' ? styles.periodTabHallOfFameActive : styles.periodTabActive),
+                ]}
+              >
+                {tab.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -203,6 +211,11 @@ const styles = StyleSheet.create({
   periodRow: { flexDirection: 'row', gap: Spacing.lg, marginBottom: Spacing.md },
   periodTab: { fontSize: 12, fontFamily: Fonts.semibold, color: Colors.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' },
   periodTabActive: { color: Colors.textPrimary },
+  // "Hall of Fame" (the lifetime/overall tab) reads as a distinct, special
+  // caption rather than a third plain tab -- orange in both states, just
+  // muted when not selected instead of grey like the other two.
+  periodTabHallOfFame: { color: 'rgba(255,106,0,0.55)' },
+  periodTabHallOfFameActive: { color: Colors.pop },
 
   scopeRow: {
     flexDirection: 'row', backgroundColor: Colors.surfaceElevated,
