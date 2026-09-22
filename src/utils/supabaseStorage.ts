@@ -102,7 +102,7 @@ export let lastLoadUserError: string | null = null;
 // already-logged-in account" path, where local can legitimately be a
 // session or two ahead of the last successful (fire-and-forget) sync and
 // overwriting it with the older remote copy would lose real data.
-export async function loadUserFromSupabase(userId: string, resetLocalLogs = false): Promise<AppState | null> {
+export async function loadUserFromSupabase(userId: string, resetLocalLogs = false, attempt = 1): Promise<AppState | null> {
   lastLoadUserError = null;
   try {
     const { data, error } = await supabase
@@ -112,11 +112,24 @@ export async function loadUserFromSupabase(userId: string, resetLocalLogs = fals
       .single();
 
     if (error || !data) {
-      if (error?.code !== 'PGRST116') {
-        // PGRST116 = no rows found — not an actual error
-        console.error('[supabaseStorage] loadUserFromSupabase error:', error?.message);
-        lastLoadUserError = error?.message ?? 'Unknown error';
+      if (error?.code === 'PGRST116') {
+        // No rows found — a real, immediate answer ("this account has no
+        // profile"), not a failure. Never worth retrying.
+        return null;
       }
+      // Every write in this file retries a couple of times on a transient
+      // failure (saveNewUserToSupabase, syncFocusLog below) — this read
+      // never did, despite deciding something far more consequential: boot
+      // treats "couldn't load this account's data" identically to "this
+      // account genuinely has none," and silently sends a real returning
+      // user through onboarding again over what might be one dropped
+      // request. Same retry pattern as the writes below.
+      console.error('[supabaseStorage] loadUserFromSupabase error:', error?.message);
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 1500 * attempt));
+        return loadUserFromSupabase(userId, resetLocalLogs, attempt + 1);
+      }
+      lastLoadUserError = error?.message ?? 'Unknown error';
       return null;
     }
 
@@ -170,6 +183,10 @@ export async function loadUserFromSupabase(userId: string, resetLocalLogs = fals
     return appState;
   } catch (err: any) {
     console.error('[supabaseStorage] loadUserFromSupabase exception:', err);
+    if (attempt < 3) {
+      await new Promise(r => setTimeout(r, 1500 * attempt));
+      return loadUserFromSupabase(userId, resetLocalLogs, attempt + 1);
+    }
     lastLoadUserError = err?.message ?? 'Unknown error';
     return null;
   }
