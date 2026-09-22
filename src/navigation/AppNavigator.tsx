@@ -173,19 +173,61 @@ const AppNavigatorInner: React.FC = () => {
     })();
   }, [showTabs, appState]);
 
-  // Resolves session/local state in the background while the boot screen's
-  // splash animation plays — sets bootTargetScreen (not screen directly) so
-  // the gating effect below can hold off actually navigating until the
-  // animation has ALSO finished playing (see that effect for why).
+  // Resolves session/local state while the boot screen's splash animation
+  // plays — sets bootTargetScreen (not screen directly) so the gating
+  // effect below can hold off actually navigating until the animation has
+  // ALSO finished playing (see that effect for why).
+  //
+  // Local-first, network-second: this used to always await the cloud
+  // fetch before deciding bootTargetScreen at all, so the splash's fixed
+  // 2.5s animation was only ever the *minimum* wait, not the actual one —
+  // on a slow connection the screen sat there well past it, reported as
+  // the splash "still getting stuck" even after it was made to keep
+  // breathing instead of freezing solid. AsyncStorage reads below are
+  // local disk, not network — they resolve in a handful of milliseconds,
+  // so checking local storage FIRST and deciding the target screen from
+  // that means the overwhelming majority of real launches (this device,
+  // same account, same key across every test build so local storage
+  // survives an APK update) land on 'todo' well within the animation's own
+  // 2.5s, every time. The cloud fetch still happens — just afterward, in
+  // the background, correcting appState in place if the account has
+  // newer data (e.g. synced from another device) without ever blocking
+  // the transition on it. Only a device with truly no local user at all
+  // (first launch, or a fresh install with no local cache but a real
+  // cloud account) still has to wait on the network, since there's
+  // nothing local to show either way.
   useEffect(() => {
     void (async () => {
       // Must resolve before anything below reads "today" — otherwise a
       // saved dev day-skip offset wouldn't apply until the next reload.
       await loadDevOffset();
-      const userId = await withTimeout(ensureSession(), REMOTE_TIMEOUT_MS, null);
-      userIdRef.current = userId;
 
       if (!FORCE_ONBOARDING_ON_LAUNCH) {
+        const localState = await StorageService.getAppState();
+        const localUser = await StorageService.getUser();
+        if (localUser) {
+          setAppState(localState);
+          setShowTabs(true);
+          setBootTargetScreen('todo');
+          void (async () => {
+            const userId = await withTimeout(ensureSession(), REMOTE_TIMEOUT_MS, null);
+            userIdRef.current = userId;
+            if (!userId) return;
+            const loaded = await withTimeout(loadUserFromSupabase(userId), REMOTE_TIMEOUT_MS, null);
+            if (loaded) {
+              setAppState(loaded);
+            } else {
+              // Existing local user with no cloud row yet (e.g. was offline before) — push it up now
+              void saveNewUserToSupabase(userId, '', localUser);
+            }
+          })();
+          return;
+        }
+
+        // No local user on this device — genuinely nothing to show without
+        // asking the network first.
+        const userId = await withTimeout(ensureSession(), REMOTE_TIMEOUT_MS, null);
+        userIdRef.current = userId;
         if (userId) {
           // Was a separate checkUserExists() + loadUserFromSupabase() pair —
           // an extra network round trip for no benefit, since a "yes" answer
@@ -203,18 +245,6 @@ const AppNavigatorInner: React.FC = () => {
             setBootTargetScreen('todo');
             return;
           }
-        }
-
-        // No session yet (never signed up/in on this device) or offline — fall back to local storage
-        const state = await StorageService.getAppState();
-        setAppState(state);
-        const user = await StorageService.getUser();
-        if (user) {
-          // Existing local user with no cloud row yet (e.g. was offline before) — push it up now
-          if (userId) void saveNewUserToSupabase(userId, '', user);
-          setShowTabs(true);
-          setBootTargetScreen('todo');
-          return;
         }
       }
 
