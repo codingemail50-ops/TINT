@@ -377,7 +377,16 @@ export const FocusScreen: React.FC<Props> = ({
 
   useEffect(() => {
     if (phase === 'active' && !paused) {
-      intervalRef.current = setInterval(tick, 1000);
+      // Polls 4x/sec rather than exactly once a second. tick() always
+      // recomputes the true remaining time from endTimeRef vs Date.now()
+      // (never just decrements), so this was never about drift -- it's
+      // about a busy JS thread occasionally delaying a callback scheduled
+      // for exactly 1000ms past an entire second boundary, which reads as
+      // the displayed number skipping straight over it. Polling more often
+      // makes that far less likely to happen, with no extra render cost:
+      // setTimeLeft bails out on an unchanged value, so this is a no-op
+      // render on the 3 out of 4 polls that land within the same second.
+      intervalRef.current = setInterval(tick, 250);
       return () => {
         if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
       };
@@ -463,8 +472,15 @@ export const FocusScreen: React.FC<Props> = ({
     dialFadeAnim.setValue(1);
   };
 
-  const togglePause = async () => {
-    await buttonPress();
+  const togglePause = () => {
+    // Not awaited: buttonPress() dynamically imports expo-haptics and
+    // round-trips a native call, and awaiting it here meant the actual
+    // pause/resume logic (and the icon flipping between play/pause) waited
+    // on that to finish first -- on a thread already busy with the
+    // per-second timer re-render, that queued delay is exactly what read
+    // as the button being sticky/laggy. Fire the haptic in parallel and
+    // apply the state change immediately.
+    void buttonPress();
     if (paused) {
       endTimeRef.current = Date.now() + timeLeft * 1000;
       setPaused(false);
