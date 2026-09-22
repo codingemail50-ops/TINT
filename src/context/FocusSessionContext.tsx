@@ -6,6 +6,12 @@ import React, { createContext, useContext, useMemo, useState, useCallback } from
 // without lifting the whole timer/gesture/sheet implementation out of
 // FocusScreen. AppNavigator uses this purely to know when to show the
 // mini-player and what to put in it.
+//
+// Both FocusScreen instances (tab + task) are mounted at the same time and
+// each writes to this same status independently — setStatus is exposed as
+// the real functional-update setState (not a plain value setter) so
+// FocusScreen can guard against the idle instance clobbering the other
+// one's genuinely active session (see the comment on its status effect).
 export interface FocusSessionStatus {
   active: boolean;
   paused: boolean;
@@ -27,7 +33,7 @@ const IDLE_STATUS: FocusSessionStatus = { active: false, paused: false, timeLeft
 
 interface Ctx {
   status: FocusSessionStatus;
-  setStatus: (s: FocusSessionStatus) => void;
+  setStatus: React.Dispatch<React.SetStateAction<FocusSessionStatus>>;
   /** Bumped whenever the mini-player is tapped for a minimized task
    *  session — TodoScreen watches this to re-expand its overlay, since
    *  navigating to the (already-current) 'todo' screen alone wouldn't

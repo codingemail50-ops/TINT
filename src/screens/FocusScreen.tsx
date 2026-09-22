@@ -327,7 +327,7 @@ export const FocusScreen: React.FC<Props> = ({
   }, []);
 
   useEffect(() => {
-    setStatus({
+    const next = {
       active: phase === 'active',
       paused,
       timeLeft,
@@ -345,6 +345,22 @@ export const FocusScreen: React.FC<Props> = ({
       // (this effect runs after commit, a tick behind the prop change),
       // making the mini-player flash back on before disappearing again.
       minimized: sessionSource === 'task' ? !visible : false,
+    };
+    setStatus(prev => {
+      // Both FocusScreen instances (tab + task) are mounted simultaneously
+      // and each runs this effect independently. The tab instance's
+      // `visible` prop (screen === 'focus') flips on every ordinary screen
+      // switch, which re-fires ITS OWN copy of this effect even while it
+      // has no active session -- without this guard, that idle instance's
+      // "I'm not active" update was unconditionally overwriting the OTHER
+      // instance's genuinely active session in the shared context the
+      // moment the user changed screens, hiding the mini-player, until the
+      // real active instance's own next tick (up to ~1s later) reported
+      // itself active again and it flashed back in. Only let an "inactive"
+      // update through when it's coming from whichever source currently
+      // owns the reported status (or nothing does yet).
+      if (!next.active && prev.source !== null && prev.source !== sessionSource) return prev;
+      return next;
     });
   }, [phase, paused, timeLeft, externalTask?.title, sessionSource, visible, setStatus]);
 
@@ -353,7 +369,14 @@ export const FocusScreen: React.FC<Props> = ({
   // unmount mid-session (AppNavigator unmounts rather than hides it while
   // the onboarding preview is open), so without this the mini-player could
   // keep showing a frozen, stale "active" status for a screen that's gone.
-  useEffect(() => () => setStatus({ active: false, paused: false, timeLeft: 0, title: '', source: null, minimized: false }), [setStatus]);
+  // Same ownership guard as above: only actually clear the shared status if
+  // this instance was the one that owned it -- an idle instance unmounting
+  // must not wipe out the OTHER instance's genuinely active session.
+  useEffect(() => () => setStatus(prev => (
+    prev.source === sessionSource
+      ? { active: false, paused: false, timeLeft: 0, title: '', source: null, minimized: false }
+      : prev
+  )), [setStatus, sessionSource]);
 
   useEffect(() => {
     const onChange = (state: AppStateStatus) => {
