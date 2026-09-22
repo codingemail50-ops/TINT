@@ -192,7 +192,7 @@ export function getFocusHeatmap(log: FocusLogEntry[], days = 70): { date: string
   return result;
 }
 
-export type FocusTimeframe = 'day' | 'week' | 'month' | 'allTime';
+export type FocusTimeframe = 'day' | 'week' | 'allTime';
 
 export interface FocusBucket { label: string; mins: number; distractedMins: number; dateLabel: string }
 
@@ -281,56 +281,17 @@ export function getFocusSummary(
     return { buckets, periodLabel: 'This Week', totalMins, sessionCount, avgMinsPerDay: totalMins / 7, avgSessionsPerDay: sessionCount / 7 };
   }
 
-  if (timeframe === 'month') {
-    const year = now.getFullYear(), month = now.getMonth();
-    const daysElapsed = now.getDate();
-    const buckets: FocusBucket[] = [];
-    let totalMins = 0, sessionCount = 0;
-    for (let day = 1; day <= daysElapsed; day++) {
-      const d = new Date(year, month, day);
-      const dateStr = d.toDateString();
-      const entries = log.filter(e => e.date === dateStr);
-      const mins = entries.reduce((s, e) => s + e.mins, 0);
-      totalMins += mins; sessionCount += entries.length;
-      buckets.push({ label: String(day), mins, distractedMins: sumMins(distractionLog, dateStr), dateLabel: shortDate(d) });
-    }
-    return { buckets, periodLabel: `${MONTH_LABELS[month]} ${year}`, totalMins, sessionCount, avgMinsPerDay: totalMins / daysElapsed, avgSessionsPerDay: sessionCount / daysElapsed };
-  }
-
-  // allTime — bucket by calendar month from the earliest log entry to now.
+  // allTime ("Overall") — lifetime totals only, no chart: with weeks or
+  // months of history, neither a per-day-of-month nor a per-calendar-month
+  // bar chart reads as a meaningful comparison (mostly sparse/empty bars
+  // early on), so this tab is numbers only. buckets stays empty; callers
+  // skip rendering the chart section entirely when it is.
   const validDates = log.map(e => new Date(e.date)).filter(d => !isNaN(d.getTime()));
   const earliest = validDates.length > 0 ? new Date(Math.min(...validDates.map(d => d.getTime()))) : now;
   const daysElapsed = Math.max(1, Math.round((now.getTime() - earliest.getTime()) / MS_PER_DAY) + 1);
 
-  const byMonth = new Map<string, number>();
-  const byMonthDistracted = new Map<string, number>();
-  const orderedKeys: string[] = [];
-  const cursor = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth(), 1);
-  while (cursor <= end) {
-    const key = `${cursor.getFullYear()}-${cursor.getMonth()}`;
-    byMonth.set(key, 0);
-    byMonthDistracted.set(key, 0);
-    orderedKeys.push(key);
-    cursor.setMonth(cursor.getMonth() + 1);
-  }
   let totalMins = 0, sessionCount = 0;
-  for (const e of log) {
-    const d = new Date(e.date);
-    if (isNaN(d.getTime())) continue;
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    if (byMonth.has(key)) byMonth.set(key, (byMonth.get(key) ?? 0) + e.mins);
-    totalMins += e.mins; sessionCount += 1;
-  }
-  for (const e of distractionLog) {
-    const d = new Date(e.date);
-    if (isNaN(d.getTime())) continue;
-    const key = `${d.getFullYear()}-${d.getMonth()}`;
-    if (byMonthDistracted.has(key)) byMonthDistracted.set(key, (byMonthDistracted.get(key) ?? 0) + e.mins);
-  }
-  const buckets = orderedKeys.map(key => {
-    const [y, m] = key.split('-').map(Number);
-    return { label: MONTH_LABELS[m], mins: byMonth.get(key) ?? 0, distractedMins: byMonthDistracted.get(key) ?? 0, dateLabel: `${MONTH_LABELS[m]} ${y}` };
-  });
-  return { buckets, periodLabel: 'All Time', totalMins, sessionCount, avgMinsPerDay: totalMins / daysElapsed, avgSessionsPerDay: sessionCount / daysElapsed };
+  for (const e of log) { totalMins += e.mins; sessionCount += 1; }
+
+  return { buckets: [], periodLabel: 'Overall', totalMins, sessionCount, avgMinsPerDay: totalMins / daysElapsed, avgSessionsPerDay: sessionCount / daysElapsed };
 }

@@ -320,8 +320,7 @@ const donutSt = StyleSheet.create({
 const TIMEFRAMES: { id: FocusTimeframe; label: string }[] = [
   { id: 'day', label: 'Day' },
   { id: 'week', label: 'Week' },
-  { id: 'month', label: 'Month' },
-  { id: 'allTime', label: 'All Time' },
+  { id: 'allTime', label: 'Overall' },
 ];
 
 function formatCount(n: number): string {
@@ -437,10 +436,14 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>Time Spent</Text>
-        <View style={styles.sectionCard}>
-          <DualBarChart buckets={summary.buckets} initialScrollIndex={timeframe === 'day' ? devNow().getHours() : undefined} />
-        </View>
+        {timeframe !== 'allTime' && (
+          <>
+            <Text style={styles.sectionLabel}>Time Spent</Text>
+            <View style={styles.sectionCard}>
+              <DualBarChart buckets={summary.buckets} initialScrollIndex={timeframe === 'day' ? devNow().getHours() : undefined} />
+            </View>
+          </>
+        )}
 
         <Text style={styles.sectionLabel}>Current Streak</Text>
         <View style={styles.sectionCard}>
