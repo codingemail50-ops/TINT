@@ -122,7 +122,10 @@ jobs:
       # TINT_UPLOAD_STORE_FILE ternary there) — an empty *path* is what
       # triggers the plugin's debug-keystore fallback, not an empty file.
       - name: Decode signing keystore
-        run: echo "${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}" | base64 -d > android/app/tint-upload.keystore
+        run: |
+          echo "${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}" | base64 -d > android/app/tint-upload.keystore
+          echo "Decoded keystore file size (0 = secret is missing/empty, real keystore is several KB):"
+          ls -l android/app/tint-upload.keystore
 
       # assembleRelease, not assembleDebug: a debug-variant APK expects a
       # live Metro server and is useless once you walk away from a laptop,
@@ -163,17 +166,19 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease
 
-      # Prints the SHA-1 of whatever certificate actually signed this APK,
-      # straight from the built file rather than trusting which branch of
-      # the fallback ran. Not sensitive — a certificate's fingerprint is
-      # exactly what gets shared with Google, never masked or secret — so
-      # this is safe to leave visible in the log for both of us to check.
+      # Prints whatever certificate actually signed this APK, straight from
+      # the built file rather than trusting which branch of the fallback
+      # ran. Not sensitive -- a certificate's fingerprint is exactly what
+      # gets shared with Google, never masked or secret -- so this is safe
+      # to leave visible in the log for both of us to check.
+      #
+      # Printing the FULL output unfiltered (not grepped for a specific
+      # heading like "SHA1:") on purpose: newer keytool/JDK versions have
+      # changed this output's exact wording more than once, and a grep that
+      # no longer matches fails silently (`|| true` swallows it) instead of
+      # erroring -- exactly what happened on the first run this step ran.
       - name: Print signing certificate fingerprint
-        run: |
-          keytool -printcert -jarfile android/app/build/outputs/apk/release/app-release.apk \
-            | grep -A1 "^Certificate fingerprints" || true
-          keytool -printcert -jarfile android/app/build/outputs/apk/release/app-release.apk \
-            | grep "SHA1:" || true
+        run: keytool -printcert -jarfile android/app/build/outputs/apk/release/app-release.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
