@@ -110,8 +110,18 @@ jobs:
       # line, never parsed as its own property at all. `printf '\n...\n'`
       # forces our line onto a fresh line of its own regardless of whether
       # the file already ended in a newline.
-      - name: Increase Gradle JVM memory (fixes Metaspace OOM)
-        run: printf '\norg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m\n' >> android/gradle.properties
+      # org.gradle.caching=true (Gradle's local build cache, on disk for the
+      # life of this job) is what actually makes the later "Build release
+      # AAB" step cheap: assembleRelease and bundleRelease are separate
+      # `./gradlew` invocations (separate steps below), so without this
+      # they don't share anything by default -- bundleRelease would redo
+      # its own full compile+R8 pass from scratch, not the "couple of
+      # minutes" that step's own comment describes. With caching on, the
+      # second invocation can reuse this run's already-computed task
+      # outputs (compiled Kotlin/Java, R8's minified output, etc.) as long
+      # as their inputs haven't changed, which they haven't between the two.
+      - name: Increase Gradle JVM memory (fixes Metaspace OOM), enable build cache
+        run: printf '\norg.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m\norg.gradle.caching=true\n' >> android/gradle.properties
 
       # Decodes the real upload keystore from a repo secret into a file on
       # the runner. Nothing here is written to the repo or to a log — GitHub
@@ -144,14 +154,20 @@ jobs:
       # with the debug keystore instead — good enough for a UI/logic check,
       # just don't expect Google Sign-In to work in that build.
       # timeout-minutes turns "hangs silently for hours" into "fails clearly
-      # within 20 minutes" if the license fix above isn't the whole story --
-      # every run before this one sat in_progress until manually cancelled,
-      # with no error and no way to tell it apart from a build that was just
-      # slow. A bounded failure is strictly more debuggable than that, no
-      # matter what the underlying cause turns out to be.
+      # within a bounded time" if the license fix above isn't the whole
+      # story -- every run before this one sat in_progress until manually
+      # cancelled, with no error and no way to tell it apart from a build
+      # that was just slow. A bounded failure is strictly more debuggable
+      # than that, no matter what the underlying cause turns out to be.
+      # Was 20 -- a real successful run has taken as long as ~18 minutes on
+      # its own on a slower runner, and one run timed out at exactly 20
+      # sitting inside minifyReleaseWithR8 (a genuinely heavy, variable-
+      # duration step) with no other sign of a real problem. 28 gives real
+      # runner-speed variance more room without losing the "fails within a
+      # bounded time" property this exists for.
       - name: Build release APK
         working-directory: android
-        timeout-minutes: 20
+        timeout-minutes: 28
         env:
           # Empty string, not just unset, when the secret isn't configured
           # yet -- Groovy's `if (System.getenv(...))` treats "" the same as
@@ -205,12 +221,15 @@ jobs:
       # bundle's signing certificate right after upload if that ever needs
       # double-checking.
       #
-      # Reuses this same build's already-compiled classes/resources (same
-      # Gradle daemon, same release variant just packaged differently), so
-      # this adds only a couple of minutes, not another full build.
+      # Reuses this same build's already-compiled classes/resources via
+      # Gradle's local build cache (org.gradle.caching=true, enabled above)
+      # -- without that, this being a separate `./gradlew` invocation would
+      # redo its own full compile+R8 pass from scratch, taking as long as
+      # the APK build above rather than "a couple of minutes." Generous
+      # timeout regardless, in case the cache doesn't fully cover it.
       - name: Build release AAB (Play Store submission format)
         working-directory: android
-        timeout-minutes: 10
+        timeout-minutes: 20
         env:
           TINT_UPLOAD_STORE_FILE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 != '' && 'tint-upload.keystore' || '' }}
           TINT_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
