@@ -193,3 +193,34 @@ jobs:
           name: tint-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 14
+
+      # AAB (Android App Bundle) is the format Google Play actually requires
+      # for submission -- the APK above is for sideloading onto a real
+      # device to test with, which Play doesn't accept directly. Same
+      # source, same signingConfig.release block (see
+      # plugins/withAndroidReleaseSigning.js) applied to this Gradle task
+      # too, so it's signed identically to the already-verified APK above --
+      # no separate signature-check step here since apksigner only
+      # understands APKs, not bundles; Play Console itself reports the
+      # bundle's signing certificate right after upload if that ever needs
+      # double-checking.
+      #
+      # Reuses this same build's already-compiled classes/resources (same
+      # Gradle daemon, same release variant just packaged differently), so
+      # this adds only a couple of minutes, not another full build.
+      - name: Build release AAB (Play Store submission format)
+        working-directory: android
+        timeout-minutes: 10
+        env:
+          TINT_UPLOAD_STORE_FILE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 != '' && 'tint-upload.keystore' || '' }}
+          TINT_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          TINT_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          TINT_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+        run: ./gradlew bundleRelease
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: tint-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 14
