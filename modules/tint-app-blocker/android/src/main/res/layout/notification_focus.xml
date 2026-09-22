@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Custom content for the focus-session notification (see
+    BlockingForegroundService.buildNotification, used via
+    NotificationCompat.Builder.setCustomContentView/setCustomBigContentView
+    + DecoratedCustomViewStyle). Deliberately minimal, per design: brand
+    name + task name in white, a live orange countdown, nothing else --
+    the previous default-template notification carried a full descriptive
+    sentence that made it read as a generic system notice rather than
+    Tint's own thing.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/tint_notification_bg"
+    android:paddingHorizontal="14dp"
+    android:paddingVertical="12dp">
+
+    <ImageView
+        android:id="@+id/notif_flame_icon"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginEnd="12dp"
+        android:contentDescription="@null" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/notif_brand"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="TINT"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.1"
+            android:alpha="0.85" />
+
+        <TextView
+            android:id="@+id/notif_task_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <Chronometer
+        android:id="@+id/notif_timer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:textColor="#FF6A00"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:fontFamily="monospace" />
+</LinearLayout>

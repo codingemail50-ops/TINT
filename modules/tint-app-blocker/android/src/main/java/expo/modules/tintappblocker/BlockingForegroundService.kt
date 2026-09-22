@@ -21,12 +21,14 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.RemoteViews
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 
@@ -474,41 +476,50 @@ class BlockingForegroundService : Service() {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    val sessionSuffix = if (durationMins > 0) " · ${durationMins}m session" else ""
-    val contentText = when {
-      isPaused -> "Session paused$sessionSuffix"
-      blockedPackages.isNotEmpty() -> "Blocking distracting apps until your session ends.$sessionSuffix"
-      else -> "Your TINT focus session is running.$sessionSuffix"
+    // Custom minimal layout (see notification_focus.xml) instead of the
+    // default template's title/body text pair -- that read as a generic
+    // system notice (light card, plain black text) rather than Tint's own
+    // thing. DecoratedCustomViewStyle keeps the OS chrome (small icon, app
+    // name, timestamp, the action buttons below) and lets this content
+    // area have its own dark gradient background.
+    val views = RemoteViews(packageName, R.layout.notification_focus)
+    views.setImageViewBitmap(R.id.notif_flame_icon, flameBitmap)
+    views.setTextViewText(R.id.notif_task_name, title)
+
+    // Chronometer is elapsedRealtime-based (SystemClock.elapsedRealtime()),
+    // not wall-clock epoch millis -- endAtMs is epoch millis (it's compared
+    // against System.currentTimeMillis() elsewhere for the actual block
+    // logic), so it has to be converted to an elapsedRealtime reference
+    // point here or the countdown would show the wrong time entirely.
+    if (!isPaused && endAtMs > 0L) {
+      val base = SystemClock.elapsedRealtime() + (endAtMs - System.currentTimeMillis())
+      views.setChronometer(R.id.notif_timer, base, null, true)
+    } else {
+      // Chronometer extends TextView, so this just overwrites its displayed
+      // text with a static label -- safe because setChronometer (and the
+      // start() call it makes internally) is only invoked in the branch
+      // above, never here, so nothing is ticking to overwrite on the next
+      // tick (endAtMs itself isn't adjusted on pause -- a pre-existing,
+      // accepted gap).
+      views.setTextViewText(R.id.notif_timer, if (isPaused) "Paused" else "")
     }
 
     val builder = NotificationCompat.Builder(this, CHANNEL_ID)
       .setContentTitle(title)
-      .setContentText(contentText)
       .setSmallIcon(applicationInfo.icon)
       .setLargeIcon(flameBitmap)
       .setOngoing(true)
       .setContentIntent(contentIntent)
       .setPriority(NotificationCompat.PRIORITY_LOW)
+      .setCustomContentView(views)
+      .setCustomBigContentView(views)
+      .setStyle(NotificationCompat.DecoratedCustomViewStyle())
       .addAction(
         if (isPaused) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause,
         if (isPaused) "Resume" else "Pause",
         togglePausePendingIntent
       )
       .addAction(android.R.drawable.ic_menu_close_clear_cancel, "End", endPendingIntent)
-
-    // A live-counting-down chronometer, driven by the OS itself — no need
-    // for the app to keep re-posting this every second. Only shown while
-    // actively running with a real end time; paused sessions fall back to
-    // the plain "Session paused" text above rather than a chronometer that
-    // would keep counting down time the session isn't actually spending
-    // (endAtMs itself isn't adjusted on pause — a pre-existing, accepted gap).
-    if (!isPaused && endAtMs > 0L) {
-      builder.setUsesChronometer(true)
-        .setChronometerCountDown(true)
-        .setWhen(endAtMs)
-    } else {
-      builder.setUsesChronometer(false)
-    }
 
     return builder.build()
   }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Black-to-grey gradient for the custom focus-session notification body
+    (see notification_focus.xml / BlockingForegroundService.buildNotification).
+    Matches the app's own near-black background (#060608) fading to a
+    lighter grey, rather than the plain system card colour the notification
+    used before this had a custom layout at all.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:angle="135"
+        android:startColor="#060608"
+        android:endColor="#3A3A3E"
+        android:type="linear" />
+    <corners android:radius="14dp" />
+</shape>
