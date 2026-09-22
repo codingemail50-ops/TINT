@@ -116,7 +116,19 @@ export const TaskItem: React.FC<Props> = ({
     // stayed. minDistance requires real movement to activate instead, so a
     // still hold now correctly falls through to longPress at 450ms, and an
     // actual swipe/drag still activates pan immediately regardless of time.
-    .minDistance(10)
+    //
+    // minDistance(10) alone measures total displacement in ANY direction,
+    // so a vertical scroll attempt (finger moving up/down more than 10px)
+    // satisfied it just as well as a real horizontal swipe -- this row's
+    // pan was winning that race against the parent ScrollView, both
+    // wobbling the row sideways (natural finger drift has some horizontal
+    // component even on a "vertical" swipe) and eating the touch so the
+    // list never scrolled at all. activeOffsetX/failOffsetY make this
+    // pan's activation direction-aware: it only claims the gesture once
+    // the movement is genuinely horizontal, and cedes to the ScrollView
+    // immediately once it's clearly vertical instead.
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-10, 10])
     .onUpdate(e => {
       dragX.value = e.translationX;
     })
