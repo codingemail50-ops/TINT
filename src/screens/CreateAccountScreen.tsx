@@ -235,7 +235,10 @@ export const CreateAccountScreen: React.FC<Props> = ({
         {/* Tiled the whole screen height on purpose (not just a header band) —
             the wall stays faintly visible above AND below the form instead
             of fading to solid black by the bottom. */}
-        {!!avatar && <AvatarWall icons={[avatar]} alternateDirection rows={20} cellSize={52} angleDeg={-8} durationMs={22000} />}
+        {/* rows must be enough to fill the full screen height (see the rows
+            doc comment in AvatarWall.tsx) -- 20 fell short on taller phones,
+            leaving a plain black gap below the tiled wall. */}
+        {!!avatar && <AvatarWall icons={[avatar]} alternateDirection rows={30} cellSize={52} angleDeg={-8} durationMs={22000} />}
         <LinearGradient
           colors={['rgba(6,6,8,0.45)', 'rgba(6,6,8,0.75)', 'rgba(6,6,8,0.75)', 'rgba(6,6,8,0.45)']}
           locations={[0, 0.35, 0.75, 1]}
@@ -293,6 +296,9 @@ export const CreateAccountScreen: React.FC<Props> = ({
               <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={Colors.textMuted} />
             </TouchableOpacity>
           </View>
+          {mode === 'signup' && password.length > 0 && password.length < 6 && (
+            <Text style={styles.hint}>Password needs at least 6 characters.</Text>
+          )}
           <TextInput
             style={styles.input}
             value={email}
@@ -380,6 +386,7 @@ const styles = StyleSheet.create({
   passwordInput: { paddingRight: 44 },
   eyeBtn: { position: 'absolute', right: Spacing.md, height: '100%', justifyContent: 'center' },
   error: { color: Colors.danger, fontSize: 13, fontFamily: Fonts.regular },
+  hint: { color: Colors.textMuted, fontSize: 12, fontFamily: Fonts.regular, marginTop: -4 },
 
   submitBtn: {
     backgroundColor: Colors.primary,
