@@ -1,4 +1,4 @@
-export type ExamType = 'JEE' | 'CLASS12' | 'CLASS10' | 'UCEED' | 'NID' | 'NIFT' | 'IPMAT';
+export type ExamType = 'JEE' | 'NEET' | 'CLASS12' | 'CLASS10' | 'UCEED' | 'NID' | 'NIFT' | 'IPMAT';
 
 export type ClassTwelveStream = 'Science' | 'Commerce' | 'Humanities';
 export const CLASS_TWELVE_STREAMS: ClassTwelveStream[] = ['Science', 'Commerce', 'Humanities'];
@@ -27,11 +27,13 @@ export interface CustomExam {
   tasks: { title: string; duration: number }[];
 }
 
-// Order here is deliberate — JEE first (most common), then the two board
-// exams, then the design entrances, IPMAT, with "Other" rendered separately
-// (and last) by whichever screen renders this list rather than living here.
+// Order here is deliberate — JEE and NEET first (the two most common
+// entrances), then the two board exams, then the design entrances, IPMAT,
+// with "Other" rendered separately (and last) by whichever screen renders
+// this list rather than living here.
 export const EXAM_TYPES: { id: ExamType; label: string; icon: string; description: string; color: string }[] = [
   { id: 'JEE',    label: 'JEE',      icon: 'flash',         description: 'Joint Entrance Exam — Mains & Advanced', color: '#3B82F6' },
+  { id: 'NEET',   label: 'NEET',     icon: 'medkit',        description: 'National Eligibility cum Entrance Test — Medical', color: '#EF4444' },
   { id: 'CLASS12', label: 'Class 12', icon: 'school',       description: 'Class 12 board exams', color: '#22C55E' },
   { id: 'CLASS10', label: 'Class 10', icon: 'school-outline', description: 'Class 10 board exams', color: '#14B8A6' },
   { id: 'UCEED',  label: 'UCEED',    icon: 'pencil',        description: 'Undergraduate Common Entrance Exam for Design', color: '#8B5CF6' },
@@ -47,6 +49,13 @@ const BASE_TASKS: Record<ExamType, Task[]> = {
     { id: 'jee-3', title: 'Chemistry — Organic & Inorganic',      duration: 75, category: 'Chemistry' },
     { id: 'jee-4', title: 'Previous Year Questions',              duration: 60, category: 'Practice' },
     { id: 'jee-5', title: 'Formula Revision',                     duration: 30, category: 'Revision' },
+  ],
+  NEET: [
+    { id: 'neet-1', title: 'Biology — Botany & Zoology',          duration: 90, category: 'Biology' },
+    { id: 'neet-2', title: 'Physics — Mechanics & Waves',         duration: 75, category: 'Physics' },
+    { id: 'neet-3', title: 'Chemistry — Organic & Inorganic',     duration: 75, category: 'Chemistry' },
+    { id: 'neet-4', title: 'Previous Year Questions',             duration: 60, category: 'Practice' },
+    { id: 'neet-5', title: 'NCERT Line-by-Line Revision',         duration: 30, category: 'Revision' },
   ],
   UCEED: [
     { id: 'uceed-1', title: 'Observation Drawing',                duration: 60, category: 'Drawing' },
@@ -125,6 +134,7 @@ export function getCombinedPreset(exams: ExamType[], classTwelveStream?: ClassTw
   }
 
   const hasJEE     = exams.includes('JEE');
+  const hasNEET    = exams.includes('NEET');
   const hasUCEED   = exams.includes('UCEED');
   const hasNID     = exams.includes('NID');
   const hasNIFT    = exams.includes('NIFT');
@@ -138,12 +148,16 @@ export function getCombinedPreset(exams: ExamType[], classTwelveStream?: ClassTw
   if (hasJEE) {
     tasks.push({ id: 'c-math', title: 'Mathematics — JEE Focus', duration: hasUCEED ? 75 : 90, category: 'Mathematics' });
   }
-  // Physics — JEE
-  if (hasJEE) {
+  // Biology — NEET only, no overlap with anything else here
+  if (hasNEET) {
+    tasks.push({ id: 'c-bio', title: 'Biology — Botany & Zoology', duration: 90, category: 'Biology' });
+  }
+  // Physics — shared by JEE and NEET, one task either way
+  if (hasJEE || hasNEET) {
     tasks.push({ id: 'c-phys', title: 'Physics', duration: 60, category: 'Physics' });
   }
-  // Chemistry — JEE (skip if purely design combo)
-  if (hasJEE && exams.length <= 2) {
+  // Chemistry — shared by JEE and NEET (skip if purely design combo)
+  if ((hasJEE || hasNEET) && exams.length <= 2) {
     tasks.push({ id: 'c-chem', title: 'Chemistry', duration: 60, category: 'Chemistry' });
   }
 
