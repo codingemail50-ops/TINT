@@ -106,22 +106,14 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
   const performLogout = async () => {
     setLogoutConfirmOpen(false);
     void buttonPress();
-    // supabase.auth.signOut() has no built-in timeout -- on a slow/stuck
-    // connection this was hanging forever with zero feedback, and since
-    // nothing below it ever ran, tapping "Log out" just silently did
-    // nothing (same class of bug already fixed for signup/login in
-    // CreateAccountScreen). Unlike signup, there's no reason to make the
-    // user wait on the network here at all: the whole point of logging out
-    // is to get off this account on THIS device right now, so the local
-    // wipe + onLogout() below always run regardless of whether the remote
-    // sign-out call finished, timed out, or failed -- worst case the old
-    // session lingers server-side a bit longer, which is harmless.
-    try {
-      await Promise.race([
-        supabase.auth.signOut(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timed out')), 5000)),
-      ]);
-    } catch {}
+    // Not awaited at all, not even with a timeout -- a 5s-capped race still
+    // meant every logout visibly waited however long the network call
+    // actually took (reported as a ~2s delay), when there's no reason to
+    // wait on it even a little: the whole point of logging out is to get
+    // off this account on THIS device right now. Fire it and move on --
+    // worst case the old session lingers server-side a bit longer, which
+    // is harmless.
+    supabase.auth.signOut().catch(() => {});
     await Promise.all([
       StorageService.clearAllUserData(),
       saveFocusLog([]),
