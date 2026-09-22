@@ -43,87 +43,106 @@ export const EXAM_TYPES: { id: ExamType; label: string; icon: string; descriptio
 ];
 
 const BASE_TASKS: Record<ExamType, Task[]> = {
+  // Problem-heavy by design — JEE rewards volume. Numbers in the titles
+  // (25 problems, 30 minutes of PYQs) are starting points; duration and
+  // title are editable per-task like any other task in the app, so a
+  // student can dial them up or down without losing the preset.
   JEE: [
-    { id: 'jee-1', title: 'Mathematics — Calculus & Algebra',     duration: 90, category: 'Mathematics' },
-    { id: 'jee-2', title: 'Physics — Mechanics & Waves',          duration: 90, category: 'Physics' },
-    { id: 'jee-3', title: 'Chemistry — Organic & Inorganic',      duration: 75, category: 'Chemistry' },
-    { id: 'jee-4', title: 'Previous Year Questions',              duration: 60, category: 'Practice' },
-    { id: 'jee-5', title: 'Formula Revision',                     duration: 30, category: 'Revision' },
+    { id: 'jee-1', title: 'Solve 25 JEE-level problems',           duration: 60, category: 'Practice' },
+    { id: 'jee-2', title: "Complete today's Physics problem set",  duration: 60, category: 'Physics' },
+    { id: 'jee-3', title: "Complete today's Chemistry problem set", duration: 60, category: 'Chemistry' },
+    { id: 'jee-4', title: "Complete today's Maths problem set",    duration: 60, category: 'Mathematics' },
+    { id: 'jee-5', title: 'Review 10 previous mistakes',           duration: 20, category: 'Revision' },
+    { id: 'jee-6', title: 'Solve 30 minutes of PYQs under a timer', duration: 30, category: 'Timed Practice' },
+    { id: 'jee-7', title: 'Analyze one timed test',                duration: 30, category: 'Analysis' },
   ],
+  // NEET's edge over a generic to-do app: "study biology" becomes a
+  // countable, closeable task (50 MCQs, one topic, one recall pass).
   NEET: [
-    { id: 'neet-1', title: 'Biology — Botany & Zoology',          duration: 90, category: 'Biology' },
-    { id: 'neet-2', title: 'Physics — Mechanics & Waves',         duration: 75, category: 'Physics' },
-    { id: 'neet-3', title: 'Chemistry — Organic & Inorganic',     duration: 75, category: 'Chemistry' },
-    { id: 'neet-4', title: 'Previous Year Questions',             duration: 60, category: 'Practice' },
-    { id: 'neet-5', title: 'NCERT Line-by-Line Revision',         duration: 30, category: 'Revision' },
+    { id: 'neet-1', title: 'Solve 50 Biology MCQs',                duration: 60, category: 'Biology' },
+    { id: 'neet-2', title: 'Solve 25 Physics MCQs',                duration: 45, category: 'Physics' },
+    { id: 'neet-3', title: 'Solve 25 Chemistry MCQs',              duration: 45, category: 'Chemistry' },
+    { id: 'neet-4', title: 'Revise one Biology topic using active recall', duration: 30, category: 'Revision' },
+    { id: 'neet-5', title: "Review today's incorrect MCQs",        duration: 20, category: 'Revision' },
+    { id: 'neet-6', title: 'Complete one timed 60-question set',   duration: 60, category: 'Timed Practice' },
+    { id: 'neet-7', title: 'Analyze one mock/test',                duration: 30, category: 'Analysis' },
   ],
+  // Deliberately not a JEE/NEET clone — UCEED rewards observation,
+  // ideation and spatial reasoning over problem-solving volume.
   UCEED: [
-    { id: 'uceed-1', title: 'Observation Drawing',                duration: 60, category: 'Drawing' },
-    { id: 'uceed-2', title: 'Visual Design & Composition',        duration: 60, category: 'Design' },
-    { id: 'uceed-3', title: 'Spatial Reasoning Practice',         duration: 45, category: 'Aptitude' },
-    { id: 'uceed-4', title: 'Design Thinking Problems',           duration: 45, category: 'Design' },
-    { id: 'uceed-5', title: 'Portfolio Work',                     duration: 60, category: 'Portfolio' },
+    { id: 'uceed-1', title: '20 min observational drawing',        duration: 20, category: 'Drawing' },
+    { id: 'uceed-2', title: '10 visualisation/spatial reasoning questions', duration: 30, category: 'Aptitude' },
+    { id: 'uceed-3', title: '1 UCEED Part-A timed set',            duration: 45, category: 'Timed Practice' },
+    { id: 'uceed-4', title: '1 product/design ideation exercise',  duration: 45, category: 'Design' },
+    { id: 'uceed-5', title: 'Draw 5 thumbnail concepts',           duration: 30, category: 'Drawing' },
+    { id: 'uceed-6', title: 'Review 5 previous mistakes',          duration: 20, category: 'Revision' },
+    { id: 'uceed-7', title: '1 timed Part-B practice',             duration: 45, category: 'Timed Practice' },
   ],
+  // Kept loose on purpose — NID's creative component benefits from
+  // variety, so tasks read as prompts to explore rather than fixed drills.
   NID: [
-    { id: 'nid-1', title: 'Studio Drawing — Observation',        duration: 75, category: 'Drawing' },
-    { id: 'nid-2', title: 'Memory Drawing Practice',             duration: 45, category: 'Drawing' },
-    { id: 'nid-3', title: 'Design Aptitude Problems',            duration: 60, category: 'Design' },
-    { id: 'nid-4', title: 'Design History & Theory',             duration: 45, category: 'Theory' },
-    { id: 'nid-5', title: 'Creative Exploration (Craft/Model)',  duration: 60, category: 'Portfolio' },
+    { id: 'nid-1', title: '20 min observational drawing',          duration: 20, category: 'Drawing' },
+    { id: 'nid-2', title: '1 visual problem-solving exercise',     duration: 30, category: 'Design' },
+    { id: 'nid-3', title: '5 thumbnail ideas from one prompt',     duration: 30, category: 'Drawing' },
+    { id: 'nid-4', title: '1 product/scene sketch',                duration: 45, category: 'Drawing' },
+    { id: 'nid-5', title: '20 aptitude questions',                 duration: 30, category: 'Aptitude' },
+    { id: 'nid-6', title: 'Review previous design mistakes',       duration: 20, category: 'Revision' },
+    { id: 'nid-7', title: '1 timed DAT-style practice set',        duration: 45, category: 'Timed Practice' },
   ],
+  // NIFT (NTA-administered) blends creative sketching with quant/verbal
+  // aptitude — the task list mirrors that mix rather than leaning design-only.
   NIFT: [
-    { id: 'nift-1', title: 'Fashion Illustration',               duration: 60, category: 'Drawing' },
-    { id: 'nift-2', title: 'Creative Ability Practice',          duration: 60, category: 'Design' },
-    { id: 'nift-3', title: 'General Ability — English & GK',     duration: 45, category: 'General' },
-    { id: 'nift-4', title: 'Design Theory & Trends',             duration: 45, category: 'Theory' },
-    { id: 'nift-5', title: 'Situation Test Prep',                duration: 45, category: 'Portfolio' },
+    { id: 'nift-1', title: '20 min fashion/product sketching',     duration: 20, category: 'Drawing' },
+    { id: 'nift-2', title: '10 quantitative questions',            duration: 20, category: 'Aptitude' },
+    { id: 'nift-3', title: '10 communication/verbal questions',    duration: 20, category: 'Aptitude' },
+    { id: 'nift-4', title: '1 creative ideation prompt',           duration: 30, category: 'Design' },
+    { id: 'nift-5', title: 'Practice one timed section',           duration: 30, category: 'Timed Practice' },
+    { id: 'nift-6', title: 'Review incorrect questions',           duration: 20, category: 'Revision' },
+    { id: 'nift-7', title: 'Complete one mixed mock section',      duration: 45, category: 'Timed Practice' },
   ],
-  // Class 10 doesn't split by stream — same subject set for everyone.
+  // Boards favor writing practice over MCQ grinding, so the list leans on
+  // long-form answers and syllabus chapters rather than raw question counts.
   CLASS10: [
-    { id: 'c10-1',  title: 'Physics',          duration: 40, category: 'Boards' },
-    { id: 'c10-2',  title: 'Chemistry',        duration: 40, category: 'Boards' },
-    { id: 'c10-3',  title: 'Biology',          duration: 40, category: 'Boards' },
-    { id: 'c10-4',  title: 'Mathematics',      duration: 45, category: 'Boards' },
-    { id: 'c10-5',  title: 'History',          duration: 30, category: 'Boards' },
-    { id: 'c10-6',  title: 'Geography',        duration: 30, category: 'Boards' },
-    { id: 'c10-7',  title: 'Civics',           duration: 30, category: 'Boards' },
-    { id: 'c10-8',  title: 'Economics',        duration: 30, category: 'Boards' },
-    { id: 'c10-9',  title: 'English',          duration: 30, category: 'Boards' },
-    { id: 'c10-10', title: 'Second Language',  duration: 30, category: 'Boards' },
+    { id: 'c10-1', title: "Revise one chapter from today's syllabus", duration: 45, category: 'Revision' },
+    { id: 'c10-2', title: 'Solve 20 board-style questions',        duration: 45, category: 'Practice' },
+    { id: 'c10-3', title: 'Write 5 answers without looking at notes', duration: 30, category: 'Writing Practice' },
+    { id: 'c10-4', title: "Review yesterday's mistakes",           duration: 20, category: 'Revision' },
+    { id: 'c10-5', title: 'Practice one case-study/application question', duration: 25, category: 'Practice' },
+    { id: 'c10-6', title: 'Complete one timed 30-minute section',  duration: 30, category: 'Timed Practice' },
+    { id: 'c10-7', title: 'Revise formulas / definitions / key dates', duration: 20, category: 'Revision' },
   ],
-  // Placeholder here — Class 12 actually branches by stream (see
-  // CLASS12_STREAM_TASKS below); this entry only exists to satisfy
-  // Record<ExamType, Task[]> and is never read directly on its own.
+  // Same task shape as Class 10 across every stream (Science/Commerce/
+  // Humanities) — these are study habits, not subject lists, so one set
+  // fits all three; see CLASS12_STREAM_TASKS below.
   CLASS12: [
-    { id: 'c12-1', title: 'Physics',            duration: 60, category: 'Boards' },
-    { id: 'c12-2', title: 'Chemistry',          duration: 60, category: 'Boards' },
-    { id: 'c12-3', title: 'Mathematics',        duration: 60, category: 'Boards' },
-    { id: 'c12-4', title: 'Practice Problems',  duration: 45, category: 'Practice' },
+    { id: 'c12-1', title: "Complete today's chapter target",       duration: 60, category: 'Study' },
+    { id: 'c12-2', title: 'Solve 25–30 board-level questions',     duration: 60, category: 'Practice' },
+    { id: 'c12-3', title: "Active-recall yesterday's topic",       duration: 20, category: 'Revision' },
+    { id: 'c12-4', title: 'Review your error log',                 duration: 20, category: 'Revision' },
+    { id: 'c12-5', title: 'Write one long-answer response under time', duration: 30, category: 'Writing Practice' },
+    { id: 'c12-6', title: 'Solve one previous-year question set',  duration: 45, category: 'Practice' },
+    { id: 'c12-7', title: 'Complete one timed paper section',      duration: 45, category: 'Timed Practice' },
   ],
+  // IPMAT is a timing game as much as an aptitude one — timed tasks are
+  // first-class here, not an afterthought tacked onto the end.
   IPMAT: [
-    { id: 'ipmat-1', title: 'Quantitative Ability Practice',     duration: 60, category: 'Aptitude' },
-    { id: 'ipmat-2', title: 'Verbal Ability & Reading Comprehension', duration: 60, category: 'Aptitude' },
-    { id: 'ipmat-3', title: 'Logical Reasoning Practice',        duration: 45, category: 'Aptitude' },
+    { id: 'ipmat-1', title: '20 Quantitative Ability questions',   duration: 30, category: 'Aptitude' },
+    { id: 'ipmat-2', title: '20 Verbal Ability questions',         duration: 30, category: 'Aptitude' },
+    { id: 'ipmat-3', title: '10 timed QA questions',               duration: 15, category: 'Timed Practice' },
+    { id: 'ipmat-4', title: 'Read and summarize one editorial/article', duration: 20, category: 'Verbal' },
+    { id: 'ipmat-5', title: 'Review your error log',               duration: 15, category: 'Revision' },
+    { id: 'ipmat-6', title: 'Complete one timed sectional',        duration: 40, category: 'Timed Practice' },
+    { id: 'ipmat-7', title: 'Analyze one mock',                    duration: 30, category: 'Analysis' },
   ],
 };
 
-// Class 12 boards vary a lot by stream — enough that one generic list
-// doesn't fit anyone well. Kept small and editable, same reasoning as
-// every other preset here.
+// Boards tasks are study habits (chapter targets, recall, error logs, timed
+// sections), not subject lists — the same set fits Science, Commerce and
+// Humanities equally well, so all three streams share BASE_TASKS.CLASS12.
 const CLASS12_STREAM_TASKS: Record<ClassTwelveStream, Task[]> = {
-  Science: BASE_TASKS.CLASS12, // PCM
-  Commerce: [
-    { id: 'c12-com-1', title: 'Business Studies',      duration: 60, category: 'Boards' },
-    { id: 'c12-com-2', title: 'Accountancy',           duration: 60, category: 'Boards' },
-    { id: 'c12-com-3', title: 'Applied Mathematics',   duration: 60, category: 'Boards' },
-    { id: 'c12-com-4', title: 'Economics',             duration: 45, category: 'Boards' },
-  ],
-  Humanities: [
-    { id: 'c12-hum-1', title: 'Political Science',     duration: 60, category: 'Boards' },
-    { id: 'c12-hum-2', title: 'Entrepreneurship',      duration: 60, category: 'Boards' },
-    { id: 'c12-hum-3', title: 'Accountancy',           duration: 60, category: 'Boards' },
-    { id: 'c12-hum-4', title: 'History',               duration: 45, category: 'Boards' },
-  ],
+  Science: BASE_TASKS.CLASS12,
+  Commerce: BASE_TASKS.CLASS12,
+  Humanities: BASE_TASKS.CLASS12,
 };
 
 export function getCombinedPreset(exams: ExamType[], classTwelveStream?: ClassTwelveStream): Task[] {
