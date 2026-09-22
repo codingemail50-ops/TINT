@@ -172,13 +172,20 @@ jobs:
       # gets shared with Google, never masked or secret -- so this is safe
       # to leave visible in the log for both of us to check.
       #
-      # Printing the FULL output unfiltered (not grepped for a specific
-      # heading like "SHA1:") on purpose: newer keytool/JDK versions have
-      # changed this output's exact wording more than once, and a grep that
-      # no longer matches fails silently (`|| true` swallows it) instead of
-      # erroring -- exactly what happened on the first run this step ran.
-      - name: Print signing certificate fingerprint
-        run: keytool -printcert -jarfile android/app/build/outputs/apk/release/app-release.apk
+      # Uses apksigner, not `keytool -printcert -jarfile`: keytool only
+      # understands the old v1 JAR-signature format (META-INF/*.RSA).
+      # Modern Android builds sign primarily with the v2/v3 APK Signature
+      # Scheme, which lives in a separate signing block outside the JAR
+      # structure entirely -- keytool can't see it at all and reports "Not
+      # a signed jar file" even on a correctly-signed APK. apksigner is the
+      # tool that actually understands every scheme Android/Play check, so
+      # it's the only trustworthy answer to "is this really signed, and
+      # with what."
+      - name: Verify APK signature
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -1)
+          echo "Using apksigner at: $APKSIGNER"
+          "$APKSIGNER" verify --print-certs -v android/app/build/outputs/apk/release/app-release.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
