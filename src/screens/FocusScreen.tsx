@@ -390,13 +390,42 @@ export const FocusScreen: React.FC<Props> = ({
         // refresh the real permission pills rather than leaving them stale
         // until the next full remount.
         if (phaseRef.current === 'setup') void refreshGrants();
+        // Re-arm the native blocker on every return to foreground during a
+        // live, unpaused session — not just once on mount. This tab
+        // instance never unmounts (see AppNavigator), so the boot-time
+        // resume effect above only ever runs once per JS process lifetime;
+        // it can't help if only the native BlockingForegroundService gets
+        // killed (some OEMs kill background services well before touching
+        // the host process) while the app itself, and this screen, survive
+        // a quick swipe-away. That left a real gap: reopening TINT right
+        // after was a warm resume with nothing left to trigger a re-arm, so
+        // the JS timer kept counting down (backed by storage, unaffected)
+        // while nothing was actually blocking for the rest of the session —
+        // exactly the "close and reopen, blocking gets overridden" report.
+        // startBlocking is safe/cheap to call even when the service never
+        // stopped, so doing this unconditionally on every foreground return
+        // closes the gap regardless of why the service went down.
+        if (phaseRef.current === 'active' && !pausedRef.current) {
+          void (async () => {
+            const saved = await loadActiveSession();
+            if (!saved || saved.source !== sessionSource) return;
+            const plannedEnd = saved.startedAtMs + saved.durationMins * 60 * 1000;
+            if (plannedEnd <= Date.now()) return;
+            let blockedIds: string[] = DEFAULT_BLOCKED_APPS;
+            try {
+              const raw = await AsyncStorage.getItem(KEYS.BLOCKED_APPS);
+              if (raw) blockedIds = JSON.parse(raw);
+            } catch {}
+            startAppBlocking(packageNamesFor(blockedIds), plannedEnd, saved.title, saved.durationMins);
+          })();
+        }
       } else if (phaseRef.current === 'active' && !pausedRef.current && backgroundedAtRef.current === null) {
         backgroundedAtRef.current = Date.now();
       }
     };
     const sub = RNAppState.addEventListener('change', onChange);
     return () => sub.remove();
-  }, [tick, paused, refreshGrants]);
+  }, [tick, paused, refreshGrants, sessionSource]);
 
   useEffect(() => {
     if (phase === 'active' && !paused) {
