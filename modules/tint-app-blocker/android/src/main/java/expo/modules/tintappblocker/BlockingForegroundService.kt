@@ -707,7 +707,21 @@ class BlockingForegroundService : Service() {
   }
 
   private fun showOverlay() {
-    if (overlayView != null) return
+    overlayView?.let { existing ->
+      if (existing.isAttachedToWindow) return
+      // The OS can silently detach this overlay window on its own (seen
+      // around recents/gesture-navigation transitions) without ever going
+      // through our own removeOverlay() -- our bookkeeping never learns
+      // about it, so overlayView keeps pointing at a view that isn't really
+      // on screen anymore. Every subsequent poll's showOverlay() call was
+      // hitting the early-return above and silently doing nothing, forever,
+      // because it trusted a stale reference instead of checking reality.
+      // That's the exact "block it once, then it never blocks again" bug:
+      // no crash, no error, just a permanently-stuck belief that the block
+      // screen is already showing when it isn't. Clear the stale reference
+      // so a real, freshly-attached view gets added below instead.
+      overlayView = null
+    }
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !android.provider.Settings.canDrawOverlays(this)) {
       // No overlay permission — nothing we can draw. The foreground-app
       // detection still ran (harmless), we just can't show the block screen.
