@@ -102,6 +102,21 @@ create policy "user can update own row"
 -- No delete policy: users can't delete their own row from the client.
 -- (Add one deliberately later if you want a "delete my account" feature.)
 
+-- Explicit table-level grants, matching the policies above exactly (no
+-- delete, since there's no delete policy to back it). These were previously
+-- implicit -- Supabase auto-granted Data API access to public-schema tables
+-- for existing projects, which is why this has worked without them. That
+-- auto-grant stops applying to any migration run after Oct 30 2026
+-- (including this file, if it's ever replayed against a fresh project), so
+-- writing the grant down here is what keeps a from-scratch setup working
+-- identically to the current live database instead of silently returning
+-- "permission denied" on every query. No `anon` grant -- every real request
+-- here already requires a signed-in session (even guest accounts are a real
+-- authenticated session via Supabase's anonymous auth, not the `anon`
+-- role), so RLS is enforced through `authenticated` alone, same as it is today.
+grant select, insert, update on public.user_data to authenticated;
+grant all on public.user_data to service_role;
+
 -- ── focus_stats_from_log ─────────────────────────────────────────────────
 -- Computes today/week/all-time focus minutes live from a user's raw
 -- focus_log, instead of trusting the stored focus_today_mins/
@@ -225,6 +240,12 @@ drop policy if exists "cancel requests you're part of" on public.friend_requests
 create policy "cancel requests you're part of"
   on public.friend_requests for delete
   using (auth.uid() = from_user or auth.uid() = to_user);
+
+-- Same reasoning as user_data's grants above -- explicit now instead of
+-- relying on Supabase's auto-grant, which stops covering fresh migration
+-- runs after Oct 30 2026.
+grant select, insert, update, delete on public.friend_requests to authenticated;
+grant all on public.friend_requests to service_role;
 
 -- ── friendships ───────────────────────────────────────────────────────────
 -- Symmetric view over accepted requests: querying `where user_id =
