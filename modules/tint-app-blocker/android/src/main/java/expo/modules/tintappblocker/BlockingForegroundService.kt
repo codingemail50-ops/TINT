@@ -13,6 +13,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -750,6 +751,19 @@ class BlockingForegroundService : Service() {
     })
     layout.addView(Button(this).apply {
       text = "Return to TINT"
+      isAllCaps = false
+      setTextColor(0xFF080810.toInt())
+      background = GradientDrawable().apply {
+        cornerRadius = 999f
+        setColor(0xFFFF6A00.toInt())
+      }
+      stateListAnimator = null
+      elevation = 0f
+      setPadding(72, 32, 72, 32)
+      layoutParams = LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.WRAP_CONTENT,
+        LinearLayout.LayoutParams.WRAP_CONTENT
+      ).apply { topMargin = 56 }
       setOnClickListener {
         removeOverlay()
         val launchIntent = packageManager.getLaunchIntentForPackage(ownPackageName)
