@@ -28,6 +28,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RemoteViews
 import android.widget.TextView
@@ -662,11 +663,16 @@ class BlockingForegroundService : Service() {
     return lastPackage
   }
 
-  // Plain LinearLayout doesn't consume the back button — unhandled, it falls
-  // through to whatever's behind our window (the blocked app), letting the
-  // user navigate it despite the overlay visually covering the screen. This
-  // swallows BACK so the overlay is actually modal, not just a picture on top.
-  private inner class BlockOverlayLayout(context: Context) : LinearLayout(context) {
+  // FrameLayout so the dot rows (showOverlay()) can be pinned to the true
+  // top/bottom screen edges via Gravity.TOP/BOTTOM while the main content
+  // stays centered -- a plain vertical LinearLayout can only stack children
+  // in a single column, it can't place some at the edges and others in the
+  // middle at the same time. Doesn't consume the back button on its own --
+  // unhandled, it falls through to whatever's behind our window (the
+  // blocked app), letting the user navigate it despite the overlay visually
+  // covering the screen. This swallows BACK so the overlay is actually
+  // modal, not just a picture on top.
+  private inner class BlockOverlayLayout(context: Context) : FrameLayout(context) {
     init {
       isFocusable = true
       isFocusableInTouchMode = true
@@ -675,6 +681,29 @@ class BlockingForegroundService : Service() {
       if (event.keyCode == KeyEvent.KEYCODE_BACK) return true
       return super.dispatchKeyEvent(event)
     }
+  }
+
+  // A row of small evenly-spaced dots, used at the top and bottom edges of
+  // the block screen (showOverlay()) as a decorative accent matching the
+  // app's pixel/retro visual language elsewhere (store listing art, etc.).
+  private fun buildDotsRow(context: Context): LinearLayout {
+    val row = LinearLayout(context).apply {
+      orientation = LinearLayout.HORIZONTAL
+      gravity = Gravity.CENTER
+    }
+    repeat(9) {
+      row.addView(View(context).apply {
+        background = GradientDrawable().apply {
+          shape = GradientDrawable.OVAL
+          setColor(0xFFFF6A00.toInt())
+        }
+        layoutParams = LinearLayout.LayoutParams(10, 10).apply {
+          marginStart = 14
+          marginEnd = 14
+        }
+      })
+    }
+    return row
   }
 
   private fun requestAudioFocus() {
@@ -730,26 +759,44 @@ class BlockingForegroundService : Service() {
     }
     val wm = windowManager ?: return
 
+    // Outer FrameLayout spans the full screen edge-to-edge (no padding) so
+    // the dot rows below can actually be pinned near the true top/bottom
+    // edges via Gravity.TOP/BOTTOM; the content block carries its own
+    // horizontal padding instead, same visual inset as before.
     val layout = BlockOverlayLayout(this).apply {
+      setBackgroundColor(0xFF080810.toInt())
+    }
+
+    layout.addView(
+      buildDotsRow(this),
+      FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP)
+        .apply { topMargin = 72 }
+    )
+    layout.addView(
+      buildDotsRow(this),
+      FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM)
+        .apply { bottomMargin = 72 }
+    )
+
+    val content = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
       gravity = Gravity.CENTER
-      setBackgroundColor(0xFF080810.toInt())
-      setPadding(64, 64, 64, 64)
+      setPadding(64, 0, 64, 0)
     }
-    layout.addView(TextView(this).apply {
+    content.addView(TextView(this).apply {
       text = BLOCK_SCREEN_LINES.random()
       textSize = 20f
       setTextColor(0xFFF5F5F5.toInt())
       gravity = Gravity.CENTER
     })
-    layout.addView(TextView(this).apply {
+    content.addView(TextView(this).apply {
       text = "This app is paused until your session ends."
       textSize = 14f
       setTextColor(0xFFAAAAAA.toInt())
       gravity = Gravity.CENTER
       setPadding(0, 24, 0, 48)
     })
-    layout.addView(Button(this).apply {
+    content.addView(Button(this).apply {
       text = "Return to TINT"
       isAllCaps = false
       setTextColor(0xFF080810.toInt())
@@ -760,8 +807,11 @@ class BlockingForegroundService : Service() {
       stateListAnimator = null
       elevation = 0f
       setPadding(72, 32, 72, 32)
+      // MATCH_PARENT so the button spans the same width as the content
+      // column above it (what "Stay locked in..." wraps to), instead of
+      // just hugging its own text.
       layoutParams = LinearLayout.LayoutParams(
-        LinearLayout.LayoutParams.WRAP_CONTENT,
+        LinearLayout.LayoutParams.MATCH_PARENT,
         LinearLayout.LayoutParams.WRAP_CONTENT
       ).apply { topMargin = 56 }
       setOnClickListener {
@@ -771,6 +821,10 @@ class BlockingForegroundService : Service() {
         launchIntent?.let { startActivity(it) }
       }
     })
+    layout.addView(
+      content,
+      FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER)
+    )
 
     val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
