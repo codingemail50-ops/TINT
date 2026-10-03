@@ -824,7 +824,7 @@ export const FocusScreen: React.FC<Props> = ({
                 <Path
                   d={TRACE_PATH}
                   fill="none"
-                  stroke={Colors.gray[500]}
+                  stroke={Colors.orange.DEFAULT}
                   strokeWidth={2.5}
                   strokeLinecap="round"
                   strokeDasharray={TRACE_LENGTH}
