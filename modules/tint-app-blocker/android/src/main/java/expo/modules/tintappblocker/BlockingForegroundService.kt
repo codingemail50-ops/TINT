@@ -84,6 +84,7 @@ class BlockingForegroundService : Service() {
     // background timer fires any tighter than this anyway.
     private const val POLL_INTERVAL_MS = 100L
     private const val LOOKBACK_MS = 10_000L
+    private const val QUERY_OVERLAP_MS = 3_000L
     // How long the overlay holds after a blocked app was last seen in front,
     // while what's in front now is the launcher/recents switcher or system
     // UI (see transitPackages). On gesture-nav phones the recents switcher
@@ -708,10 +709,19 @@ class BlockingForegroundService : Service() {
   // UsageStatsManager has no "what's in front right now" call — querying
   // recent foreground-transition events and taking the latest one is the
   // documented, standard way to approximate it.
+  // Last app seen coming to the front, kept across polls -- the 10s
+  // lookback alone forgot it once a bypassed blocked app had been open a
+  // while with no new events, so it was never re-blocked.
+  private var lastKnownForegroundPackage: String? = null
+  private var lastQueryEndMs = 0L
+
   private fun currentForegroundPackage(): String? {
     val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return null
     val end = System.currentTimeMillis()
-    val begin = end - LOOKBACK_MS
+    // Read from just before the last read (overlap catches events Android
+    // logs late) rather than a fixed window, so the last app opened is never
+    // forgotten just because nothing new happened for a while.
+    val begin = if (lastQueryEndMs > 0L) lastQueryEndMs - QUERY_OVERLAP_MS else end - LOOKBACK_MS
     val events = try {
       usm.queryEvents(begin, end)
     } catch (e: Exception) {
@@ -731,7 +741,9 @@ class BlockingForegroundService : Service() {
         lastPackage = event.packageName
       }
     }
-    return lastPackage
+    lastQueryEndMs = end
+    if (lastPackage != null) lastKnownForegroundPackage = lastPackage
+    return lastKnownForegroundPackage
   }
 
   // Plain LinearLayout doesn't consume the back button — unhandled, it falls
