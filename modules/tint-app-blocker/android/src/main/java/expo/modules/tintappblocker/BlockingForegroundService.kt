@@ -73,6 +73,8 @@ class BlockingForegroundService : Service() {
     const val ACTION_EMERGENCY_PAUSE = "expo.modules.tintappblocker.action.EMERGENCY_PAUSE"
     const val EXTRA_CHALLENGE = "expo.modules.tintappblocker.extra.CHALLENGE"
     const val EXTRA_PAUSE_MS = "expo.modules.tintappblocker.extra.PAUSE_MS"
+    const val EXTRA_START_AT_MS = "expo.modules.tintappblocker.extra.START_AT_MS"
+    private const val KEY_START_AT = "start_at_ms"
     private const val PREFS_NAME = "tint_challenge_blocking"
     private const val KEY_ACTIVE = "active"
     private const val KEY_PACKAGES = "packages"
@@ -385,6 +387,8 @@ class BlockingForegroundService : Service() {
   private var challengeMode: Boolean = false
   // Blocking is lifted until this time (the challenge's emergency button).
   private var emergencyUntilMs: Long = 0L
+  // A solo challenge can be set to begin later: nothing is blocked before this.
+  private var startAtMs: Long = 0L
   private var lastNotificationRefreshMs: Long = 0L
   // Which blocked package the overlay being shown is for (challenge stats).
   private var overlayForPackage: String? = null
@@ -512,7 +516,13 @@ class BlockingForegroundService : Service() {
       durationMins = intent?.getIntExtra(EXTRA_DURATION_MINS, 0) ?: 0
       isPaused = false
       challengeMode = intent?.getBooleanExtra(EXTRA_CHALLENGE, false) ?: false
-      emergencyUntilMs = 0L
+      startAtMs = if (challengeMode) intent?.getLongExtra(EXTRA_START_AT_MS, 0L) ?: 0L else 0L
+      // Re-arming the same challenge (TINT calls this on every open) must
+      // not cancel an emergency window that's still running.
+      val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+      emergencyUntilMs = if (challengeMode && prefs.getBoolean(KEY_ACTIVE, false) &&
+        prefs.getLong(KEY_END_AT, 0L) == endAtMs
+      ) prefs.getLong(KEY_EMERGENCY_UNTIL, 0L) else 0L
       if (challengeMode) persistChallenge()
     }
     try {
@@ -636,6 +646,13 @@ class BlockingForegroundService : Service() {
 
   // "6d 23h 59m" while there are days left, "5h 12m" on the last day.
   private fun formatChallengeTimeLeft(): String {
+    val now = System.currentTimeMillis()
+    if (now < startAtMs) {
+      val wait = startAtMs - now
+      val h = wait / 3_600_000L
+      val m = (wait % 3_600_000L) / 60_000L
+      return if (h > 0) "Starts in ${h}h ${m}m" else "Starts in ${m}m"
+    }
     val remaining = (endAtMs - System.currentTimeMillis()).coerceAtLeast(0L)
     val days = remaining / 86_400_000L
     val hours = (remaining % 86_400_000L) / 3_600_000L
@@ -757,7 +774,8 @@ class BlockingForegroundService : Service() {
       .putStringSet(KEY_PACKAGES, blockedPackages)
       .putLong(KEY_END_AT, endAtMs)
       .putString(KEY_TITLE, title)
-      .putLong(KEY_EMERGENCY_UNTIL, 0L)
+      .putLong(KEY_START_AT, startAtMs)
+      .putLong(KEY_EMERGENCY_UNTIL, emergencyUntilMs)
       .apply()
   }
 
@@ -781,6 +799,7 @@ class BlockingForegroundService : Service() {
     isPaused = false
     challengeMode = true
     emergencyUntilMs = prefs.getLong(KEY_EMERGENCY_UNTIL, 0L)
+    startAtMs = prefs.getLong(KEY_START_AT, 0L)
     return true
   }
 
@@ -810,8 +829,9 @@ class BlockingForegroundService : Service() {
     if (!updateForegroundState()) return
     val now = System.currentTimeMillis()
 
-    // Emergency window: state above keeps tracking, but nothing is covered.
-    if (now < emergencyUntilMs) {
+    // Not started yet, or an emergency window: state above keeps tracking,
+    // but nothing is covered.
+    if (now < startAtMs || now < emergencyUntilMs) {
       removeOverlay()
       return
     }

@@ -88,9 +88,9 @@ export function startAppBlocking(packageNames: string[], endAtMs: number, title:
 }
 
 /** Starts always-on blocking for a 7-day challenge (see the native module). */
-export function startChallengeAppBlocking(packageNames: string[], endAtMs: number, title: string): void {
+export function startChallengeAppBlocking(packageNames: string[], startAtMs: number, endAtMs: number, title: string): void {
   if (!isNativeBlockingAvailable()) return;
-  TintAppBlocker.startChallengeBlocking(packageNames, endAtMs, title);
+  TintAppBlocker.startChallengeBlocking(packageNames, startAtMs, endAtMs, title);
 }
 
 /** Per-day blocked-app open counts for the challenge report. */

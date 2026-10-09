@@ -60,8 +60,8 @@ class TintAppBlockerModule : Module() {
 
     // 7-day challenge: same blocking engine, but saved so it survives kills
     // and reboots, with a "6d 23h" notification and no pause button. Runs
-    // until endAtMs (or stopBlocking).
-    Function("startChallengeBlocking") { packageNames: List<String>, endAtMs: Double, title: String ->
+    // from startAtMs (0 = now) until endAtMs (or stopBlocking).
+    Function("startChallengeBlocking") { packageNames: List<String>, startAtMs: Double, endAtMs: Double, title: String ->
       val context = appContext.reactContext ?: return@Function Unit
       val intent = Intent(context, BlockingForegroundService::class.java).apply {
         action = BlockingForegroundService.ACTION_START
@@ -69,6 +69,7 @@ class TintAppBlockerModule : Module() {
         putExtra(BlockingForegroundService.EXTRA_END_AT_MS, endAtMs.toLong())
         putExtra(BlockingForegroundService.EXTRA_TITLE, title)
         putExtra(BlockingForegroundService.EXTRA_CHALLENGE, true)
+        putExtra(BlockingForegroundService.EXTRA_START_AT_MS, startAtMs.toLong())
       }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         context.startForegroundService(intent)
