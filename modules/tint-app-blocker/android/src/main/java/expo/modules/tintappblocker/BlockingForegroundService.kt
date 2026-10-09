@@ -692,16 +692,9 @@ class BlockingForegroundService : Service() {
         lastBlockedSeenAtMs = now
         showOverlay()
       }
-      // Recents switcher / launcher / system UI right after a blocked app:
-      // the reported bypass is a quick flick up into recents and back down
-      // into the blocked app. Keep the overlay up through that, so there's
-      // nothing to slip past on the way back.
-      transitPackages.contains(foregroundPackage) &&
-        now - lastBlockedSeenAtMs < TRANSIT_HOLD_MS -> {
-        // hold — leave the overlay exactly as it is
-      }
-      // A real, non-blocked app (or the launcher after the hold expired):
-      // drop the overlay right away, no lingering on top of WhatsApp etc.
+      // Anything that isn't a blocked app (home screen, recents, another
+      // app): drop the overlay right away, no lingering. A blocked app coming
+      // back to the front is caught by the branch above.
       else -> removeOverlay()
     }
   }
