@@ -516,7 +516,7 @@ class BlockingForegroundService : Service() {
       durationMins = intent?.getIntExtra(EXTRA_DURATION_MINS, 0) ?: 0
       isPaused = false
       challengeMode = intent?.getBooleanExtra(EXTRA_CHALLENGE, false) ?: false
-      startAtMs = if (challengeMode) intent?.getLongExtra(EXTRA_START_AT_MS, 0L) ?: 0L else 0L
+      startAtMs = if (challengeMode) (intent?.getLongExtra(EXTRA_START_AT_MS, 0L) ?: 0L) else 0L
       // Re-arming the same challenge (TINT calls this on every open) must
       // not cancel an emergency window that's still running.
       val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
