@@ -58,9 +58,13 @@ export interface MemberRow {
   joined_at: string;
   quit_at: string | null;
   last_seen_at: string | null;
+}
+
+/** Only the owner can read this (see challenge_member_private). Never
+ *  shown to squad members. */
+export interface MemberPrivate {
   emergency_used: number;
   baseline: UsageSnapshot | null;
-  report: unknown;
 }
 
 export interface UsageSnapshot {
@@ -212,7 +216,13 @@ export function challengeErrorMessage(err: unknown): string {
   return raw || 'Something went wrong. Try again.';
 }
 
-function toLocal(ch: ChallengeRow, member: MemberRow | null, uid: string | null, prev?: LocalChallenge | null): LocalChallenge {
+function toLocal(
+  ch: ChallengeRow,
+  member: MemberRow | null,
+  uid: string | null,
+  prev?: LocalChallenge | null,
+  priv?: MemberPrivate | null,
+): LocalChallenge {
   const startAtMs = ch.start_at ? Date.parse(ch.start_at) : null;
   const endAtMs = startAtMs !== null ? startAtMs + ch.days * DAY_MS : null;
   const same = prev && prev.id === ch.id ? prev : null;
@@ -229,9 +239,9 @@ function toLocal(ch: ChallengeRow, member: MemberRow | null, uid: string | null,
     startAtMs,
     endAtMs,
     apps: member?.apps ?? same?.apps ?? [],
-    emergencyUsed: Math.max(member?.emergency_used ?? 0, same?.emergencyUsed ?? 0),
+    emergencyUsed: Math.max(priv?.emergency_used ?? 0, same?.emergencyUsed ?? 0),
     emergencyUntilMs: same?.emergencyUntilMs ?? 0,
-    baselineSaved: !!member?.baseline || !!same?.baselineSaved,
+    baselineSaved: !!priv?.baseline || !!same?.baselineSaved,
     notificationsScheduled: same?.notificationsScheduled ?? false,
     quitDay: same?.quitDay ?? null,
   };
@@ -272,10 +282,29 @@ export async function leaveLobby(id: string): Promise<void> {
   await clearLocalChallenge();
 }
 
+const MEMBER_COLUMNS = 'challenge_id, user_id, name, avatar, apps, status, joined_at, quit_at, last_seen_at';
+
+/** This account's own private challenge data (null if none / offline). */
+export async function fetchMyPrivate(id: string): Promise<MemberPrivate | null> {
+  const uid = await currentUserId();
+  if (!uid) return null;
+  try {
+    const { data } = await supabase
+      .from('challenge_member_private')
+      .select('emergency_used, baseline')
+      .eq('challenge_id', id)
+      .eq('user_id', uid)
+      .maybeSingle();
+    return (data as MemberPrivate | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchMembers(id: string): Promise<MemberRow[]> {
   const { data, error } = await supabase
     .from('challenge_members')
-    .select('*')
+    .select(MEMBER_COLUMNS)
     .eq('challenge_id', id)
     .order('joined_at', { ascending: true });
   if (error) throw error;
@@ -299,7 +328,8 @@ export async function refreshChallenge(prev: LocalChallenge): Promise<LocalChall
     await clearLocalChallenge();
     return null;
   }
-  const local = toLocal(data as ChallengeRow, me, uid, prev);
+  const priv = await fetchMyPrivate(prev.id);
+  const local = toLocal(data as ChallengeRow, me, uid, prev, priv);
   await saveLocalChallenge(local);
   return local;
 }
@@ -311,15 +341,16 @@ export async function fetchMyLatestChallenge(): Promise<LocalChallenge | null> {
   if (!uid) return null;
   const { data, error } = await supabase
     .from('challenge_members')
-    .select('*, challenges(*)')
+    .select(`${MEMBER_COLUMNS}, challenges(*)`)
     .eq('user_id', uid)
     .order('joined_at', { ascending: false })
     .limit(1);
   if (error) throw error;
-  const row = (data ?? [])[0] as (MemberRow & { challenges: ChallengeRow | null }) | undefined;
+  const row = (data ?? [])[0] as unknown as (MemberRow & { challenges: ChallengeRow | null }) | undefined;
   if (!row || !row.challenges) return null;
   const prev = await loadLocalChallenge();
-  const local = toLocal(row.challenges, row, uid, prev);
+  const priv = await fetchMyPrivate(row.challenges.id);
+  const local = toLocal(row.challenges, row, uid, prev, priv);
   await saveLocalChallenge(local);
   return local;
 }
@@ -444,19 +475,7 @@ export async function saveBaselineIfNeeded(local: LocalChallenge): Promise<Local
 }
 
 export async function fetchMyBaseline(local: LocalChallenge): Promise<UsageSnapshot | null> {
-  const uid = await currentUserId();
-  if (!uid) return null;
-  try {
-    const { data } = await supabase
-      .from('challenge_members')
-      .select('baseline')
-      .eq('challenge_id', local.id)
-      .eq('user_id', uid)
-      .maybeSingle();
-    return (data?.baseline as UsageSnapshot | null) ?? null;
-  } catch {
-    return null;
-  }
+  return (await fetchMyPrivate(local.id))?.baseline ?? null;
 }
 
 export interface ChallengeReport {

@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as IntentLauncher from 'expo-intent-launcher';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { PixelIcon } from '../components/PixelIcon';
@@ -20,7 +21,7 @@ import {
 import { useHaptics } from '../hooks/useHaptics';
 import { confirmDeleteAccount, openPrivacyPolicy } from '../utils/accountDeletion';
 
-type Step = 'loading' | 'permissions' | 'choose' | 'solo' | 'squad' | 'create' | 'join' | 'lobby';
+type Step = 'loading' | 'disclosure' | 'permissions' | 'choose' | 'solo' | 'squad' | 'create' | 'join' | 'lobby';
 type StartChoice = 'now' | 'tonight' | 'tomorrow';
 
 interface Props {
@@ -30,6 +31,15 @@ interface Props {
 }
 
 const LOBBY_POLL_MS = 3000;
+const CONSENT_KEY = 'tint_lockin_consent_v1';
+
+async function hasConsent(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(CONSENT_KEY)) === 'yes';
+  } catch {
+    return false;
+  }
+}
 
 function startTimeFor(choice: StartChoice): number | null {
   if (choice === 'now') return null;
@@ -101,7 +111,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
         void begin(local);
         return;
       }
-      setStep(afterPermissions());
+      setStep((await hasConsent()) ? afterPermissions() : 'disclosure');
     })();
   }, [afterPermissions, begin]);
 
@@ -147,6 +157,14 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
       clearInterval(id);
     };
   }, [step, lobby, begin]);
+
+  const agree = async () => {
+    void buttonPress();
+    try {
+      await AsyncStorage.setItem(CONSENT_KEY, 'yes');
+    } catch {}
+    setStep(afterPermissions());
+  };
 
   const grant = async (permission: BlockingPermission) => {
     void buttonPress();
@@ -283,12 +301,32 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
     <View style={cs.screen}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={cs.content} keyboardShouldPersistTaps="handled">
+        {step === 'disclosure' && (
+          <>
+            <Eyebrow>Before you start</Eyebrow>
+            <Text style={cs.title}>How the 7 Day Lock In works</Text>
+            <View style={cs.card}>
+              <Text style={styles.discLine}>• <Text style={styles.discBold}>Blocking runs all day, for 7 days.</Text> Even when TINT isn't open, it keeps running in the background, with a notification that stays up. It restarts itself if your phone restarts.</Text>
+              <Text style={styles.discLine}>• <Text style={styles.discBold}>To do this, TINT watches which app is open.</Text> It uses Android's Usage access to see when one of the apps you picked is opened, and Display over other apps to cover it. TINT doesn't upload a list of your apps or what you open.</Text>
+              <Text style={styles.discLine}>• <Text style={styles.discBold}>What is saved to your account:</Text> how many times you tried to open each blocked app, each day. And, for those apps only, how many times and for how long you used them in the 7 days before you start. This is only used for your end-of-challenge report. Only you can see it.</Text>
+              <Text style={styles.discLine}>• <Text style={styles.discBold}>Squad members can see</Text> your username, avatar, the apps you picked, and whether you're still in.</Text>
+              <Text style={styles.discLine}>• <Text style={styles.discBold}>You're always in control.</Text> You get 2 emergency unlocks of 5 minutes, and you can leave the challenge any time. You can delete your account any time.</Text>
+            </View>
+            <PrimaryButton label="I agree, continue" onPress={() => void agree()} />
+            <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
+              <Text style={cs.link}>Read the privacy policy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={confirmLogout} hitSlop={8}>
+              <Text style={cs.link}>Not now</Text>
+            </TouchableOpacity>
+          </>
+        )}
+
         {step === 'permissions' && (
           <>
             <Eyebrow>Before you start</Eyebrow>
             <Text style={cs.title}>Let TINT block apps</Text>
-            <Text style={cs.sub}>Two Android settings. TINT uses them to see when one of the apps you pick is opened, and cover it with the block screen.</Text>
-            <Text style={cs.sub}>For your challenge report, TINT saves to your account how many times you opened those apps, and how much you used them in the week before you started. Nothing about any other app leaves your phone.</Text>
+            <Text style={cs.sub}>Two Android settings, as explained on the last screen. TINT uses them to see when one of your picked apps is opened, and cover it.</Text>
             <PermissionRow
               title="Usage access"
               body="Lets TINT see which app is open."
@@ -519,6 +557,8 @@ const styles = StyleSheet.create({
   },
   memberName: { flex: 1, fontSize: 15, fontFamily: Fonts.semibold, color: Colors.textPrimary },
   waiting: { textAlign: 'center' },
+  discLine: { fontSize: 14, lineHeight: 21, fontFamily: Fonts.regular, color: Colors.textSecondary },
+  discBold: { fontFamily: Fonts.bold, color: Colors.textPrimary },
   footerLinks: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, flexWrap: 'wrap' },
   danger: { color: Colors.danger },
 });
