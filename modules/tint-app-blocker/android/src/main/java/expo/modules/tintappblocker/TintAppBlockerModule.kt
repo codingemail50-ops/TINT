@@ -6,6 +6,9 @@ import android.content.Intent
 import android.os.Build
 import android.os.Process
 import android.provider.Settings
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
+import org.json.JSONObject
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -91,6 +94,21 @@ class TintAppBlockerModule : Module() {
       Unit
     }
 
+    // Per-day counts of how many times a blocked app was opened during a
+    // challenge: {"20261010": {"com.instagram.android": 12, ...}, ...}.
+    Function("getChallengeBlockStats") {
+      val context = appContext.reactContext ?: return@Function "{}"
+      readChallengeBlockStats(context)
+    }
+
+    // Real usage of the given apps between two times, from Android's own
+    // usage log (it only keeps about a week, so the challenge takes the
+    // "before" snapshot when it starts): {"pkg": {"opens": n, "foregroundMs": ms}}.
+    Function("getUsageSummary") { packageNames: List<String>, fromMs: Double, toMs: Double ->
+      val context = appContext.reactContext ?: return@Function "{}"
+      computeUsageSummary(context, packageNames.toSet(), fromMs.toLong(), toMs.toLong())
+    }
+
     Function("stopBlocking") {
       val context = appContext.reactContext ?: return@Function Unit
       val intent = Intent(context, BlockingForegroundService::class.java).apply {
@@ -142,6 +160,81 @@ class TintAppBlockerModule : Module() {
       }
     }
   }
+}
+
+internal fun readChallengeBlockStats(context: Context): String {
+  val result = JSONObject()
+  try {
+    val prefs = context.getSharedPreferences(
+      BlockingForegroundService.STATS_PREFS_NAME, Context.MODE_PRIVATE
+    )
+    val prefix = BlockingForegroundService.STATS_KEY_PREFIX
+    for ((key, value) in prefs.all) {
+      if (!key.startsWith(prefix) || value !is Int) continue
+      val rest = key.substring(prefix.length)
+      val sep = rest.indexOf('_')
+      if (sep <= 0) continue
+      val day = rest.substring(0, sep)
+      val pkg = rest.substring(sep + 1)
+      val perDay = result.optJSONObject(day) ?: JSONObject().also { result.put(day, it) }
+      perDay.put(pkg, value)
+    }
+  } catch (e: Exception) {
+    // Best-effort.
+  }
+  return result.toString()
+}
+
+// Event types by their fixed Android values (the named constants differ by
+// API level but the numbers are the same): 1 = came to front, 2 = went to
+// background / paused, 23 = stopped.
+internal fun computeUsageSummary(
+  context: Context,
+  packages: Set<String>,
+  fromMs: Long,
+  toMs: Long
+): String {
+  val opens = HashMap<String, Int>()
+  val foreground = HashMap<String, Long>()
+  try {
+    val usm = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+    val events = usm?.queryEvents(fromMs, toMs)
+    if (events != null) {
+      val event = UsageEvents.Event()
+      val resumedAt = HashMap<String, Long>()
+      while (events.hasNextEvent()) {
+        events.getNextEvent(event)
+        val pkg = event.packageName ?: continue
+        if (!packages.contains(pkg)) continue
+        val key = pkg + "/" + (event.className ?: "")
+        when (event.eventType) {
+          1 -> {
+            if (resumedAt.keys.none { it.startsWith("$pkg/") }) {
+              opens[pkg] = (opens[pkg] ?: 0) + 1
+            }
+            resumedAt[key] = event.timeStamp
+          }
+          2, 23 -> {
+            val start = resumedAt.remove(key)
+            if (start != null) {
+              foreground[pkg] = (foreground[pkg] ?: 0L) + (event.timeStamp - start).coerceAtLeast(0L)
+            }
+          }
+        }
+      }
+      for ((key, start) in resumedAt) {
+        val pkg = key.substringBefore("/")
+        foreground[pkg] = (foreground[pkg] ?: 0L) + (toMs - start).coerceAtLeast(0L)
+      }
+    }
+  } catch (e: Exception) {
+    // Best-effort: fall through with whatever was gathered.
+  }
+  val result = JSONObject()
+  for (pkg in packages) {
+    result.put(pkg, JSONObject().put("opens", opens[pkg] ?: 0).put("foregroundMs", foreground[pkg] ?: 0L))
+  }
+  return result.toString()
 }
 
 internal fun hasUsageAccessPermission(context: Context): Boolean {

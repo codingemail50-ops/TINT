@@ -14,6 +14,8 @@ type TintAppBlockerNativeModule = {
   startBlocking(packageNames: string[], endAtMs: number, title: string, durationMins: number): void;
   startChallengeBlocking(packageNames: string[], endAtMs: number, title: string): void;
   emergencyPause(durationMs: number): void;
+  getChallengeBlockStats(): string;
+  getUsageSummary(packageNames: string[], fromMs: number, toMs: number): string;
   stopBlocking(): void;
   setPaused(paused: boolean, endAtMs: number): void;
   hasUsageAccess(): boolean;
@@ -47,6 +49,30 @@ export function startChallengeBlocking(packageNames: string[], endAtMs: number, 
 /** Lifts blocking for `durationMs`, then it resumes on its own. */
 export function emergencyPause(durationMs: number): void {
   NativeModule?.emergencyPause(durationMs);
+}
+
+/** Per-day counts of blocked-app opens during a challenge, as
+ *  {"yyyyMMdd": {"<package>": count}}. Empty object when unavailable. */
+export function getChallengeBlockStats(): Record<string, Record<string, number>> {
+  try {
+    return JSON.parse(NativeModule?.getChallengeBlockStats() ?? '{}');
+  } catch {
+    return {};
+  }
+}
+
+/** Real opens + foreground time of the given apps between two timestamps,
+ *  from Android's usage log (only about a week is kept). */
+export function getUsageSummary(
+  packageNames: string[],
+  fromMs: number,
+  toMs: number
+): Record<string, { opens: number; foregroundMs: number }> {
+  try {
+    return JSON.parse(NativeModule?.getUsageSummary(packageNames, fromMs, toMs) ?? '{}');
+  } catch {
+    return {};
+  }
 }
 
 /** Stops polling, removes any visible overlay, and stops the service. */

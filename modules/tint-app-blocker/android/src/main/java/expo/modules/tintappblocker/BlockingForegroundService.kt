@@ -80,6 +80,11 @@ class BlockingForegroundService : Service() {
     private const val KEY_TITLE = "title"
     private const val KEY_EMERGENCY_UNTIL = "emergency_until_ms"
     private const val NOTIFICATION_REFRESH_MS = 60_000L
+    // Separate file from the challenge config above: that one is wiped when a
+    // challenge stops, but the per-day "blocked app opened" counts are what
+    // the end-of-challenge report is built from, so they must outlive it.
+    const val STATS_PREFS_NAME = "tint_challenge_stats"
+    const val STATS_KEY_PREFIX = "opens_"
 
     /** True if a 7-day challenge is saved and hasn't ended yet. */
     fun hasActiveChallenge(context: Context): Boolean {
@@ -380,6 +385,8 @@ class BlockingForegroundService : Service() {
   // Blocking is lifted until this time (the challenge's emergency button).
   private var emergencyUntilMs: Long = 0L
   private var lastNotificationRefreshMs: Long = 0L
+  // Which blocked package the overlay being shown is for (challenge stats).
+  private var overlayForPackage: String? = null
   private var overlayView: View? = null
   private var windowManager: WindowManager? = null
   private var ownPackageName: String = ""
@@ -729,6 +736,20 @@ class BlockingForegroundService : Service() {
     pollRunnable = null
   }
 
+  // One tap on a blocked app = one more "urge" for that day, counted only
+  // when a fresh block screen actually goes up (not on every poll).
+  private fun recordBlockedOpen(pkg: String?) {
+    if (pkg == null) return
+    try {
+      val day = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())
+      val prefs = getSharedPreferences(STATS_PREFS_NAME, Context.MODE_PRIVATE)
+      val key = STATS_KEY_PREFIX + day + "_" + pkg
+      prefs.edit().putInt(key, prefs.getInt(key, 0) + 1).apply()
+    } catch (e: Exception) {
+      // Stats are best-effort; never let them affect blocking.
+    }
+  }
+
   private fun persistChallenge() {
     getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
       .putBoolean(KEY_ACTIVE, true)
@@ -804,6 +825,7 @@ class BlockingForegroundService : Service() {
       }
       blockedAppOpen -> {
         lastBlockedSeenAtMs = now
+        overlayForPackage = resumedActivities.values.firstOrNull { blockedPackages.contains(it) }
         showOverlay()
       }
       // The blocked app really went away (home screen, another app):
@@ -995,6 +1017,7 @@ class BlockingForegroundService : Service() {
     try {
       wm.addView(layout, params)
       overlayView = layout
+      if (challengeMode) recordBlockedOpen(overlayForPackage)
       layout.requestFocus()
       requestAudioFocus()
     } catch (e: Exception) {

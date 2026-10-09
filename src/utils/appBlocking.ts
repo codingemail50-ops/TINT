@@ -93,6 +93,22 @@ export function startChallengeAppBlocking(packageNames: string[], endAtMs: numbe
   TintAppBlocker.startChallengeBlocking(packageNames, endAtMs, title);
 }
 
+/** Per-day blocked-app open counts for the challenge report. */
+export function getChallengeBlockStats(): Record<string, Record<string, number>> {
+  if (!isNativeBlockingAvailable()) return {};
+  return TintAppBlocker.getChallengeBlockStats();
+}
+
+/** Real usage of apps between two times (used for the before/after report). */
+export function getUsageSummary(
+  packageNames: string[],
+  fromMs: number,
+  toMs: number
+): Record<string, { opens: number; foregroundMs: number }> {
+  if (!isNativeBlockingAvailable()) return {};
+  return TintAppBlocker.getUsageSummary(packageNames, fromMs, toMs);
+}
+
 /** The challenge's emergency button: lifts blocking for `durationMs`. */
 export function emergencyPauseBlocking(durationMs: number): void {
   if (!isNativeBlockingAvailable()) return;
