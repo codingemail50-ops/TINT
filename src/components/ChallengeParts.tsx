@@ -7,6 +7,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, ActivityInd
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { BLOCKABLE_APPS } from '../data/blockableApps';
+import Svg, { Rect } from 'react-native-svg';
+import { buildBonfireStage, BONFIRE_STAGE_COUNT } from './pixelBonfireStages';
 
 export const PrimaryButton: React.FC<{
   label: string;
@@ -70,6 +72,44 @@ export const DayProgressBar: React.FC<{ days: number; fraction: number }> = ({ d
           </View>
         );
       })}
+    </View>
+  );
+};
+
+// Day -> bonfire size and color, like the Today screen's bonfire: a small
+// dark flame on day 1, the biggest and brightest on day 7.
+const DAY_STAGE = [3, 3, 4, 4, 5, 5, 6];
+const DAY_PALETTE = ['lockinDim', 'lockinDim', 'lockinMid', 'lockinMid', 'lockinMid', 'lockin', 'lockin'];
+const TALLEST_ROWS = (() => {
+  const def = buildBonfireStage(BONFIRE_STAGE_COUNT, 'lockin');
+  return def.rows - Math.min(...def.cells.map(c => c.y));
+})();
+
+/** The Lock In bonfire for a given day (1-7; 0 = not started, shown as day 1). */
+export const LockInBonfire: React.FC<{ day: number; maxHeight?: number }> = ({ day, maxHeight = 56 }) => {
+  const i = Math.min(6, Math.max(0, day - 1));
+  const def = React.useMemo(() => buildBonfireStage(DAY_STAGE[i], DAY_PALETTE[i]), [i]);
+  const minY = React.useMemo(() => Math.min(...def.cells.map(c => c.y)), [def]);
+  const cropRows = def.rows - minY;
+  const scale = maxHeight / TALLEST_ROWS;
+  const breathe = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(breathe, { toValue: 1.05, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(breathe, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [breathe]);
+  return (
+    <View style={{ height: maxHeight, justifyContent: 'flex-end', alignItems: 'center' }}>
+      <Animated.View style={{ transform: [{ scale: breathe }] }}>
+        <Svg width={scale * def.cols} height={scale * cropRows} viewBox={`0 ${minY} ${def.cols} ${cropRows}`}>
+          {def.cells.map((c, k) => (
+            <Rect key={k} x={c.x} y={c.y} width={1} height={1} fill={c.color} />
+          ))}
+        </Svg>
+      </Animated.View>
     </View>
   );
 };

@@ -76,6 +76,27 @@ export function progressLine(day: number): string {
   }
 }
 
+/** Wording for the completion screen. Each person is assigned one (see
+ *  getWinVariant in utils/challenge.ts) and keeps it. Only the words vary. */
+export const WIN_VARIANTS: { headline: string; line: string }[] = [
+  {
+    headline: 'YOU SAID YOU WOULD. YOU DID.',
+    line: 'You kept a promise to yourself for seven straight days. Let that sink in.',
+  },
+  {
+    headline: 'YOU PROVED IT TO YOURSELF.',
+    line: "Seven days. Locked in. You showed yourself what you're capable of.",
+  },
+  {
+    headline: 'YOU HAD THE URGE. YOU HAD THE CONTROL.',
+    line: "Seven days of choosing differently. That's a win worth celebrating.",
+  },
+  {
+    headline: 'SEVEN DAYS. NO EXCUSES. ALL YOU.',
+    line: 'Nobody did it for you. You showed up every single day.',
+  },
+];
+
 export interface ChallengeNotificationCopy { title: string; body: string }
 
 /** Morning and evening local notifications, per day. */

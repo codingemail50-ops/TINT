@@ -10,10 +10,10 @@ import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { PixelIcon } from '../components/PixelIcon';
 import { PixelFlame } from '../components/PixelFlame';
 import {
-  DayProgressBar, Eyebrow, HoldToConfirm, PrimaryButton, SecondaryButton, useNow, challengeStyles as cs,
+  DayProgressBar, Eyebrow, HoldToConfirm, LockInBonfire, PrimaryButton, SecondaryButton, useNow, challengeStyles as cs,
 } from '../components/ChallengeParts';
 import { BLOCKABLE_APPS, packageNamesFor } from '../data/blockableApps';
-import { quoteFor, progressLine } from '../data/challengeMessages';
+import { quoteFor, progressLine, WIN_VARIANTS } from '../data/challengeMessages';
 import { checkPermission, isNativeBlockingAvailable, stopAppBlocking } from '../utils/appBlocking';
 import {
   LocalChallenge, MemberRow, UsageSnapshot, EMERGENCY_LIMIT, EMERGENCY_MS,
@@ -21,7 +21,7 @@ import {
   touchChallenge, onChallengeRunning, armChallengeBlocking, uploadChallengeStats, triggerEmergency, quitChallenge,
   serverNow, hasStarted, dayNumber, daysCompleted, progressFraction, formatTimeLeft,
   urgesToday, urgesTotal, urgesByApp, fetchMyBaseline, saveReport, clearLocalChallenge,
-  cancelChallengeNotifications, challengeErrorMessage,
+  cancelChallengeNotifications, challengeErrorMessage, getWinVariant,
 } from '../utils/challenge';
 import { useHaptics } from '../hooks/useHaptics';
 
@@ -70,6 +70,7 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade }) =
   const [blockingOk, setBlockingOk] = useState(true);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [winVariant, setWinVariant] = useState<number | null>(null);
   const tick = useNow(1000);
   const { buttonPress } = useHaptics();
   const cardRef = useRef<View>(null);
@@ -141,6 +142,12 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade }) =
       void refresh();
     }
   }, [tick, local, refresh]);
+
+  // Completion wording: assigned once per person, then always the same.
+  useEffect(() => {
+    if (local?.status !== 'done' || winVariant !== null) return;
+    void getWinVariant(WIN_VARIANTS.length).then(setWinVariant);
+  }, [local?.status, winVariant]);
 
   // Save the final report once.
   useEffect(() => {
@@ -252,17 +259,27 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade }) =
     const beforeApps = baseline ? Object.entries(baseline.apps) : [];
     const beforeOpens = beforeApps.reduce((a, [, v]) => a + v.opens, 0);
     const beforeTime = beforeApps.reduce((a, [, v]) => a + v.foregroundMs, 0);
+    if (winVariant === null) {
+      return (
+        <View style={[cs.screen, styles.center]}>
+          <StatusBar style="light" />
+          <ActivityIndicator color={Colors.pop} />
+        </View>
+      );
+    }
+    const wording = WIN_VARIANTS[winVariant];
     return (
       <View style={cs.screen}>
         <StatusBar style="light" />
         <ScrollView contentContainerStyle={cs.content}>
           <View ref={cardRef} collapsable={false} style={[cs.card, styles.reportCard]}>
-            <PixelFlame size={96} state="flicker" intensity="pop" />
+            <PixelFlame size={96} state="flicker" intensity="lockin" />
             <Eyebrow>7 Day Lock In · Complete</Eyebrow>
-            <Text style={styles.reportTitle}>7 days. Locked in.</Text>
+            <Text style={styles.reportTitle}>{wording.headline}</Text>
+            <Text style={styles.reportLine}>{wording.line}</Text>
             <View style={styles.bigStatRow}>
-              <BigStat value={String(total)} label="urges resisted" />
-              <BigStat value={String(local.emergencyUsed)} label="emergency unlocks" />
+              <BigStat value={`${local.days}/${local.days}`} label="days completed" />
+              <BigStat value={String(total)} label="blocked attempts" />
             </View>
             {byApp.slice(0, 3).map(([pkg, n]) => (
               <Text key={pkg} style={styles.reportLine}>You tried to open {appLabel(pkg)} {n} time{n === 1 ? '' : 's'}.</Text>
@@ -273,8 +290,9 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade }) =
               </Text>
             )}
           </View>
-          <PrimaryButton label="Share" onPress={() => void share()} loading={sharing} />
-          <SecondaryButton label="Keep going with TINT for studying" onPress={onUpgrade} />
+          <PrimaryButton label="SHARE YOUR WIN" onPress={() => void share()} loading={sharing} />
+          <Text style={[cs.sub, styles.momentum]}>Turn this momentum into something more.</Text>
+          <SecondaryButton label="KEEP THE MOMENTUM" onPress={onUpgrade} />
           <TouchableOpacity onPress={() => void goAgain()} hitSlop={8}>
             <Text style={cs.link}>Do another 7 days</Text>
           </TouchableOpacity>
@@ -306,11 +324,14 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade }) =
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={cs.content}>
         <Eyebrow>7 Day Lock In</Eyebrow>
-        {started ? (
-          <Text style={styles.dayTitle}>Day {day} <Text style={styles.dayOf}>of {local.days}</Text></Text>
-        ) : (
-          <Text style={styles.dayTitle}>Starts in {formatTimeLeft((local.startAtMs ?? now) - now)}</Text>
-        )}
+        <View style={styles.titleRow}>
+          {started ? (
+            <Text style={[styles.dayTitle, styles.titleText]}>Day {day} <Text style={styles.dayOf}>of {local.days}</Text></Text>
+          ) : (
+            <Text style={[styles.dayTitle, styles.titleText]}>Starts in {formatTimeLeft((local.startAtMs ?? now) - now)}</Text>
+          )}
+          <LockInBonfire day={Math.max(1, day)} maxHeight={64} />
+        </View>
 
         <View style={styles.progressBlock}>
           <DayProgressBar days={local.days} fraction={progressFraction(local, now)} />
@@ -404,6 +425,9 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
   dayTitle: { fontFamily: Fonts.pixel, fontSize: 56, color: Colors.textPrimary, letterSpacing: 0.5, marginTop: -Spacing.sm },
   dayOf: { fontSize: 32, color: Colors.textMuted },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm },
+  titleText: { flexShrink: 1 },
+  momentum: { textAlign: 'center', marginBottom: -Spacing.sm },
   progressBlock: { gap: Spacing.sm },
   statRow: { flexDirection: 'row', gap: 8 },
   smallStat: { flex: 1, padding: Spacing.md, gap: 4, alignItems: 'flex-start' },

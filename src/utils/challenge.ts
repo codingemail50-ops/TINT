@@ -32,6 +32,7 @@ export const DEFAULT_CHALLENGE_APPS = ['instagram', 'youtube', 'snapchat', 'face
 const DAY_MS = 86_400_000;
 const LOCAL_KEY = 'tint_challenge_local';
 const NOTIFICATION_PREFIX = 'tint-challenge-';
+const WIN_VARIANT_KEY = 'tint_lockin_win_variant_';
 
 export type ChallengeMode = 'solo' | 'squad';
 export type LocalStatus = 'lobby' | 'active' | 'quit' | 'done';
@@ -470,6 +471,34 @@ export async function saveReport(local: LocalChallenge, report: ChallengeReport)
   try {
     await supabase.rpc('save_challenge_member_data', { p_id: local.id, p_report: report });
   } catch {}
+}
+
+/** Which completion-screen wording this person gets, 0..count-1. Picked
+ *  once and then kept: from their account id when there is one (so it's the
+ *  same after a reinstall, and spread evenly across people), else at random.
+ *  Saved on the phone either way. */
+export async function getWinVariant(count: number): Promise<number> {
+  const uid = await currentUserId();
+  const key = WIN_VARIANT_KEY + (uid ?? 'anon');
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    if (raw !== null) {
+      const saved = Number(raw);
+      if (Number.isInteger(saved) && saved >= 0 && saved < count) return saved;
+    }
+  } catch {}
+  let picked: number;
+  if (uid) {
+    let h = 0;
+    for (let i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) >>> 0;
+    picked = h % count;
+  } else {
+    picked = Math.floor(Math.random() * count);
+  }
+  try {
+    await AsyncStorage.setItem(key, String(picked));
+  } catch {}
+  return picked;
 }
 
 // ── notifications ───────────────────────────────────────────────────────

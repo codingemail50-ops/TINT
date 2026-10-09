@@ -150,4 +150,11 @@ export const FLAME_PALETTES: Record<string, FlamePalette> = {
   // idea as Opal's gold/black and blue/ice egg re-skins.
   gold:    { outline: '#1A1204', shades: ['#5C4308', '#A67C0E', '#E0A81A', '#FFE694'] },
   ice:     { outline: '#08151F', shades: ['#1D4E6E', '#3A87B0', '#7FC4E0', '#EAF8FF'] },
+  // 7 Day Lock In fire, from one ramp: deep brown #782401 outline, then dark
+  // orange #A03201, burnt orange #C44301, main orange #F45F01, bright orange
+  // #FB7E18, light orange #FCC268, hot core #FDE0B0. Early days burn darker,
+  // the last days brightest; 'lockin' (brightest) is the full flame.
+  lockinDim: { outline: '#782401', shades: ['#A03201', '#C44301', '#F45F01', '#FB7E18'] },
+  lockinMid: { outline: '#782401', shades: ['#C44301', '#F45F01', '#FB7E18', '#FCC268'] },
+  lockin:    { outline: '#782401', shades: ['#F45F01', '#FB7E18', '#FCC268', '#FDE0B0'] },
 };
