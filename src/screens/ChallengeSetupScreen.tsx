@@ -81,7 +81,13 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout }) =
     void (async () => {
       let local = await loadLocalChallenge();
       try {
-        local = (await fetchMyLatestChallenge()) ?? local;
+        // Bounded: on a bad connection the request can retry for a long
+        // time, and this screen would sit on a spinner.
+        const fetched = await Promise.race([
+          fetchMyLatestChallenge(),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 10_000)),
+        ]);
+        local = fetched ?? local;
       } catch {}
       if (local?.status === 'lobby') {
         setLobby(local);

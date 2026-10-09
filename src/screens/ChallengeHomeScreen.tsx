@@ -136,9 +136,13 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade }) =
     return () => clearInterval(id);
   }, [local?.id, local?.mode]);
 
-  // The moment the 7 days run out while the screen is open.
+  // The moment the 7 days run out while the screen is open (once, not on
+  // every tick while the refresh is still in flight).
+  const finishRefreshRef = useRef<string | null>(null);
   useEffect(() => {
-    if (local?.status === 'active' && local.endAtMs !== null && serverNow() >= local.endAtMs) {
+    if (local?.status === 'active' && local.endAtMs !== null && serverNow() >= local.endAtMs
+      && finishRefreshRef.current !== local.id) {
+      finishRefreshRef.current = local.id;
       void refresh();
     }
   }, [tick, local, refresh]);

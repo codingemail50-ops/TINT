@@ -82,6 +82,7 @@ class BlockingForegroundService : Service() {
     private const val KEY_TITLE = "title"
     private const val KEY_EMERGENCY_UNTIL = "emergency_until_ms"
     private const val NOTIFICATION_REFRESH_MS = 60_000L
+    private const val SAME_CHALLENGE_SLACK_MS = 10 * 60_000L
     // Separate file from the challenge config above: that one is wiped when a
     // challenge stops, but the per-day "blocked app opened" counts are what
     // the end-of-challenge report is built from, so they must outlive it.
@@ -505,6 +506,14 @@ class BlockingForegroundService : Service() {
     val restoring = intent == null || intent.action == ACTION_RESTORE
     val restored = restoring && loadPersistedChallenge()
     if (intent?.action == ACTION_RESTORE && !restored) {
+      // Started with startForegroundService (BootReceiver), so Android
+      // requires startForeground before stopping, or it crashes the app.
+      try {
+        startForeground(NOTIFICATION_ID, buildNotification())
+        @Suppress("DEPRECATION")
+        stopForeground(true)
+      } catch (e: Exception) {
+      }
       stopSelf()
       return START_NOT_STICKY
     }
@@ -520,8 +529,10 @@ class BlockingForegroundService : Service() {
       // Re-arming the same challenge (TINT calls this on every open) must
       // not cancel an emergency window that's still running.
       val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+      // Same challenge = same end time, give or take the app's clock
+      // correction (a few seconds), so allow some slack.
       emergencyUntilMs = if (challengeMode && prefs.getBoolean(KEY_ACTIVE, false) &&
-        prefs.getLong(KEY_END_AT, 0L) == endAtMs
+        Math.abs(prefs.getLong(KEY_END_AT, 0L) - endAtMs) < SAME_CHALLENGE_SLACK_MS
       ) prefs.getLong(KEY_EMERGENCY_UNTIL, 0L) else 0L
       if (challengeMode) persistChallenge()
     }
@@ -1009,7 +1020,11 @@ class BlockingForegroundService : Service() {
       gravity = Gravity.CENTER
     })
     layout.addView(TextView(this).apply {
-      text = "This app is paused until your session ends."
+      text = if (challengeMode) {
+        "Blocked for your 7 Day Lock In. You've got this."
+      } else {
+        "This app is paused until your session ends."
+      }
       textSize = 14f
       setTextColor(0xFFAAAAAA.toInt())
       gravity = Gravity.CENTER

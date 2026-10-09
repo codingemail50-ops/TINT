@@ -591,6 +591,17 @@ const AppNavigatorInner: React.FC = () => {
         return;
       }
     }
+    // New Google account that came in through the 7 Day Lock In button:
+    // it already picked an avatar, so treat this like finishing signup
+    // instead of sending it back to the avatar/exam screen.
+    if (googleEmail && draftRef.current.challengePath) {
+      handleSignedUp({
+        name: googleEmail.split('@')[0] || 'Friend',
+        email: googleEmail,
+        userId: userIdRef.current ?? undefined,
+      });
+      return;
+    }
     // Logged in but no cloud profile row yet — run through the same
     // onboarding a brand-new signup goes through, starting from avatar/exam.
     if (googleEmail) draftRef.current.email = googleEmail;
