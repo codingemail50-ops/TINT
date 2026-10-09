@@ -14,6 +14,7 @@ import { FriendsPanel } from '../components/FriendsPanel';
 import { saveFocusLog, saveBestFlameMins } from '../utils/focusLog';
 import { saveDistractionLog } from '../utils/distractionLog';
 import { clearActiveSession } from '../utils/activeFocusSession';
+import { confirmDeleteAccount, openPrivacyPolicy } from '../utils/accountDeletion';
 import { supabase } from '../lib/supabase';
 import { FocusGoalScreen } from './FocusGoalScreen';
 import { CustomExamModal } from '../components/CustomExamModal';
@@ -199,6 +200,15 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
           <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
           <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>
+
+        <View style={styles.accountLinks}>
+          <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
+            <Text style={styles.accountLink}>Privacy policy</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => confirmDeleteAccount(onLogout)} hitSlop={8}>
+            <Text style={[styles.accountLink, styles.accountLinkDanger]}>Delete account</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={{ height: 60 }} />
         </ScrollView>
@@ -406,6 +416,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.danger + '55', paddingVertical: 14, marginTop: Spacing.lg,
   },
   logoutText: { fontSize: 15, fontFamily: Fonts.semibold, color: Colors.danger },
+  accountLinks: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.xl, marginTop: Spacing.lg },
+  accountLink: { fontSize: 13, fontFamily: Fonts.medium, color: Colors.textSecondary },
+  accountLinkDanger: { color: Colors.danger },
 
   confirmBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   confirmCard: {

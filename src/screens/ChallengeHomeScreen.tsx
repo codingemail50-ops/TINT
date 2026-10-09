@@ -23,12 +23,14 @@ import {
   cancelChallengeNotifications, challengeErrorMessage, getWinVariant,
 } from '../utils/challenge';
 import { useHaptics } from '../hooks/useHaptics';
+import { confirmDeleteAccount, openPrivacyPolicy } from '../utils/accountDeletion';
 
 interface Props {
   /** No challenge on this account, or they chose to go again. */
   onRestart: () => void;
   /** Finished (or left) and wants regular TINT for studying. */
   onUpgrade: () => void;
+  onAccountDeleted: () => void;
 }
 
 const MEMBER_POLL_MS = 15_000;
@@ -62,7 +64,7 @@ function formatClock(ms: number): string {
 // The running 7 Day Lock In: day X of 7, the progress bar, time left,
 // urges resisted, a quote for where they are in the week, the squad, the
 // emergency unlock, and leaving. Also the finished and left screens.
-export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade }) => {
+export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onAccountDeleted }) => {
   const [local, setLocal] = useState<LocalChallenge | null>(null);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [baseline, setBaseline] = useState<UsageSnapshot | null>(null);
@@ -299,6 +301,14 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade }) =
           <TouchableOpacity onPress={() => void goAgain()} hitSlop={8}>
             <Text style={cs.link}>Do another 7 days</Text>
           </TouchableOpacity>
+          <View style={styles.footerLinks}>
+            <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
+              <Text style={cs.link}>Privacy policy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => confirmDeleteAccount(onAccountDeleted)} hitSlop={8}>
+              <Text style={[cs.link, styles.danger]}>Delete account</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </View>
     );
@@ -315,6 +325,14 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade }) =
           <Text style={cs.sub}>Every hour you held counts. You resisted {total} urge{total === 1 ? '' : 's'}. Try again when you're ready.</Text>
           <PrimaryButton label="Start again" onPress={() => void goAgain()} />
           <SecondaryButton label="Use TINT for studying" onPress={onUpgrade} />
+          <View style={styles.footerLinks}>
+            <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
+              <Text style={cs.link}>Privacy policy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => confirmDeleteAccount(onAccountDeleted)} hitSlop={8}>
+              <Text style={[cs.link, styles.danger]}>Delete account</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </View>
     );
@@ -392,6 +410,14 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade }) =
         <TouchableOpacity onPress={pressLeave} hitSlop={8}>
           <Text style={cs.link}>Leave challenge</Text>
         </TouchableOpacity>
+        <View style={styles.footerLinks}>
+          <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
+            <Text style={cs.link}>Privacy policy</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => confirmDeleteAccount(onAccountDeleted)} hitSlop={8}>
+            <Text style={[cs.link, styles.danger]}>Delete account</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       <Modal visible={leaveOpen} transparent animationType="fade" onRequestClose={() => setLeaveOpen(false)}>
@@ -440,6 +466,8 @@ const styles = StyleSheet.create({
   warning: { borderColor: Colors.danger },
   warningText: { fontSize: 13, lineHeight: 19, fontFamily: Fonts.medium, color: Colors.danger },
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 4 },
+  footerLinks: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginTop: Spacing.md },
+  danger: { color: Colors.danger },
   memberAvatar: {
     width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surfaceElevated,
     alignItems: 'center', justifyContent: 'center',

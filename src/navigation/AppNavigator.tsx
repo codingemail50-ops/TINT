@@ -701,12 +701,14 @@ const AppNavigatorInner: React.FC = () => {
             <ChallengeSetupScreen
               onStarted={() => setScreen('challengeHome')}
               onLogout={() => void handleChallengeLogout()}
+              onAccountDeleted={handleLogout}
             />
           )}
           {screen === 'challengeHome' && (
             <ChallengeHomeScreen
               onRestart={() => setScreen('challengeSetup')}
               onUpgrade={handleUpgradeFromChallenge}
+              onAccountDeleted={handleLogout}
             />
           )}
           {screen === 'createAccount' && (

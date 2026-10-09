@@ -18,6 +18,7 @@ import {
   fetchMyLatestChallenge, loadLocalChallenge, challengeErrorMessage, onChallengeRunning,
 } from '../utils/challenge';
 import { useHaptics } from '../hooks/useHaptics';
+import { confirmDeleteAccount, openPrivacyPolicy } from '../utils/accountDeletion';
 
 type Step = 'loading' | 'permissions' | 'choose' | 'solo' | 'squad' | 'create' | 'join' | 'lobby';
 type StartChoice = 'now' | 'tonight' | 'tomorrow';
@@ -25,6 +26,7 @@ type StartChoice = 'now' | 'tonight' | 'tomorrow';
 interface Props {
   onStarted: (local: LocalChallenge) => void;
   onLogout: () => void;
+  onAccountDeleted: () => void;
 }
 
 const LOBBY_POLL_MS = 3000;
@@ -50,7 +52,7 @@ function permissionsReady(): boolean {
 // Everything between the intro slides and the running challenge: the two
 // permissions blocking needs, solo vs squad, picking apps, and the squad
 // lobby (code, live member list, Start).
-export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout }) => {
+export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onAccountDeleted }) => {
   const [step, setStep] = useState<Step>('loading');
   const [apps, setApps] = useState<string[]>(DEFAULT_CHALLENGE_APPS);
   const [startChoice, setStartChoice] = useState<StartChoice>('now');
@@ -285,7 +287,8 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout }) =
           <>
             <Eyebrow>Before you start</Eyebrow>
             <Text style={cs.title}>Let TINT block apps</Text>
-            <Text style={cs.sub}>Two Android settings. TINT only uses them to see when a blocked app opens and cover it.</Text>
+            <Text style={cs.sub}>Two Android settings. TINT uses them to see when one of the apps you pick is opened, and cover it with the block screen.</Text>
+            <Text style={cs.sub}>For your challenge report, TINT saves to your account how many times you opened those apps, and how much you used them in the week before you started. Nothing about any other app leaves your phone.</Text>
             <PermissionRow
               title="Usage access"
               body="Lets TINT see which app is open."
@@ -329,9 +332,17 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout }) =
               body={`Up to ${MAX_SQUAD} friends, one code.`}
               onPress={() => { void buttonPress(); setStep('squad'); }}
             />
-            <TouchableOpacity onPress={confirmLogout} hitSlop={8}>
-              <Text style={cs.link}>Log out</Text>
-            </TouchableOpacity>
+            <View style={styles.footerLinks}>
+              <TouchableOpacity onPress={confirmLogout} hitSlop={8}>
+                <Text style={cs.link}>Log out</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
+                <Text style={cs.link}>Privacy policy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => confirmDeleteAccount(onAccountDeleted)} hitSlop={8}>
+                <Text style={[cs.link, styles.danger]}>Delete account</Text>
+              </TouchableOpacity>
+            </View>
           </>
         )}
 
@@ -508,4 +519,6 @@ const styles = StyleSheet.create({
   },
   memberName: { flex: 1, fontSize: 15, fontFamily: Fonts.semibold, color: Colors.textPrimary },
   waiting: { textAlign: 'center' },
+  footerLinks: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, flexWrap: 'wrap' },
+  danger: { color: Colors.danger },
 });
