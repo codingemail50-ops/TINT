@@ -358,6 +358,10 @@ class BlockingForegroundService : Service() {
   private val flameBitmap: Bitmap by lazy { buildFlameBitmap() }
   // When a blocked app was last confirmed in front — see TRANSIT_HOLD_MS.
   private var lastBlockedSeenAtMs = 0L
+  // Remaining time frozen at the moment of pausing, shown as static text
+  // in the notification while paused.
+  private var pausedRemainingMs = 0L
+  private val logoBitmap: Bitmap? by lazy { buildLogoBitmap() }
   // See RETURN_TO_TINT_GRACE_MS.
   private var returningToTintUntilMs = 0L
   // Launcher(s) — which on gesture-nav phones also host the recents
@@ -408,6 +412,7 @@ class BlockingForegroundService : Service() {
       ACTION_SET_PAUSED -> {
         isPaused = intent?.getBooleanExtra(EXTRA_PAUSED, false) ?: false
         endAtMs = intent?.getLongExtra(EXTRA_END_AT_MS, endAtMs) ?: endAtMs
+        if (isPaused) pausedRemainingMs = (endAtMs - System.currentTimeMillis()).coerceAtLeast(0L)
         updateNotification()
         return START_STICKY
       }
@@ -417,6 +422,14 @@ class BlockingForegroundService : Service() {
       // pause logic and will confirm back via ACTION_SET_PAUSED.
       ACTION_NOTIF_TOGGLE_PAUSE -> {
         isPaused = !isPaused
+        val nowMs = System.currentTimeMillis()
+        if (isPaused) {
+          pausedRemainingMs = (endAtMs - nowMs).coerceAtLeast(0L)
+        } else {
+          // Resume from where it was paused until JS confirms the real
+          // end time via ACTION_SET_PAUSED a moment later.
+          endAtMs = nowMs + pausedRemainingMs
+        }
         updateNotification()
         actionListener?.invoke(if (isPaused) "pause" else "resume")
         return START_STICKY
@@ -497,13 +510,6 @@ class BlockingForegroundService : Service() {
       this, 1, togglePauseIntent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
-    val endIntent = Intent(this, BlockingForegroundService::class.java).apply {
-      action = ACTION_NOTIF_END
-    }
-    val endPendingIntent = PendingIntent.getService(
-      this, 2, endIntent,
-      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    )
 
     // Custom minimal layout (see notification_focus.xml) instead of the
     // default template's title/body text pair -- that read as a generic
@@ -512,8 +518,13 @@ class BlockingForegroundService : Service() {
     // name, timestamp, the action buttons below) and lets this content
     // area have its own dark gradient background.
     val views = RemoteViews(packageName, R.layout.notification_focus)
-    views.setImageViewBitmap(R.id.notif_flame_icon, flameBitmap)
-    views.setTextViewText(R.id.notif_task_name, title)
+    views.setImageViewBitmap(R.id.notif_flame_icon, logoBitmap ?: flameBitmap)
+    views.setImageViewResource(
+      R.id.notif_toggle,
+      if (isPaused) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause
+    )
+    views.setInt(R.id.notif_toggle, "setColorFilter", 0xFFFFFFFF.toInt())
+    views.setOnClickPendingIntent(R.id.notif_toggle, togglePausePendingIntent)
 
     // Chronometer is elapsedRealtime-based (SystemClock.elapsedRealtime()),
     // not wall-clock epoch millis -- endAtMs is epoch millis (it's compared
@@ -523,6 +534,12 @@ class BlockingForegroundService : Service() {
     if (!isPaused && endAtMs > 0L) {
       val base = SystemClock.elapsedRealtime() + (endAtMs - System.currentTimeMillis())
       views.setChronometer(R.id.notif_timer, base, null, true)
+      views.setChronometerCountDown(R.id.notif_timer, true)
+    } else if (isPaused) {
+      val totalSec = pausedRemainingMs / 1000
+      // Stop any ticking from a previous update before writing static text.
+      views.setChronometer(R.id.notif_timer, SystemClock.elapsedRealtime(), null, false)
+      views.setTextViewText(R.id.notif_timer, String.format("%02d:%02d", totalSec / 60, totalSec % 60))
     } else {
       // Chronometer extends TextView, so this just overwrites its displayed
       // text with a static label -- safe because setChronometer (and the
@@ -530,27 +547,40 @@ class BlockingForegroundService : Service() {
       // above, never here, so nothing is ticking to overwrite on the next
       // tick (endAtMs itself isn't adjusted on pause -- a pre-existing,
       // accepted gap).
-      views.setTextViewText(R.id.notif_timer, if (isPaused) "Paused" else "")
+      views.setTextViewText(R.id.notif_timer, "")
     }
 
+    // Pause/resume lives inside the custom layout now (notif_toggle), so no
+    // addAction buttons -- keeps the card to logo + timer + one control.
     val builder = NotificationCompat.Builder(this, CHANNEL_ID)
       .setContentTitle(title)
       .setSmallIcon(applicationInfo.icon)
-      .setLargeIcon(flameBitmap)
       .setOngoing(true)
+      .setOnlyAlertOnce(true)
       .setContentIntent(contentIntent)
       .setPriority(NotificationCompat.PRIORITY_LOW)
       .setCustomContentView(views)
       .setCustomBigContentView(views)
       .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-      .addAction(
-        if (isPaused) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause,
-        if (isPaused) "Resume" else "Pause",
-        togglePausePendingIntent
-      )
-      .addAction(android.R.drawable.ic_menu_close_clear_cancel, "End", endPendingIntent)
 
     return builder.build()
+  }
+
+  // The app's own launcher icon (the TINT logo) as a bitmap for the
+  // notification's left image. Null if it can't be read -- caller falls
+  // back to the pixel flame.
+  private fun buildLogoBitmap(): Bitmap? {
+    return try {
+      val drawable = packageManager.getApplicationIcon(ownPackageName)
+      val size = 144
+      val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+      val canvas = Canvas(bitmap)
+      drawable.setBounds(0, 0, size, size)
+      drawable.draw(canvas)
+      bitmap
+    } catch (e: Exception) {
+      null
+    }
   }
 
   private fun updateNotification() {
