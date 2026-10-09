@@ -8,6 +8,18 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
+    <!-- Not a permission (nothing for Play Console to review) — Android 11+
+         package visibility: lets BlockingForegroundService look up which
+         app(s) are the phone's home screen, since on gesture-nav phones the
+         recents switcher lives inside the launcher. Only home-screen apps
+         become visible, nothing else installed. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+    </queries>
+
     <application>
         <service
             android:name="expo.modules.tintappblocker.BlockingForegroundService"

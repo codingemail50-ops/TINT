@@ -77,21 +77,27 @@ class BlockingForegroundService : Service() {
     // as the block not working. UsageStatsManager.queryEvents over a short
     // 10s lookback is a cheap call, so polling this much more often is a
     // fine trade for the overlay actually feeling instant.
-    private const val POLL_INTERVAL_MS = 300L
+    // Was 300ms. A fast swipe into the recents switcher and straight back
+    // into a blocked app could land inside the gap between two checks; at
+    // 100ms that gap is a third the size. Going much lower buys little and
+    // starts costing real battery, and Android doesn't guarantee a
+    // background timer fires any tighter than this anyway.
+    private const val POLL_INTERVAL_MS = 100L
     private const val LOOKBACK_MS = 10_000L
-    // How many consecutive polls (900ms at the interval above) have to agree
-    // "no blocked app in front" before the overlay actually comes down. Fast
-    // app-switching (recents/gesture nav, split-screen, a share sheet) can
-    // make UsageStatsManager briefly report a transient launcher/system
-    // package as the foreground app for a poll cycle or two even while the
-    // blocked app is what's actually on screen (or about to be again the
-    // instant that transient surface closes) — this was the reported bypass:
-    // switch screens fast enough and the overlay would drop for a beat.
-    // Showing the overlay stays instant (one poll, no debounce) — only
-    // hiding it is debounced, so the only failure mode this can cause is the
-    // overlay lingering an extra beat after a genuine exit, never a gap that
-    // exposes the blocked app.
-    private const val REQUIRED_CLEAR_POLLS = 3
+    // How long the overlay holds after a blocked app was last seen in front,
+    // while what's in front now is the launcher/recents switcher or system
+    // UI (see transitPackages). On gesture-nav phones the recents switcher
+    // and the home screen are the same launcher app, so this can't tell
+    // "flicked into recents and back" from "went home" -- it only holds
+    // briefly, which covers the out-and-back swipe, then lets go if the
+    // user really stayed on the home screen. Any other, real app in front
+    // drops the overlay immediately, with no hold at all.
+    private const val TRANSIT_HOLD_MS = 1_500L
+    // After "Return to TINT", Android can keep reporting the blocked app in
+    // front for a moment before TINT actually opens; without this, a 100ms
+    // poll would throw the overlay straight back up in that gap. Ends early
+    // the moment TINT itself is seen in front.
+    private const val RETURN_TO_TINT_GRACE_MS = 1_000L
 
     // In-process only (no android:process split in the manifest, confirmed)
     // — a plain static callback is enough to hand a notification-button tap
@@ -350,9 +356,15 @@ class BlockingForegroundService : Service() {
   private var ownPackageName: String = ""
   private var pollRunnable: Runnable? = null
   private val flameBitmap: Bitmap by lazy { buildFlameBitmap() }
-  // See REQUIRED_CLEAR_POLLS — counts consecutive polls in a row that found
-  // no blocked app in front; reset to 0 the moment any poll finds one.
-  private var consecutiveClearPolls = 0
+  // When a blocked app was last confirmed in front — see TRANSIT_HOLD_MS.
+  private var lastBlockedSeenAtMs = 0L
+  // See RETURN_TO_TINT_GRACE_MS.
+  private var returningToTintUntilMs = 0L
+  // Launcher(s) — which on gesture-nav phones also host the recents
+  // switcher — plus system UI (notification shade, older recents). Being
+  // "in front" here right after a blocked app is treated as passing
+  // through, not as leaving. Resolved once in onCreate().
+  private var transitPackages: Set<String> = setOf("com.android.systemui")
 
   private var audioManager: AudioManager? = null
   private var audioFocusRequest: AudioFocusRequest? = null
@@ -366,6 +378,23 @@ class BlockingForegroundService : Service() {
     ownPackageName = packageName
     windowManager = getSystemService(Context.WINDOW_SERVICE) as? WindowManager
     audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    transitPackages = transitPackages + resolveLauncherPackages()
+  }
+
+  // Every installed home-screen app (needs the HOME-intent <queries> entry
+  // in this module's manifest to be visible on Android 11+). Failure just
+  // leaves system UI as the only transit package — blocking still works,
+  // only the recents-switcher hold is lost.
+  private fun resolveLauncherPackages(): Set<String> {
+    return try {
+      val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+      packageManager.queryIntentActivities(homeIntent, 0)
+        .mapNotNull { it.activityInfo?.packageName }
+        .filter { it != ownPackageName }
+        .toSet()
+    } catch (e: Exception) {
+      emptySet()
+    }
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -404,7 +433,7 @@ class BlockingForegroundService : Service() {
 
     val packages = intent?.getStringArrayListExtra(EXTRA_PACKAGES) ?: arrayListOf()
     blockedPackages = packages.toSet()
-    consecutiveClearPolls = 0
+    lastBlockedSeenAtMs = 0L
     endAtMs = intent?.getLongExtra(EXTRA_END_AT_MS, 0L) ?: 0L
     title = intent?.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() } ?: "Focus session active"
     durationMins = intent?.getIntExtra(EXTRA_DURATION_MINS, 0) ?: 0
@@ -595,7 +624,7 @@ class BlockingForegroundService : Service() {
 
   private fun stopBlockingAndSelf() {
     stopPolling()
-    consecutiveClearPolls = 0
+    lastBlockedSeenAtMs = 0L
     removeOverlay()
     @Suppress("DEPRECATION")
     stopForeground(true)
@@ -617,18 +646,32 @@ class BlockingForegroundService : Service() {
     // failed) — an inconclusive reading, not a confident "nothing blocked is
     // in front." Do nothing rather than guess: if a blocked app is genuinely
     // still up, the overlay (already showing) simply stays; if it's
-    // genuinely gone, one of the next polls will get a real reading and
-    // resolve it through the debounce below.
+    // genuinely gone, one of the next polls will get a real reading.
     val foregroundPackage = currentForegroundPackage() ?: return
+    val now = System.currentTimeMillis()
 
-    if (blockedPackages.contains(foregroundPackage)) {
-      consecutiveClearPolls = 0
-      showOverlay()
-    } else {
-      consecutiveClearPolls++
-      if (consecutiveClearPolls >= REQUIRED_CLEAR_POLLS) {
-        removeOverlay()
+    if (foregroundPackage == ownPackageName) returningToTintUntilMs = 0L
+
+    when {
+      // Just tapped "Return to TINT" and TINT hasn't come up yet — don't
+      // re-cover the blocked app in the meantime.
+      blockedPackages.contains(foregroundPackage) && now < returningToTintUntilMs -> {
       }
+      blockedPackages.contains(foregroundPackage) -> {
+        lastBlockedSeenAtMs = now
+        showOverlay()
+      }
+      // Recents switcher / launcher / system UI right after a blocked app:
+      // the reported bypass is a quick flick up into recents and back down
+      // into the blocked app. Keep the overlay up through that, so there's
+      // nothing to slip past on the way back.
+      transitPackages.contains(foregroundPackage) &&
+        now - lastBlockedSeenAtMs < TRANSIT_HOLD_MS -> {
+        // hold — leave the overlay exactly as it is
+      }
+      // A real, non-blocked app (or the launcher after the hold expired):
+      // drop the overlay right away, no lingering on top of WhatsApp etc.
+      else -> removeOverlay()
     }
   }
 
@@ -751,6 +794,7 @@ class BlockingForegroundService : Service() {
     layout.addView(Button(this).apply {
       text = "Return to TINT"
       setOnClickListener {
+        returningToTintUntilMs = System.currentTimeMillis() + RETURN_TO_TINT_GRACE_MS
         removeOverlay()
         val launchIntent = packageManager.getLaunchIntentForPackage(ownPackageName)
         launchIntent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
