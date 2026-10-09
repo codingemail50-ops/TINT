@@ -12,6 +12,8 @@ export type FocusNotificationActionEvent = {
 // where every function below just becomes a safe no-op.
 type TintAppBlockerNativeModule = {
   startBlocking(packageNames: string[], endAtMs: number, title: string, durationMins: number): void;
+  startChallengeBlocking(packageNames: string[], endAtMs: number, title: string): void;
+  emergencyPause(durationMs: number): void;
   stopBlocking(): void;
   setPaused(paused: boolean, endAtMs: number): void;
   hasUsageAccess(): boolean;
@@ -34,6 +36,17 @@ export function isAvailable(): boolean {
  *  the notification itself. No-op if unavailable. */
 export function startBlocking(packageNames: string[], endAtMs: number, title: string, durationMins: number): void {
   NativeModule?.startBlocking(packageNames, endAtMs, title, durationMins);
+}
+
+/** 7-day challenge blocking: saved so it survives kills and reboots, shows a
+ *  "6d 23h" notification with no pause button, and runs until `endAtMs`. */
+export function startChallengeBlocking(packageNames: string[], endAtMs: number, title: string): void {
+  NativeModule?.startChallengeBlocking(packageNames, endAtMs, title);
+}
+
+/** Lifts blocking for `durationMs`, then it resumes on its own. */
+export function emergencyPause(durationMs: number): void {
+  NativeModule?.emergencyPause(durationMs);
 }
 
 /** Stops polling, removes any visible overlay, and stops the service. */

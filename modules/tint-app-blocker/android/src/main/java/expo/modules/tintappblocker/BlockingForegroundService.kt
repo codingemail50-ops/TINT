@@ -51,8 +51,10 @@ private data class FlameCell(val x: Int, val y: Int, val color: Int)
  *    in the manifest): the user hasn't ended their session or taken a
  *    break, so blocking has to keep working with TINT fully closed.
  *
- * No AccessibilityService, no boot receiver, no persistence beyond the
- * lifetime of one focus session — on purpose, per the approved V1 scope.
+ * No AccessibilityService. Focus sessions have no persistence beyond their
+ * own lifetime. A 7-day challenge ("challengeMode") is the one exception: its
+ * config is saved so the service can come back after the OS kills it or the
+ * phone reboots (see BootReceiver), and it runs until its endAtMs.
  */
 class BlockingForegroundService : Service() {
 
@@ -65,6 +67,26 @@ class BlockingForegroundService : Service() {
     // reliably reach), which forwards the tap to JS via actionListener below.
     const val ACTION_NOTIF_TOGGLE_PAUSE = "expo.modules.tintappblocker.action.NOTIF_TOGGLE_PAUSE"
     const val ACTION_NOTIF_END = "expo.modules.tintappblocker.action.NOTIF_END"
+    // Challenge mode: bring a persisted challenge back after a reboot / kill.
+    const val ACTION_RESTORE = "expo.modules.tintappblocker.action.RESTORE"
+    // Challenge mode: lift blocking for a fixed number of ms, then resume.
+    const val ACTION_EMERGENCY_PAUSE = "expo.modules.tintappblocker.action.EMERGENCY_PAUSE"
+    const val EXTRA_CHALLENGE = "expo.modules.tintappblocker.extra.CHALLENGE"
+    const val EXTRA_PAUSE_MS = "expo.modules.tintappblocker.extra.PAUSE_MS"
+    private const val PREFS_NAME = "tint_challenge_blocking"
+    private const val KEY_ACTIVE = "active"
+    private const val KEY_PACKAGES = "packages"
+    private const val KEY_END_AT = "end_at_ms"
+    private const val KEY_TITLE = "title"
+    private const val KEY_EMERGENCY_UNTIL = "emergency_until_ms"
+    private const val NOTIFICATION_REFRESH_MS = 60_000L
+
+    /** True if a 7-day challenge is saved and hasn't ended yet. */
+    fun hasActiveChallenge(context: Context): Boolean {
+      val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+      return prefs.getBoolean(KEY_ACTIVE, false) &&
+        prefs.getLong(KEY_END_AT, 0L) > System.currentTimeMillis()
+    }
     const val EXTRA_PACKAGES = "expo.modules.tintappblocker.extra.PACKAGES"
     const val EXTRA_END_AT_MS = "expo.modules.tintappblocker.extra.END_AT_MS"
     const val EXTRA_TITLE = "expo.modules.tintappblocker.extra.TITLE"
@@ -352,6 +374,12 @@ class BlockingForegroundService : Service() {
   // current state into the notification (icon/label/chronometer) and
   // forwards notification-button taps back to JS to act on.
   private var isPaused: Boolean = false
+  // 7-day challenge: no pause button, "6d 23h" style countdown, persisted so
+  // it survives kills/reboots. See the class comment.
+  private var challengeMode: Boolean = false
+  // Blocking is lifted until this time (the challenge's emergency button).
+  private var emergencyUntilMs: Long = 0L
+  private var lastNotificationRefreshMs: Long = 0L
   private var overlayView: View? = null
   private var windowManager: WindowManager? = null
   private var ownPackageName: String = ""
@@ -438,6 +466,16 @@ class BlockingForegroundService : Service() {
       // User tapped End on the notification — forward to JS (which runs its
       // normal end-session flow) and tear down the service/notification
       // right away rather than waiting on the JS round trip.
+      // Challenge emergency button: stop blocking for a fixed window, then
+      // the normal polling picks blocking back up on its own.
+      ACTION_EMERGENCY_PAUSE -> {
+        val ms = intent?.getLongExtra(EXTRA_PAUSE_MS, 0L) ?: 0L
+        emergencyUntilMs = System.currentTimeMillis() + ms
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+          .putLong(KEY_EMERGENCY_UNTIL, emergencyUntilMs).apply()
+        removeOverlay()
+        return START_STICKY
+      }
       ACTION_NOTIF_END -> {
         actionListener?.invoke("end")
         stopBlockingAndSelf()
@@ -445,15 +483,30 @@ class BlockingForegroundService : Service() {
       }
     }
 
-    val packages = intent?.getStringArrayListExtra(EXTRA_PACKAGES) ?: arrayListOf()
-    blockedPackages = packages.toSet()
-    lastBlockedSeenAtMs = 0L
     resumedActivities.clear()
     lastQueryEndMs = 0L
-    endAtMs = intent?.getLongExtra(EXTRA_END_AT_MS, 0L) ?: 0L
-    title = intent?.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() } ?: "Focus session active"
-    durationMins = intent?.getIntExtra(EXTRA_DURATION_MINS, 0) ?: 0
-    isPaused = false
+    lastBlockedSeenAtMs = 0L
+    // After a reboot (BootReceiver) or an OS kill + restart (null intent),
+    // bring a saved challenge back. Nothing saved and an explicit RESTORE
+    // means there's nothing to do. A null intent with nothing saved falls
+    // through to the old behavior, unchanged.
+    val restoring = intent == null || intent.action == ACTION_RESTORE
+    val restored = restoring && loadPersistedChallenge()
+    if (intent?.action == ACTION_RESTORE && !restored) {
+      stopSelf()
+      return START_NOT_STICKY
+    }
+    if (!restored) {
+      val packages = intent?.getStringArrayListExtra(EXTRA_PACKAGES) ?: arrayListOf()
+      blockedPackages = packages.toSet()
+      endAtMs = intent?.getLongExtra(EXTRA_END_AT_MS, 0L) ?: 0L
+      title = intent?.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() } ?: "Focus session active"
+      durationMins = intent?.getIntExtra(EXTRA_DURATION_MINS, 0) ?: 0
+      isPaused = false
+      challengeMode = intent?.getBooleanExtra(EXTRA_CHALLENGE, false) ?: false
+      emergencyUntilMs = 0L
+      if (challengeMode) persistChallenge()
+    }
     try {
       startForeground(NOTIFICATION_ID, buildNotification())
     } catch (e: Exception) {
@@ -528,13 +581,17 @@ class BlockingForegroundService : Service() {
     )
     views.setInt(R.id.notif_toggle, "setColorFilter", 0xFFFFFFFF.toInt())
     views.setOnClickPendingIntent(R.id.notif_toggle, togglePausePendingIntent)
+    // A challenge can't be paused from the notification.
+    if (challengeMode) views.setViewVisibility(R.id.notif_toggle, View.GONE)
 
     // Chronometer is elapsedRealtime-based (SystemClock.elapsedRealtime()),
     // not wall-clock epoch millis -- endAtMs is epoch millis (it's compared
     // against System.currentTimeMillis() elsewhere for the actual block
     // logic), so it has to be converted to an elapsedRealtime reference
     // point here or the countdown would show the wrong time entirely.
-    if (!isPaused && endAtMs > 0L) {
+    if (challengeMode) {
+      views.setTextViewText(R.id.notif_timer, formatChallengeTimeLeft())
+    } else if (!isPaused && endAtMs > 0L) {
       val base = SystemClock.elapsedRealtime() + (endAtMs - System.currentTimeMillis())
       views.setChronometer(R.id.notif_timer, base, null, true)
       views.setChronometerCountDown(R.id.notif_timer, true)
@@ -567,6 +624,15 @@ class BlockingForegroundService : Service() {
       .setStyle(NotificationCompat.DecoratedCustomViewStyle())
 
     return builder.build()
+  }
+
+  // "6d 23h" while there are days left, "5h 12m" on the last day.
+  private fun formatChallengeTimeLeft(): String {
+    val remaining = (endAtMs - System.currentTimeMillis()).coerceAtLeast(0L)
+    val days = remaining / 86_400_000L
+    val hours = (remaining % 86_400_000L) / 3_600_000L
+    val mins = (remaining % 3_600_000L) / 60_000L
+    return if (days > 0) "${days}d ${hours}h" else "${hours}h ${mins}m"
   }
 
   // The app's own launcher icon (the TINT logo) as a bitmap for the
@@ -628,6 +694,14 @@ class BlockingForegroundService : Service() {
           stopBlockingAndSelf()
           return
         }
+        // Challenge countdown is plain text ("6d 23h"), not a ticking
+        // chronometer, so it needs an occasional refresh.
+        if (challengeMode &&
+          System.currentTimeMillis() - lastNotificationRefreshMs >= NOTIFICATION_REFRESH_MS
+        ) {
+          lastNotificationRefreshMs = System.currentTimeMillis()
+          try { updateNotification() } catch (e: Exception) { }
+        }
         // A single bad poll must never kill the whole loop. checkForegroundApp()
         // reads a live UsageEvents cursor, and a burst of foreground-transition
         // events in quick succession (e.g. home -> recents -> straight back
@@ -655,7 +729,41 @@ class BlockingForegroundService : Service() {
     pollRunnable = null
   }
 
+  private fun persistChallenge() {
+    getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+      .putBoolean(KEY_ACTIVE, true)
+      .putStringSet(KEY_PACKAGES, blockedPackages)
+      .putLong(KEY_END_AT, endAtMs)
+      .putString(KEY_TITLE, title)
+      .putLong(KEY_EMERGENCY_UNTIL, 0L)
+      .apply()
+  }
+
+  private fun clearPersistedChallenge() {
+    getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().apply()
+  }
+
+  // Returns false (and clears) when nothing valid is saved.
+  private fun loadPersistedChallenge(): Boolean {
+    val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    if (!prefs.getBoolean(KEY_ACTIVE, false)) return false
+    val end = prefs.getLong(KEY_END_AT, 0L)
+    if (end <= System.currentTimeMillis()) {
+      clearPersistedChallenge()
+      return false
+    }
+    blockedPackages = prefs.getStringSet(KEY_PACKAGES, emptySet())?.toSet() ?: emptySet()
+    endAtMs = end
+    title = prefs.getString(KEY_TITLE, null)?.takeIf { it.isNotBlank() } ?: "7 Day Lock In"
+    durationMins = 0
+    isPaused = false
+    challengeMode = true
+    emergencyUntilMs = prefs.getLong(KEY_EMERGENCY_UNTIL, 0L)
+    return true
+  }
+
   private fun stopBlockingAndSelf() {
+    clearPersistedChallenge()
     stopPolling()
     lastBlockedSeenAtMs = 0L
     removeOverlay()
@@ -679,6 +787,12 @@ class BlockingForegroundService : Service() {
     // guess; the next poll gets a real one.
     if (!updateForegroundState()) return
     val now = System.currentTimeMillis()
+
+    // Emergency window: state above keeps tracking, but nothing is covered.
+    if (now < emergencyUntilMs) {
+      removeOverlay()
+      return
+    }
 
     if (lastResumedPackage == ownPackageName) returningToTintUntilMs = 0L
     val blockedAppOpen = resumedActivities.values.any { blockedPackages.contains(it) }

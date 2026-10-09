@@ -55,6 +55,42 @@ class TintAppBlockerModule : Module() {
       Unit
     }
 
+    // 7-day challenge: same blocking engine, but saved so it survives kills
+    // and reboots, with a "6d 23h" notification and no pause button. Runs
+    // until endAtMs (or stopBlocking).
+    Function("startChallengeBlocking") { packageNames: List<String>, endAtMs: Double, title: String ->
+      val context = appContext.reactContext ?: return@Function Unit
+      val intent = Intent(context, BlockingForegroundService::class.java).apply {
+        action = BlockingForegroundService.ACTION_START
+        putStringArrayListExtra(BlockingForegroundService.EXTRA_PACKAGES, ArrayList(packageNames))
+        putExtra(BlockingForegroundService.EXTRA_END_AT_MS, endAtMs.toLong())
+        putExtra(BlockingForegroundService.EXTRA_TITLE, title)
+        putExtra(BlockingForegroundService.EXTRA_CHALLENGE, true)
+      }
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        context.startForegroundService(intent)
+      } else {
+        context.startService(intent)
+      }
+      Unit
+    }
+
+    // Challenge emergency button: lifts blocking for durationMs, then it
+    // resumes by itself.
+    Function("emergencyPause") { durationMs: Double ->
+      val context = appContext.reactContext ?: return@Function Unit
+      val intent = Intent(context, BlockingForegroundService::class.java).apply {
+        action = BlockingForegroundService.ACTION_EMERGENCY_PAUSE
+        putExtra(BlockingForegroundService.EXTRA_PAUSE_MS, durationMs.toLong())
+      }
+      try {
+        context.startService(intent)
+      } catch (e: Exception) {
+        // Service not running -- nothing is blocking, so nothing to lift.
+      }
+      Unit
+    }
+
     Function("stopBlocking") {
       val context = appContext.reactContext ?: return@Function Unit
       val intent = Intent(context, BlockingForegroundService::class.java).apply {

@@ -87,6 +87,18 @@ export function startAppBlocking(packageNames: string[], endAtMs: number, title:
   TintAppBlocker.startBlocking(packageNames, endAtMs, title, durationMins);
 }
 
+/** Starts always-on blocking for a 7-day challenge (see the native module). */
+export function startChallengeAppBlocking(packageNames: string[], endAtMs: number, title: string): void {
+  if (!isNativeBlockingAvailable()) return;
+  TintAppBlocker.startChallengeBlocking(packageNames, endAtMs, title);
+}
+
+/** The challenge's emergency button: lifts blocking for `durationMs`. */
+export function emergencyPauseBlocking(durationMs: number): void {
+  if (!isNativeBlockingAvailable()) return;
+  TintAppBlocker.emergencyPause(durationMs);
+}
+
 /** Stops polling, removes any visible block overlay, and stops the
  *  foreground service. Safe to call even if blocking was never started. */
 export function stopAppBlocking(): void {
