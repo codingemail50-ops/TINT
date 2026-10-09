@@ -33,6 +33,12 @@
         "FOREGROUND_SERVICE_SPECIAL_USE"
       ]
     },
+    "owner": "tint-app",
+    "extra": {
+      "eas": {
+        "projectId": "e1df2724-4ef7-45e0-9eec-158f3c53bb4a"
+      }
+    },
     "web": {
       "favicon": "./assets/favicon.png"
     },
