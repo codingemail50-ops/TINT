@@ -7,7 +7,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, ActivityInd
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { BLOCKABLE_APPS } from '../data/blockableApps';
-import Svg, { Rect } from 'react-native-svg';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { buildBonfireStage, BONFIRE_STAGE_COUNT } from './pixelBonfireStages';
 
 export const PrimaryButton: React.FC<{
@@ -110,6 +110,116 @@ export const LockInBonfire: React.FC<{ day: number; maxHeight?: number }> = ({ d
           ))}
         </Svg>
       </Animated.View>
+    </View>
+  );
+};
+
+// The TINT logo flame, cell for cell (traced from the logo artwork).
+// Digits are shades on the Lock In ramp, '.' is empty. Single cells off on
+// their own are embers and flicker.
+const LOGO_FLAME = [
+  '..4.............',
+  '................',
+  '...4............',
+  '.......1........',
+  '.......21.......',
+  '......142.......',
+  '.......421......',
+  '......1441......',
+  '4...1.14441.....',
+  '...12124641...4.',
+  '...14144641.....',
+  '..143245641.1...',
+  '.114444654212...',
+  '11444466644241..',
+  '12446667644641..',
+  '14446677664641..',
+  '.145667775641...',
+  '..1446776642...4',
+  '...11455441.....',
+  '.....22221......',
+];
+const LOGO_COLS = LOGO_FLAME[0].length;
+const LOGO_ROWS = LOGO_FLAME.length;
+const SHADE: Record<string, string> = {
+  '1': '#782401', // deep brown: outline/shadow
+  '2': '#A03201', // dark orange
+  '3': '#C44301', // burnt orange
+  '4': '#F45F01', // main orange
+  '5': '#FB7E18', // bright orange
+  '6': '#FCC268', // light orange
+  '7': '#FDE0B0', // hot core
+};
+
+function isEmber(x: number, y: number): boolean {
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if ((dx || dy) && (LOGO_FLAME[y + dy]?.[x + dx] ?? '.') !== '.') return false;
+    }
+  }
+  return true;
+}
+
+/** Paths per color: `dim` 0 = full brightness, each step darkens the
+ *  flame body by one shade (the outline stays the same). */
+function logoPaths(dim: number, embers: boolean): [string, string][] {
+  const byColor = new Map<string, string>();
+  LOGO_FLAME.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      const ch = row[x];
+      if (ch === '.' || isEmber(x, y) !== embers) continue;
+      const shade = ch === '1' ? 1 : Math.max(2, Number(ch) - dim);
+      const color = SHADE[String(shade)];
+      byColor.set(color, (byColor.get(color) ?? '') + `M${x},${y}h1v1h-1z`);
+    }
+  });
+  return Array.from(byColor.entries());
+}
+
+/** The TINT logo flame, breathing, with flickering embers. */
+export const LogoFlame: React.FC<{ size?: number; dim?: number }> = ({ size = 110, dim = 0 }) => {
+  const body = React.useMemo(() => logoPaths(dim, false), [dim]);
+  const sparks = React.useMemo(() => logoPaths(dim, true), [dim]);
+  const breathe = useRef(new Animated.Value(1)).current;
+  const flicker = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const a = Animated.loop(Animated.sequence([
+      Animated.timing(breathe, { toValue: 1.04, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(breathe, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]));
+    const b = Animated.loop(Animated.sequence([
+      Animated.timing(flicker, { toValue: 0.25, duration: 420, useNativeDriver: true }),
+      Animated.timing(flicker, { toValue: 1, duration: 520, useNativeDriver: true }),
+    ]));
+    a.start();
+    b.start();
+    return () => { a.stop(); b.stop(); };
+  }, [breathe, flicker]);
+  const height = (size / LOGO_COLS) * LOGO_ROWS;
+  const box = `0 0 ${LOGO_COLS} ${LOGO_ROWS}`;
+  return (
+    <Animated.View style={{ width: size, height, transform: [{ scale: breathe }] }}>
+      <Svg width={size} height={height} viewBox={box}>
+        {body.map(([color, d]) => <Path key={color} d={d} fill={color} />)}
+      </Svg>
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: flicker }]}>
+        <Svg width={size} height={height} viewBox={box}>
+          {sparks.map(([color, d]) => <Path key={color} d={d} fill={color} />)}
+        </Svg>
+      </Animated.View>
+    </Animated.View>
+  );
+};
+
+/** The logo flame for a challenge day: small and darker on day 1, full
+ *  size and brightest on day 7. */
+export const DayFlame: React.FC<{ day: number; maxSize?: number }> = ({ day, maxSize = 56 }) => {
+  const d = Math.min(7, Math.max(1, day));
+  const size = Math.round(maxSize * (0.55 + 0.45 * ((d - 1) / 6)));
+  const dim = d <= 2 ? 2 : d <= 5 ? 1 : 0;
+  return (
+    <View style={{ height: (maxSize / LOGO_COLS) * LOGO_ROWS, justifyContent: 'flex-end', alignItems: 'center' }}>
+      <LogoFlame size={size} dim={dim} />
     </View>
   );
 };

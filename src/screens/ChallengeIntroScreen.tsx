@@ -2,9 +2,8 @@ import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Colors, Spacing, Typography } from '../constants/theme';
-import { PixelFlame } from '../components/PixelFlame';
 import { PixelIcon } from '../components/PixelIcon';
-import { Eyebrow, PrimaryButton } from '../components/ChallengeParts';
+import { Eyebrow, LogoFlame, PrimaryButton } from '../components/ChallengeParts';
 import { useHaptics } from '../hooks/useHaptics';
 
 const { width: W } = Dimensions.get('window');
@@ -24,7 +23,7 @@ export const ChallengeIntroScreen: React.FC<Props> = ({ avatar, onDone }) => {
   const slides = [
     {
       key: 'what',
-      art: <PixelFlame size={110} state="flicker" intensity="lockin" />,
+      art: <LogoFlame size={110} />,
       eyebrow: '7 Day Lock In',
       title: 'No reels. No shorts.\n7 days.',
       body: 'The apps you pick stay blocked, all day, every day, for a week.',
@@ -46,7 +45,7 @@ export const ChallengeIntroScreen: React.FC<Props> = ({ avatar, onDone }) => {
     },
     {
       key: 'luck',
-      art: <PixelFlame size={110} state="flicker" intensity="lockin" />,
+      art: <LogoFlame size={110} />,
       eyebrow: 'Good luck',
       title: 'The first days are the hardest.',
       body: 'Every time the urge hits, TINT will be there. Just get through today.',

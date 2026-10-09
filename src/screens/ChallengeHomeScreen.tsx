@@ -8,9 +8,8 @@ import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { PixelIcon } from '../components/PixelIcon';
-import { PixelFlame } from '../components/PixelFlame';
 import {
-  DayProgressBar, Eyebrow, HoldToConfirm, LockInBonfire, PrimaryButton, SecondaryButton, useNow, challengeStyles as cs,
+  DayFlame, DayProgressBar, Eyebrow, HoldToConfirm, LogoFlame, PrimaryButton, SecondaryButton, useNow, challengeStyles as cs,
 } from '../components/ChallengeParts';
 import { BLOCKABLE_APPS, packageNamesFor } from '../data/blockableApps';
 import { quoteFor, progressLine, WIN_VARIANTS } from '../data/challengeMessages';
@@ -277,7 +276,7 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade }) =
         <StatusBar style="light" />
         <ScrollView contentContainerStyle={cs.content}>
           <View ref={cardRef} collapsable={false} style={[cs.card, styles.reportCard]}>
-            <PixelFlame size={96} state="flicker" intensity="lockin" />
+            <LogoFlame size={96} />
             <Eyebrow>7 Day Lock In · Complete</Eyebrow>
             <Text style={styles.reportTitle}>{wording.headline}</Text>
             <Text style={styles.reportLine}>{wording.line}</Text>
@@ -334,7 +333,7 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade }) =
           ) : (
             <Text style={[styles.dayTitle, styles.titleText]}>Starts in {formatTimeLeft((local.startAtMs ?? now) - now)}</Text>
           )}
-          <LockInBonfire day={Math.max(1, day)} maxHeight={64} />
+          <DayFlame day={Math.max(1, day)} maxSize={52} />
         </View>
 
         <View style={styles.progressBlock}>
