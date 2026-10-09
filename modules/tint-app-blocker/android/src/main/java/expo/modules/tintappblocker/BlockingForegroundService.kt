@@ -112,6 +112,7 @@ class BlockingForegroundService : Service() {
     private const val POLL_INTERVAL_MS = 100L
     private const val LOOKBACK_MS = 10_000L
     private const val QUERY_OVERLAP_MS = 3_000L
+    private const val CHALLENGE_REPLAY_MS = 30 * 60_000L
     // How long the overlay holds after a blocked app was last seen in front,
     // while what's in front now is the launcher/recents switcher or system
     // UI (see transitPackages). On gesture-nav phones the recents switcher
@@ -860,7 +861,11 @@ class BlockingForegroundService : Service() {
     // logs late) rather than a fixed window, so state never ages out just
     // because nothing new happened for a while. Re-reading the overlap is
     // harmless: replaying the same events in order lands on the same state.
-    val begin = if (lastQueryEndMs > 0L) lastQueryEndMs - QUERY_OVERLAP_MS else end - LOOKBACK_MS
+    // First read after (re)start: a challenge replays further back, so after
+    // the phone kills and restarts the service it can rebuild which app is
+    // open instead of waiting for that app's next event.
+    val firstLookback = if (challengeMode) CHALLENGE_REPLAY_MS else LOOKBACK_MS
+    val begin = if (lastQueryEndMs > 0L) lastQueryEndMs - QUERY_OVERLAP_MS else end - firstLookback
     val events = try {
       usm.queryEvents(begin, end)
     } catch (e: Exception) {
