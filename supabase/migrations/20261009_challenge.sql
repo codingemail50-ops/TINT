@@ -117,8 +117,8 @@ set search_path = public
 as $$
 declare
   uid uuid := auth.uid();
+  v_id uuid := gen_random_uuid();
   v_code text;
-  v_ch public.challenges;
   v_name text;
   v_avatar text;
   tries int := 0;
@@ -137,20 +137,20 @@ begin
     if tries > 20 then raise exception 'could not make a code, try again'; end if;
   end loop;
 
-  select name, avatar into v_name, v_avatar from public.user_data where id = uid;
+  v_name := (select u.name from public.user_data u where u.id = uid);
+  v_avatar := (select u.avatar from public.user_data u where u.id = uid);
 
-  insert into public.challenges (code, creator_id, mode, status, start_at)
+  insert into public.challenges (id, code, creator_id, mode, status, start_at)
   values (
-    v_code, uid, p_mode,
+    v_id, v_code, uid, p_mode,
     case when p_mode = 'solo' then 'active' else 'lobby' end,
     case when p_mode = 'solo' then coalesce(p_start_at, now()) else null end
-  )
-  returning * into v_ch;
+  );
 
   insert into public.challenge_members (challenge_id, user_id, name, avatar, apps)
-  values (v_ch.id, uid, coalesce(v_name, 'Anonymous'), coalesce(v_avatar, 'star'), coalesce(p_apps, '{}'));
+  values (v_id, uid, coalesce(v_name, 'Anonymous'), coalesce(v_avatar, 'star'), coalesce(p_apps, '{}'));
 
-  return v_ch;
+  return (select c from public.challenges c where c.id = v_id);
 end;
 $$;
 
@@ -162,27 +162,28 @@ set search_path = public
 as $$
 declare
   uid uuid := auth.uid();
-  v_ch public.challenges;
+  v_id uuid;
   v_name text;
   v_avatar text;
 begin
   if uid is null then raise exception 'not signed in'; end if;
   if public._in_open_challenge(uid) then raise exception 'already in a challenge'; end if;
 
-  select * into v_ch from public.challenges
-  where code = upper(trim(p_code)) and mode = 'squad' and status = 'lobby';
-  if not found then raise exception 'code not found, or that squad already started'; end if;
+  v_id := (select c.id from public.challenges c
+           where c.code = upper(trim(p_code)) and c.mode = 'squad' and c.status = 'lobby');
+  if v_id is null then raise exception 'code not found, or that squad already started'; end if;
 
-  if (select count(*) from public.challenge_members where challenge_id = v_ch.id) >= 6 then
+  if (select count(*) from public.challenge_members m where m.challenge_id = v_id) >= 6 then
     raise exception 'this squad is full (6 max)';
   end if;
 
-  select name, avatar into v_name, v_avatar from public.user_data where id = uid;
+  v_name := (select u.name from public.user_data u where u.id = uid);
+  v_avatar := (select u.avatar from public.user_data u where u.id = uid);
 
   insert into public.challenge_members (challenge_id, user_id, name, avatar, apps)
-  values (v_ch.id, uid, coalesce(v_name, 'Anonymous'), coalesce(v_avatar, 'star'), coalesce(p_apps, '{}'));
+  values (v_id, uid, coalesce(v_name, 'Anonymous'), coalesce(v_avatar, 'star'), coalesce(p_apps, '{}'));
 
-  return v_ch;
+  return (select c from public.challenges c where c.id = v_id);
 end;
 $$;
 
@@ -193,15 +194,12 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare
-  v_ch public.challenges;
 begin
   update public.challenges
   set status = 'active', start_at = now()
-  where id = p_id and creator_id = auth.uid() and status = 'lobby'
-  returning * into v_ch;
+  where id = p_id and creator_id = auth.uid() and status = 'lobby';
   if not found then raise exception 'only the squad creator can start a squad in its lobby'; end if;
-  return v_ch;
+  return (select c from public.challenges c where c.id = p_id);
 end;
 $$;
 
