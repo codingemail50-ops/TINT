@@ -634,13 +634,13 @@ class BlockingForegroundService : Service() {
     return builder.build()
   }
 
-  // "6d 23h" while there are days left, "5h 12m" on the last day.
+  // "6d 23h 59m" while there are days left, "5h 12m" on the last day.
   private fun formatChallengeTimeLeft(): String {
     val remaining = (endAtMs - System.currentTimeMillis()).coerceAtLeast(0L)
     val days = remaining / 86_400_000L
     val hours = (remaining % 86_400_000L) / 3_600_000L
     val mins = (remaining % 3_600_000L) / 60_000L
-    return if (days > 0) "${days}d ${hours}h" else "${hours}h ${mins}m"
+    return if (days > 0) "${days}d ${hours}h ${mins}m" else "${hours}h ${mins}m"
   }
 
   // The app's own launcher icon (the TINT logo) as a bitmap for the
