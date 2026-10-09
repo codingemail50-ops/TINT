@@ -13,6 +13,10 @@ import { FocusScreen } from '../screens/FocusScreen';
 import { ProductivityScreen } from '../screens/ProductivityScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { ChallengeIntroScreen } from '../screens/ChallengeIntroScreen';
+import { ChallengeSetupScreen } from '../screens/ChallengeSetupScreen';
+import { ChallengeHomeScreen } from '../screens/ChallengeHomeScreen';
+import { clearLocalChallenge, cancelChallengeNotifications } from '../utils/challenge';
 import { StorageService, AppState, UserProfile, FutureGoal } from '../utils/storage';
 import { ExamType, CustomExam, ClassTwelveStream } from '../data/examPresets';
 import { supabase } from '../lib/supabase';
@@ -82,7 +86,8 @@ async function ensureSession(): Promise<string | null> {
 
 type Screen =
   | 'boot' | 'walkthrough' | 'avatarExam' | 'focusGoal' | 'createAccount'
-  | 'todo' | 'focus' | 'productivity' | 'leaderboard' | 'profile';
+  | 'todo' | 'focus' | 'productivity' | 'leaderboard' | 'profile'
+  | 'challengeIntro' | 'challengeSetup' | 'challengeHome';
 
 const TAB_CONFIG = [
   { id: 'todo' as Screen, label: 'Today', icon: 'checkbox' as const },
@@ -95,7 +100,17 @@ const TAB_CONFIG = [
 // the bottom tab bar must not paint over onboarding screens — every launch
 // goes through onboarding now (see FORCE_ONBOARDING_ON_LAUNCH below), so
 // this fires on ordinary use, not just first installs.
-const ONBOARDING_SCREENS = new Set<Screen>(['walkthrough', 'avatarExam', 'focusGoal', 'createAccount']);
+const ONBOARDING_SCREENS = new Set<Screen>([
+  'walkthrough', 'avatarExam', 'focusGoal', 'createAccount',
+  // The 7 Day Lock In is its own small app inside TINT: no tab bar, and the
+  // Today/Focus screens stay unmounted while it's on screen.
+  'challengeIntro', 'challengeSetup', 'challengeHome',
+]);
+
+// People who came in through the 7 Day Lock In button never picked an exam.
+function isChallengeOnly(user: UserProfile | null | undefined): boolean {
+  return !!user && (user.examTypes?.length ?? 0) === 0 && !user.customExam;
+}
 
 interface OnboardingDraft {
   avatar: string;
@@ -106,6 +121,8 @@ interface OnboardingDraft {
   name: string;
   email: string;
   futureGoal?: FutureGoal;
+  /** Came in through the 7 Day Lock In button. */
+  challengePath?: boolean;
 }
 
 export const AppNavigator: React.FC = () => (
@@ -144,6 +161,8 @@ const AppNavigatorInner: React.FC = () => {
   const userIdRef = useRef<string | null>(null);
   const { status: focusStatus, requestExpand } = useFocusSessionStatus();
   const draftRef = useRef<OnboardingDraft>({ avatar: 'star', examTypes: [], dailyFocusGoalMins: 60, name: '', email: '' });
+  // A challenge user, already signed in, picking exams to use regular TINT.
+  const upgradingFromChallengeRef = useRef(false);
 
   // Once per app-open (guarded by the ref, same pattern as the recap check
   // below), pops today's motivational postcard if it hasn't been shown yet.
@@ -207,8 +226,12 @@ const AppNavigatorInner: React.FC = () => {
         const localUser = await StorageService.getUser();
         if (localUser) {
           setAppState(localState);
-          setShowTabs(true);
-          setBootTargetScreen('todo');
+          if (isChallengeOnly(localUser)) {
+            setBootTargetScreen('challengeHome');
+          } else {
+            setShowTabs(true);
+            setBootTargetScreen('todo');
+          }
           void (async () => {
             const userId = await withTimeout(ensureSession(), REMOTE_TIMEOUT_MS, null);
             userIdRef.current = userId;
@@ -241,8 +264,12 @@ const AppNavigatorInner: React.FC = () => {
           const loaded = await withTimeout(loadUserFromSupabase(userId), REMOTE_TIMEOUT_MS, null);
           if (loaded) {
             setAppState(loaded);
-            setShowTabs(true);
-            setBootTargetScreen('todo');
+            if (isChallengeOnly(loaded.user)) {
+              setBootTargetScreen('challengeHome');
+            } else {
+              setShowTabs(true);
+              setBootTargetScreen('todo');
+            }
             return;
           }
         }
@@ -319,7 +346,49 @@ const AppNavigatorInner: React.FC = () => {
     draftRef.current.examTypes = data.examTypes;
     draftRef.current.customExam = data.customExam;
     draftRef.current.classTwelveStream = data.classTwelveStream;
+    draftRef.current.challengePath = false;
+    // Already signed in (finished a challenge, now wants regular TINT):
+    // skip account creation and go straight to the walkthrough.
+    setScreen(upgradingFromChallengeRef.current ? 'walkthrough' : 'createAccount');
+  };
+
+  // ── 7 Day Lock In: avatarExam -> createAccount -> challengeIntro -> challengeSetup -> challengeHome ──
+  const handleChallengeChosen = (avatar: string) => {
+    draftRef.current.avatar = avatar;
+    draftRef.current.examTypes = [];
+    draftRef.current.customExam = undefined;
+    draftRef.current.classTwelveStream = undefined;
+    draftRef.current.challengePath = true;
     setScreen('createAccount');
+  };
+
+  const handleUpgradeFromChallenge = () => {
+    const user = appState.user;
+    if (user) {
+      draftRef.current.name = user.name;
+      draftRef.current.email = user.email;
+      draftRef.current.avatar = user.avatar;
+      draftRef.current.dailyFocusGoalMins = user.dailyFocusGoalMins ?? 60;
+    }
+    draftRef.current.challengePath = false;
+    upgradingFromChallengeRef.current = true;
+    setScreen('avatarExam');
+  };
+
+  // Same clean-up as the Profile screen's log out, plus the challenge's own
+  // local copy and scheduled notifications.
+  const handleChallengeLogout = async () => {
+    supabase.auth.signOut().catch(() => {});
+    await Promise.all([
+      StorageService.clearAllUserData(),
+      saveFocusLog([]),
+      saveDistractionLog([]),
+      saveBestFlameMins(0),
+      clearActiveSession(),
+      clearLocalChallenge(),
+      cancelChallengeNotifications(),
+    ]);
+    handleLogout();
   };
 
   const handleLoginShortcut = () => {
@@ -340,6 +409,8 @@ const AppNavigatorInner: React.FC = () => {
     userIdRef.current = null;
     setShowTabs(false);
     setLoginShortcut(false);
+    upgradingFromChallengeRef.current = false;
+    draftRef.current.challengePath = false;
     setRecapData(null);
     recapCheckedRef.current = false;
     setMotivationMessage(null);
@@ -364,6 +435,7 @@ const AppNavigatorInner: React.FC = () => {
   };
 
   const finishOnboarding = (user: UserProfile) => {
+    upgradingFromChallengeRef.current = false;
     // Defensive, same as logout's clearing — local storage isn't namespaced
     // per-account, so without this a brand-new signup on a device someone
     // else (or a previous test account) used could silently inherit a
@@ -426,12 +498,16 @@ const AppNavigatorInner: React.FC = () => {
     // thing that could independently fail and leave the account with no
     // profile row at all.
     if (userId) userIdRef.current = userId;
-    setScreen('walkthrough');
+    setScreen(draftRef.current.challengePath ? 'challengeIntro' : 'walkthrough');
     const { avatar, examTypes, customExam, classTwelveStream, dailyFocusGoalMins } = draftRef.current;
-    void saveOnboardingProgress({
+    const user: UserProfile = {
       name, email, examTypes, customExam, classTwelveStream, avatar, futureGoal: null,
       createdAt: new Date().toISOString(), dailyFocusGoalMins,
-    });
+    };
+    // The challenge path never reaches finishOnboarding, so the in-memory
+    // profile is set here (the walkthrough path sets it at the end).
+    if (draftRef.current.challengePath) setAppState(prev => ({ ...prev, user }));
+    void saveOnboardingProgress(user);
   };
 
   const handleLoggedIn = async (hasProfile: boolean, userId?: string, googleEmail?: string) => {
@@ -479,6 +555,10 @@ const AppNavigatorInner: React.FC = () => {
         // a session this account never ran.
         void clearActiveSession();
         setAppState(loaded);
+        if (isChallengeOnly(loaded.user)) {
+          setScreen('challengeHome');
+          return;
+        }
         setShowTabs(true);
         setScreen('todo');
         Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
@@ -596,6 +676,26 @@ const AppNavigatorInner: React.FC = () => {
             <AvatarExamScreen
               onComplete={handleAvatarExamComplete}
               onLogin={handleLoginShortcut}
+              onChallenge={upgradingFromChallengeRef.current ? undefined : handleChallengeChosen}
+              showLogin={!upgradingFromChallengeRef.current}
+            />
+          )}
+          {screen === 'challengeIntro' && (
+            <ChallengeIntroScreen
+              avatar={appState.user?.avatar ?? draftRef.current.avatar}
+              onDone={() => setScreen('challengeSetup')}
+            />
+          )}
+          {screen === 'challengeSetup' && (
+            <ChallengeSetupScreen
+              onStarted={() => setScreen('challengeHome')}
+              onLogout={() => void handleChallengeLogout()}
+            />
+          )}
+          {screen === 'challengeHome' && (
+            <ChallengeHomeScreen
+              onRestart={() => setScreen('challengeSetup')}
+              onUpgrade={handleUpgradeFromChallenge}
             />
           )}
           {screen === 'createAccount' && (

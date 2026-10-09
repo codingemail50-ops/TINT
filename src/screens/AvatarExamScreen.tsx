@@ -15,13 +15,18 @@ const WALL_HEIGHT = 260;
 interface Props {
   onComplete: (data: { avatar: string; examTypes: ExamType[]; customExam?: CustomExam; classTwelveStream?: ClassTwelveStream }) => void;
   onLogin: () => void;
+  /** Shown as the orange "7 Day Lock In" button above the exams. Omitted
+   *  (button hidden) when coming back from a finished challenge. */
+  onChallenge?: (avatar: string) => void;
+  /** False when an already signed-in person is picking exams. */
+  showLogin?: boolean;
 }
 
 // Screen 1 of onboarding — a continuously-scrolling wall of pixel-icon
 // avatars at a slight angle (tap one to pick it, same procedural icon set as
 // the rest of the app) and which exam(s) to prep for, in one screen instead
 // of two separate steps.
-export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin }) => {
+export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onChallenge, showLogin = true }) => {
   const [avatar, setAvatar] = useState(AVATARS[0]);
   // Wall is only shown while actively picking — once you tap one, it locks
   // in and the wall stops animating/mounting entirely (both for a calmer
@@ -133,6 +138,16 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin }) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {onChallenge && (
+          <TouchableOpacity
+            style={examS.challengeBtn}
+            onPress={() => { buttonPress(); onChallenge(avatar); }}
+            activeOpacity={0.85}
+          >
+            <Text style={examS.challengeText}>7 Day Lock In</Text>
+            <Text style={examS.challengeSub}>No reels. No shorts. 7 days.</Text>
+          </TouchableOpacity>
+        )}
         <Text style={examS.sectionLabel}>What's Your Exam?</Text>
         <View style={examS.grid}>
           {EXAM_TYPES.map((exam, index) => {
@@ -210,9 +225,11 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin }) => {
             <Text style={[styles.nextText, !canProceed && { color: Colors.textMuted }]}>Continue →</Text>
           </View>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onLogin} activeOpacity={0.7}>
-          <Text style={styles.loginLink}>Already have an account? <Text style={styles.loginLinkStrong}>Log in</Text></Text>
-        </TouchableOpacity>
+        {showLogin && (
+          <TouchableOpacity onPress={onLogin} activeOpacity={0.7}>
+            <Text style={styles.loginLink}>Already have an account? <Text style={styles.loginLinkStrong}>Log in</Text></Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <CustomExamModal
@@ -226,6 +243,17 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin }) => {
 };
 
 const examS = StyleSheet.create({
+  challengeBtn: {
+    backgroundColor: Colors.pop,
+    borderRadius: BorderRadius.full,
+    borderWidth: 2,
+    borderColor: Colors.pop,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+  },
+  challengeText: { fontFamily: Fonts.pixel, fontSize: 24, color: '#000', letterSpacing: 0.5 },
+  challengeSub: { fontSize: 12, fontFamily: Fonts.semibold, color: '#000', opacity: 0.7 },
   sectionLabel: { fontFamily: Fonts.pixel, fontSize: 26, color: Colors.textPrimary, letterSpacing: 0.5, marginBottom: Spacing.sm },
   otherBtn: {
     backgroundColor: Colors.surfaceElevated,
