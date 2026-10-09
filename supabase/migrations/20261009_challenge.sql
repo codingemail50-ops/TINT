@@ -1,16 +1,16 @@
 -- 7 Day Lock In challenge: solo + squad (up to 6). Idempotent -- safe to
--- re-run. Run in the Supabase SQL Editor (Dashboard -> SQL Editor -> New query).
+-- re-run. Run in the Supabase SQL Editor (Dashboard to SQL Editor to New query).
 --
 -- All writes go through the functions at the bottom (security definer), so a
--- client can't invent codes, join full/started squads, or edit other
--- people's rows. Tables only allow members to READ their own challenge.
+-- client cant invent codes, join full/started squads, or edit other
+-- peoples rows. Tables only allow members to READ their own challenge.
 
 create table if not exists public.challenges (
   id uuid primary key default gen_random_uuid(),
   code text not null unique,
   creator_id uuid not null references auth.users(id) on delete cascade,
   mode text not null check (mode in ('solo', 'squad')),
-  -- 'lobby' = squad still gathering; 'active' = started (solo starts at once,
+  -- lobby = squad still gathering; active = started (solo starts at once,
   -- or at a chosen future time). It is over once start_at + days has passed.
   status text not null default 'lobby' check (status in ('lobby', 'active')),
   days int not null default 7,
@@ -48,7 +48,7 @@ alter table public.challenges enable row level security;
 alter table public.challenge_members enable row level security;
 alter table public.challenge_day_stats enable row level security;
 
--- security definer so the policies below don't recurse into themselves.
+-- security definer so the policies below dont recurse into themselves.
 create or replace function public.is_challenge_member(cid uuid)
 returns boolean
 language sql
@@ -78,7 +78,7 @@ revoke insert, update, delete on public.challenges from anon, authenticated;
 revoke insert, update, delete on public.challenge_members from anon, authenticated;
 revoke insert, update, delete on public.challenge_day_stats from anon, authenticated;
 
--- ── functions ─────────────────────────────────────────────────────────────
+-- -- functions ------------------------------------------------------------?
 
 -- True if the signed-in user is already in a lobby or a running challenge.
 create or replace function public._in_open_challenge(uid uuid)
@@ -237,7 +237,7 @@ as $$
   where challenge_id = p_id and user_id = auth.uid() and status = 'active';
 $$;
 
--- "Still going": the phone calls this when the app opens and every few hours.
+-- Still going: the phone calls this when the app opens and every few hours.
 create or replace function public.touch_challenge(p_id uuid)
 returns void
 language sql
@@ -249,7 +249,7 @@ as $$
   where challenge_id = p_id and user_id = auth.uid();
 $$;
 
--- The phone's own before-snapshot / final report / emergency count.
+-- The phones own before-snapshot / final report / emergency count.
 create or replace function public.save_challenge_member_data(
   p_id uuid,
   p_baseline jsonb default null,
