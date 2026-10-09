@@ -1,0 +1,10 @@
+revoke all on public.leaderboard_view from anon;
+revoke all on public.friendships from anon;
+revoke all on function public.public_history(jsonb) from public, anon;
+revoke all on function public.find_user_by_email(text) from public, anon;
+revoke all on function public.friends_leaderboard() from public, anon;
+revoke all on function public.focus_stats_from_log(jsonb) from public, anon;
+grant execute on function public.public_history(jsonb) to authenticated;
+grant execute on function public.find_user_by_email(text) to authenticated;
+grant execute on function public.friends_leaderboard() to authenticated;
+grant execute on function public.focus_stats_from_log(jsonb) to authenticated;

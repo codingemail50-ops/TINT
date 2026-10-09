@@ -310,6 +310,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
               <Text style={styles.discLine}>• <Text style={styles.discBold}>To do this, TINT watches which app is open.</Text> It uses Android's Usage access to see when one of the apps you picked is opened, and Display over other apps to cover it. TINT doesn't upload a list of your apps or what you open.</Text>
               <Text style={styles.discLine}>• <Text style={styles.discBold}>What is saved to your account:</Text> how many times you tried to open each blocked app, each day. And, for those apps only, how many times and for how long you used them in the 7 days before you start. This is only used for your end-of-challenge report. Only you can see it.</Text>
               <Text style={styles.discLine}>• <Text style={styles.discBold}>Squad members can see</Text> your username, avatar, the apps you picked, and whether you're still in.</Text>
+              <Text style={styles.discLine}>• <Text style={styles.discBold}>TINT's leaderboard.</Text> Your username and avatar can appear to other TINT users on the leaderboard, with your streak and focus minutes.</Text>
               <Text style={styles.discLine}>• <Text style={styles.discBold}>You're always in control.</Text> You get 2 emergency unlocks of 5 minutes, and you can leave the challenge any time. You can delete your account any time.</Text>
             </View>
             <PrimaryButton label="I agree, continue" onPress={() => void agree()} />
