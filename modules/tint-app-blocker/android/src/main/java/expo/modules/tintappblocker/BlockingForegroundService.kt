@@ -448,6 +448,8 @@ class BlockingForegroundService : Service() {
     val packages = intent?.getStringArrayListExtra(EXTRA_PACKAGES) ?: arrayListOf()
     blockedPackages = packages.toSet()
     lastBlockedSeenAtMs = 0L
+    resumedActivities.clear()
+    lastQueryEndMs = 0L
     endAtMs = intent?.getLongExtra(EXTRA_END_AT_MS, 0L) ?: 0L
     title = intent?.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() } ?: "Focus session active"
     durationMins = intent?.getIntExtra(EXTRA_DURATION_MINS, 0) ?: 0
@@ -673,70 +675,96 @@ class BlockingForegroundService : Service() {
       return
     }
 
-    // No qualifying event in the lookback window (or the query itself
-    // failed) — an inconclusive reading, not a confident "nothing blocked is
-    // in front." Do nothing rather than guess: if a blocked app is genuinely
-    // still up, the overlay (already showing) simply stays; if it's
-    // genuinely gone, one of the next polls will get a real reading.
-    val foregroundPackage = currentForegroundPackage() ?: return
+    // Query failed -- an inconclusive reading. Do nothing rather than
+    // guess; the next poll gets a real one.
+    if (!updateForegroundState()) return
     val now = System.currentTimeMillis()
 
-    if (foregroundPackage == ownPackageName) returningToTintUntilMs = 0L
+    if (lastResumedPackage == ownPackageName) returningToTintUntilMs = 0L
+    val blockedAppOpen = resumedActivities.values.any { blockedPackages.contains(it) }
 
     when {
       // Just tapped "Return to TINT" and TINT hasn't come up yet — don't
       // re-cover the blocked app in the meantime.
-      blockedPackages.contains(foregroundPackage) && now < returningToTintUntilMs -> {
+      blockedAppOpen && now < returningToTintUntilMs -> {
       }
-      blockedPackages.contains(foregroundPackage) -> {
+      blockedAppOpen -> {
         lastBlockedSeenAtMs = now
         showOverlay()
       }
-      // Anything that isn't a blocked app (home screen, recents, another
-      // app): drop the overlay right away, no lingering. A blocked app coming
-      // back to the front is caught by the branch above.
+      // The blocked app really went away (home screen, another app):
+      // drop the overlay right away, no lingering.
       else -> removeOverlay()
     }
   }
 
-  // UsageStatsManager has no "what's in front right now" call — querying
-  // recent foreground-transition events and taking the latest one is the
-  // documented, standard way to approximate it.
-  // Last app seen coming to the front, kept across polls -- the 10s
-  // lookback alone forgot it once a bypassed blocked app had been open a
-  // while with no new events, so it was never re-blocked.
-  private var lastKnownForegroundPackage: String? = null
+  // UsageStatsManager has no "what's in front right now" call, only a log of
+  // activities coming to the front (resumed) and going away (paused /
+  // stopped). An activity counts as open from its resume until its pause.
+  //
+  // Only looking at "which app resumed last" was the bypass: a quick flick
+  // toward recents and back logs the launcher/recents resuming, but the
+  // blocked app never actually paused, so it never logs a fresh resume
+  // either -- the newest entry said "recents" while the blocked app was on
+  // screen. Tracking pauses too means the blocked app stays "open" through
+  // that flick and stays covered; actually leaving it logs a pause, which
+  // drops the block immediately.
+  //
+  // Keyed by package/activity, valued by package.
+  private val resumedActivities = HashMap<String, String>()
+  private var lastResumedPackage: String? = null
   private var lastQueryEndMs = 0L
 
-  private fun currentForegroundPackage(): String? {
-    val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return null
+  // Reads new events since the last read and updates resumedActivities.
+  // Returns false only if the query itself failed.
+  private fun updateForegroundState(): Boolean {
+    val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return false
     val end = System.currentTimeMillis()
     // Read from just before the last read (overlap catches events Android
-    // logs late) rather than a fixed window, so the last app opened is never
-    // forgotten just because nothing new happened for a while.
+    // logs late) rather than a fixed window, so state never ages out just
+    // because nothing new happened for a while. Re-reading the overlap is
+    // harmless: replaying the same events in order lands on the same state.
     val begin = if (lastQueryEndMs > 0L) lastQueryEndMs - QUERY_OVERLAP_MS else end - LOOKBACK_MS
     val events = try {
       usm.queryEvents(begin, end)
     } catch (e: Exception) {
-      return null
+      return false
     }
-    var lastPackage: String? = null
     val event = UsageEvents.Event()
     while (events.hasNextEvent()) {
       events.getNextEvent(event)
-      val isForegroundEvent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      val pkg = event.packageName ?: continue
+      val key = pkg + "/" + (event.className ?: "")
+      val isQ = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+      val resumed = if (isQ) {
         event.eventType == UsageEvents.Event.ACTIVITY_RESUMED
       } else {
         @Suppress("DEPRECATION")
         event.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND
       }
-      if (isForegroundEvent) {
-        lastPackage = event.packageName
+      val gone = if (isQ) {
+        event.eventType == UsageEvents.Event.ACTIVITY_PAUSED ||
+          event.eventType == UsageEvents.Event.ACTIVITY_STOPPED
+      } else {
+        @Suppress("DEPRECATION")
+        event.eventType == UsageEvents.Event.MOVE_TO_BACKGROUND
+      }
+      if (resumed) {
+        // A real app (or TINT) coming to the front means anything else is
+        // no longer in front -- this also clears an entry whose pause
+        // Android never logged, so the overlay can't get stuck. The
+        // launcher/recents/system UI don't clear: that's the flick.
+        if (!transitPackages.contains(pkg)) {
+          resumedActivities.entries.removeAll { it.value != pkg }
+        }
+        resumedActivities[key] = pkg
+        lastResumedPackage = pkg
+      } else if (gone) {
+        resumedActivities.remove(key)
       }
     }
     lastQueryEndMs = end
-    if (lastPackage != null) lastKnownForegroundPackage = lastPackage
-    return lastKnownForegroundPackage
+    return true
   }
 
   // Plain LinearLayout doesn't consume the back button — unhandled, it falls
