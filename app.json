@@ -31,7 +31,8 @@
         "PACKAGE_USAGE_STATS",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_SPECIAL_USE"
-      ]
+      ],
+      "allowBackup": false
     },
     "owner": "tint-app",
     "extra": {
