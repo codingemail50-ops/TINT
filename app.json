@@ -32,7 +32,13 @@
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_SPECIAL_USE"
       ],
-      "allowBackup": false
+      "allowBackup": false,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "owner": "tint-app",
     "extra": {

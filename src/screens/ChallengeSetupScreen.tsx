@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Share, Alert,
-  AppState as RNAppState, ActivityIndicator, Platform,
+  AppState as RNAppState, ActivityIndicator, Platform, Linking,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as IntentLauncher from 'expo-intent-launcher';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { PixelIcon } from '../components/PixelIcon';
@@ -71,6 +72,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
   const [lobby, setLobby] = useState<LocalChallenge | null>(null);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [grants, setGrants] = useState({ usageAccess: false, overlay: false });
+  const [notifGranted, setNotifGranted] = useState(false);
   const { buttonPress } = useHaptics();
   const startedRef = useRef(false);
   // Kept in a ref so `begin` (and the effects that use it) keep one stable
@@ -121,6 +123,9 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
       usageAccess: checkPermission('usageAccess') === true,
       overlay: checkPermission('overlay') === true,
     });
+    Notifications.getPermissionsAsync()
+      .then(p => setNotifGranted(p.status === 'granted'))
+      .catch(() => {});
   }, []);
   useEffect(() => {
     refreshGrants();
@@ -173,6 +178,22 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
     } catch {
       Alert.alert('Not available', 'This permission can only be granted on the Android app.');
     }
+  };
+
+  // Android 13+ lets people turn notifications off. The challenge still
+  // runs without them, but its persistent notification can then be hidden
+  // from the notification shade, so this is asked for here, with context.
+  const askNotifications = async () => {
+    void buttonPress();
+    try {
+      const current = await Notifications.getPermissionsAsync();
+      if (current.status !== 'granted' && current.canAskAgain) {
+        await Notifications.requestPermissionsAsync();
+      } else if (current.status !== 'granted') {
+        await Linking.openSettings();
+      }
+    } catch {}
+    refreshGrants();
   };
 
   const openBatterySettings = async () => {
@@ -306,7 +327,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
             <Eyebrow>Before you start</Eyebrow>
             <Text style={cs.title}>How the 7 Day Lock In works</Text>
             <View style={cs.card}>
-              <Text style={styles.discLine}>• <Text style={styles.discBold}>Blocking runs all day, for 7 days.</Text> Even when TINT isn't open, it keeps running in the background, with a notification that stays up. It restarts itself if your phone restarts.</Text>
+              <Text style={styles.discLine}>• <Text style={styles.discBold}>Blocking runs all day, for 7 days.</Text> Even when TINT isn't open, it keeps running in the background, with a notification that stays up when notifications are allowed. It restarts itself if your phone restarts.</Text>
               <Text style={styles.discLine}>• <Text style={styles.discBold}>To do this, TINT watches which app is open.</Text> It uses Android's Usage access to see when one of the apps you picked is opened, and Display over other apps to cover it. TINT doesn't upload a list of your apps or what you open.</Text>
               <Text style={styles.discLine}>• <Text style={styles.discBold}>What is saved to your account:</Text> how many times you tried to open each blocked app, each day. And, for those apps only, how many times and for how long you used them in the 7 days before you start. This is only used for your end-of-challenge report. Only you can see it.</Text>
               <Text style={styles.discLine}>• <Text style={styles.discBold}>Squad members can see</Text> your username, avatar, the apps you picked, and whether you're still in.</Text>
@@ -339,6 +360,13 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
               body="Lets TINT show the block screen."
               granted={grants.overlay}
               onPress={() => void grant('overlay')}
+            />
+            <PermissionRow
+              title="Notifications (recommended)"
+              body="Shows the challenge notification while blocking runs, and your daily reminders. If you turn them off, blocking still works, but Android may hide the notification."
+              granted={notifGranted}
+              optional
+              onPress={() => void askNotifications()}
             />
             <PermissionRow
               title="Battery: Unrestricted (recommended)"
