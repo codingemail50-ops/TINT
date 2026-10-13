@@ -20,7 +20,6 @@ const { width: W } = Dimensions.get('window');
 // scale on RN Web (it falls back to the source's raw pixel height), so the
 // screenshot assets below are sized with explicit computed pixel dimensions.
 const TASK_IMG_W = W * 0.78;
-const TASK_IMG_H = TASK_IMG_W * (1170 / 980);
 const DIAL_IMG_W = W * 0.46;
 const DIAL_IMG_H = DIAL_IMG_W * (610 / 710);
 
@@ -78,6 +77,24 @@ const ProblemSlide: React.FC = () => {
 };
 
 // ── Screen 2 — structure your day ───────────────────────────────────────
+// One task row of the preview below, drawn from views (the same way the squad
+// slide's preview is) rather than loaded from a screenshot file, so it always
+// shows.
+const MockTaskRow: React.FC<{ title: string; onDark?: boolean }> = ({ title, onDark }) => (
+  <View style={[styles.taskRow, onDark ? styles.taskRowOnOrange : styles.taskRowOutline]}>
+    <View style={styles.taskCheck} />
+    <View style={styles.taskRowText}>
+      <Text style={styles.taskRowTitle} numberOfLines={1}>{title}</Text>
+      <View style={styles.taskRowMeta}>
+        <View style={styles.taskChip}><Text style={styles.taskChipText}>Study</Text></View>
+        <Ionicons name="timer-outline" size={13} color={Colors.textSecondary} />
+        <Text style={styles.taskMetaText}>1h</Text>
+      </View>
+    </View>
+    <Ionicons name="close" size={16} color={Colors.textMuted} />
+  </View>
+);
+
 const TaskSlide: React.FC = () => {
   return (
     <View style={styles.slideInner}>
@@ -86,11 +103,16 @@ const TaskSlide: React.FC = () => {
       <Text style={styles.title}>Prioritize your tasks.</Text>
       <Text style={styles.bodyBig}>Add what you need to do. Mark what matters most. Focus on that first.</Text>
 
-      <Image
-        source={require('../../assets/walkthrough/task-panels.png')}
-        style={styles.screenshotTask}
-        resizeMode="contain"
-      />
+      <View style={styles.taskMock}>
+        <View style={styles.taskPanelPriority}>
+          <Text style={styles.taskPanelLabelDark}>HIGH PRIORITY</Text>
+          <MockTaskRow title="Mock test" onDark />
+        </View>
+        <View style={styles.taskPanelTodo}>
+          <Text style={styles.taskPanelLabel}>TO DO</Text>
+          <MockTaskRow title="Aptitude" />
+        </View>
+      </View>
     </View>
   );
 };
@@ -396,7 +418,24 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5, textTransform: 'uppercase', textAlign: 'center', marginTop: Spacing.xxl,
   },
 
-  screenshotTask: { width: TASK_IMG_W, height: TASK_IMG_H, marginTop: Spacing.lg },
+  taskMock: { width: TASK_IMG_W, marginTop: Spacing.lg, gap: Spacing.md },
+  taskPanelPriority: { backgroundColor: Colors.pop, borderRadius: BorderRadius.lg, padding: Spacing.md, gap: Spacing.sm },
+  taskPanelTodo: {
+    backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.lg, borderWidth: 1, borderColor: Colors.border,
+    padding: Spacing.md, gap: Spacing.sm,
+  },
+  taskPanelLabelDark: { fontFamily: Fonts.pixel, fontSize: 18, color: '#000', letterSpacing: 1.5 },
+  taskPanelLabel: { fontFamily: Fonts.pixel, fontSize: 18, color: Colors.textSecondary, letterSpacing: 1.5 },
+  taskRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderRadius: BorderRadius.md, padding: Spacing.sm + 2 },
+  taskRowOnOrange: { backgroundColor: Colors.surface },
+  taskRowOutline: { borderWidth: 1, borderColor: Colors.border },
+  taskCheck: { width: 22, height: 22, borderRadius: 7, borderWidth: 2, borderColor: Colors.border },
+  taskRowText: { flex: 1, gap: 4 },
+  taskRowTitle: { fontSize: 16, fontFamily: Fonts.medium, color: Colors.textPrimary },
+  taskRowMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  taskChip: { borderWidth: 1, borderColor: Colors.border, borderRadius: BorderRadius.full, paddingHorizontal: 8, paddingVertical: 1 },
+  taskChipText: { fontSize: 11, fontFamily: Fonts.medium, color: Colors.textSecondary },
+  taskMetaText: { fontSize: 12, fontFamily: Fonts.regular, color: Colors.textSecondary },
   screenshotDial: { width: DIAL_IMG_W, height: DIAL_IMG_H, marginTop: Spacing.lg },
 
   mockCard: {
