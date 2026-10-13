@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal,
   AppState as RNAppState, ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -24,6 +24,7 @@ import {
 } from '../utils/challenge';
 import { useHaptics } from '../hooks/useHaptics';
 import { confirmDeleteAccount, openPrivacyPolicy } from '../utils/accountDeletion';
+import { ConfirmDialog, DialogConfig } from '../components/ConfirmDialog';
 
 interface Props {
   /** No challenge on this account, or they chose to go again. */
@@ -70,6 +71,9 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
   const [baseline, setBaseline] = useState<UsageSnapshot | null>(null);
   const [blockingOk, setBlockingOk] = useState(true);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  // The confirmation boxes on this screen (emergency unlock, leaving), shown in
+  // TINT's own style instead of Android's system alert.
+  const [dialog, setDialog] = useState<DialogConfig | null>(null);
   const [sharing, setSharing] = useState(false);
   const [winVariant, setWinVariant] = useState<number | null>(null);
   const tick = useNow(1000);
@@ -188,50 +192,57 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
   const pressEmergency = () => {
     void buttonPress();
     if (emergencyLeft === 0) {
-      Alert.alert('No unlocks left', `You've used both emergency unlocks for this challenge.`);
+      setDialog({
+        title: 'No unlocks left',
+        message: `You've used both emergency unlocks for this challenge.`,
+        confirmLabel: 'OK',
+      });
       return;
     }
-    Alert.alert(
-      'Emergency unlock?',
-      `All your apps unlock for ${EMERGENCY_MS / 60_000} minutes, then lock again by themselves. You have ${emergencyLeft} left for the whole challenge.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Unlock for 5 min', onPress: async () => setLocal(await triggerEmergency(local)) },
-      ],
-    );
+    setDialog({
+      title: 'Emergency unlock?',
+      message: `All your apps unlock for ${EMERGENCY_MS / 60_000} minutes, then lock again by themselves. You have ${emergencyLeft} left for the whole challenge.`,
+      confirmLabel: 'Unlock for 5 min',
+      cancelLabel: 'Cancel',
+      onConfirm: async () => setLocal(await triggerEmergency(local)),
+    });
   };
 
   const pressLeave = () => {
     void buttonPress();
     const streak = daysCompleted(local, now);
-    Alert.alert(
-      'You sure?',
-      `You're on day ${day} of 7. ${streak > 0 ? `That's ${streak} full day${streak === 1 ? '' : 's'} you already won.` : 'The first day is the hardest. You can get through it.'}`,
-      [
-        { text: 'Stay locked in', style: 'cancel' },
-        {
-          text: 'I still want to leave',
-          style: 'destructive',
-          onPress: () => Alert.alert(
-            'This ends your challenge',
-            local.mode === 'squad'
-              ? 'Your streak and badge are gone, and your squad will see that you left.'
-              : 'Your streak and badge are gone, and you would start again from day 1.',
-            [
-              { text: 'Stay locked in', style: 'cancel' },
-              { text: 'Continue', style: 'destructive', onPress: () => setLeaveOpen(true) },
-            ],
-          ),
-        },
-      ],
-    );
+    setDialog({
+      title: 'You sure?',
+      message: `You're on day ${day} of 7. ${streak > 0 ? `That's ${streak} full day${streak === 1 ? '' : 's'} you already won.` : 'The first day is the hardest. You can get through it.'}`,
+      confirmLabel: 'I still want to leave',
+      cancelLabel: 'Stay locked in',
+      destructive: true,
+      onConfirm: () => setDialog({
+        title: 'This ends your challenge',
+        message: local.mode === 'squad'
+          ? 'Your streak and badge are gone, and your squad will see that you left.'
+          : 'Your streak and badge are gone, and you would start again from day 1.',
+        confirmLabel: 'Continue',
+        cancelLabel: 'Stay locked in',
+        destructive: true,
+        onConfirm: () => setLeaveOpen(true),
+      }),
+    });
+  };
+
+  // Closes the box, then runs its action. An action that opens the next box
+  // simply replaces it, so there is no flash in between.
+  const dialogConfirm = () => {
+    const d = dialog;
+    setDialog(null);
+    d?.onConfirm?.();
   };
 
   const confirmLeave = async () => {
     try {
       setLocal(await quitChallenge(local));
     } catch (err) {
-      Alert.alert("Couldn't leave", challengeErrorMessage(err));
+      setDialog({ title: "Couldn't leave", message: challengeErrorMessage(err), confirmLabel: 'OK' });
     } finally {
       setLeaveOpen(false);
     }
@@ -432,6 +443,8 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
           </View>
         </View>
       </Modal>
+
+      <ConfirmDialog dialog={dialog} onConfirm={dialogConfirm} onCancel={() => setDialog(null)} />
     </View>
   );
 };
