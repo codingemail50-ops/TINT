@@ -658,9 +658,25 @@ export const FocusScreen: React.FC<Props> = ({
       await handleGrantPermission(permission);
       return;
     }
-    const next = !grants[permission];
-    setGrants(prev => ({ ...prev, [permission]: next }));
-    await setSelfReportedGrant(permission, next);
+    // Expo Go / web preview: there is no real permission to read back, so the
+    // toggle is self-reported. Turning it OFF needs no explanation. Turning it
+    // ON follows the same steps as the real thing: the toggle stays OFF, the
+    // popup explains why, "Enable" opens Android Settings, and only when the
+    // user comes back does it flip ON. "Not now" leaves it OFF.
+    if (grants[permission]) {
+      setGrants(prev => ({ ...prev, [permission]: false }));
+      await setSelfReportedGrant(permission, false);
+      return;
+    }
+    await requestWithConsent(async () => {
+      try {
+        await openPermissionSettings(permission);
+      } catch {
+        // Not on an Android phone (web preview): nothing to open.
+      }
+      setGrants(prev => ({ ...prev, [permission]: true }));
+      await setSelfReportedGrant(permission, true);
+    });
   };
 
   const stats = computeFocusStats(focusLog);
