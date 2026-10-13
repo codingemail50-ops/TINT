@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase';
 import { useHaptics } from '../hooks/useHaptics';
 import { AvatarWall } from '../components/AvatarWall';
 import { GoogleSignin, isSuccessResponse, isErrorWithCode, statusCodes } from '../utils/googleAuth';
+import { openPrivacyPolicy } from '../utils/accountDeletion';
 
 // Public (non-secret) Web OAuth client id from Google Cloud Console — see
 // PRIORITY 2 in the EAS audit for the full Google Cloud/Supabase setup this
@@ -334,6 +335,11 @@ export const CreateAccountScreen: React.FC<Props> = ({
             )}
           </TouchableOpacity>
 
+          <Text style={styles.policyLine}>
+            By continuing, you agree to the{' '}
+            <Text style={styles.policyLink} onPress={openPrivacyPolicy}>Privacy Policy</Text>.
+          </Text>
+
           {mode === 'login' && (
             <>
               <View style={styles.dividerRow}>
@@ -368,6 +374,8 @@ export const CreateAccountScreen: React.FC<Props> = ({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background, paddingHorizontal: Spacing.xl, justifyContent: 'center', gap: Spacing.xl },
   backBtn: { position: 'absolute', top: 58, left: Spacing.xl },
+  policyLine: { textAlign: 'center', fontSize: 12, lineHeight: 18, color: Colors.textSecondary, fontFamily: Fonts.regular },
+  policyLink: { color: Colors.textPrimary, fontFamily: Fonts.semibold, textDecorationLine: 'underline' },
   backText: { fontSize: 15, color: Colors.textSecondary, fontFamily: Fonts.medium },
   header: { gap: Spacing.xs, marginBottom: Spacing.md },
   wordmark: {

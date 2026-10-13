@@ -28,6 +28,7 @@ import {
 } from '../utils/appBlocking';
 import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY, packageNamesFor } from '../data/blockableApps';
 import { ensureNotificationPermission, notifySessionComplete } from '../utils/sessionNotifications';
+import { usePermissionConsentGate } from '../components/PermissionDisclosure';
 
 const DEFAULT_DURATION = 25;
 const HOLD_MS = 2000;
@@ -155,6 +156,7 @@ export const FocusScreen: React.FC<Props> = ({
   const dialFadeAnim = useRef(new Animated.Value(1)).current;
   const blobEnterAnim = useRef(new Animated.Value(1)).current;
   const { taskComplete, buttonPress } = useHaptics();
+  const { requestWithConsent, disclosureModal } = usePermissionConsentGate();
   const { setStatus } = useFocusSessionStatus();
   const bootstrappedRef = useRef(false);
 
@@ -637,11 +639,14 @@ export const FocusScreen: React.FC<Props> = ({
 
   const handleGrantPermission = async (permission: BlockingPermission) => {
     await buttonPress();
-    try {
-      await openPermissionSettings(permission);
-    } catch {
-      Alert.alert('Not available', 'This permission can only be granted on an Android build outside Expo Go.');
-    }
+    // First time only: explain why before Android Settings opens.
+    await requestWithConsent(async () => {
+      try {
+        await openPermissionSettings(permission);
+      } catch {
+        Alert.alert('Not available', 'This permission can only be granted on an Android build outside Expo Go.');
+      }
+    });
   };
 
   const handleToggleGrant = async (permission: BlockingPermission) => {
@@ -681,6 +686,7 @@ export const FocusScreen: React.FC<Props> = ({
   return (
     <View style={[styles.container, !visible && styles.hidden]} pointerEvents={visible ? 'auto' : 'none'}>
       <StatusBar style="light" />
+      {disclosureModal}
 
       {phase !== 'active' && (
         <Animated.ScrollView

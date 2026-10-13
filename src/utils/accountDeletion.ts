@@ -14,6 +14,7 @@ import { stopAppBlocking } from './appBlocking';
 import { clearLocalChallenge, cancelChallengeNotifications } from './challenge';
 import { PRIVACY_POLICY_URL } from '../constants/links';
 import { BLOCKED_APPS_STORAGE_KEY } from '../data/blockableApps';
+import { clearPermissionConsent } from './permissionConsent';
 
 export async function wipeThisDevice(): Promise<void> {
   stopAppBlocking();
@@ -27,6 +28,8 @@ export async function wipeThisDevice(): Promise<void> {
     cancelChallengeNotifications(),
     // The apps picked for focus-session blocking.
     AsyncStorage.removeItem(BLOCKED_APPS_STORAGE_KEY).catch(() => {}),
+    // The deleted account's agreement to the permission screens.
+    clearPermissionConsent(),
   ]);
 }
 

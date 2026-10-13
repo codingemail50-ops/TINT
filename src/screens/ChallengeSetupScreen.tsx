@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as IntentLauncher from 'expo-intent-launcher';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
@@ -21,6 +20,7 @@ import {
 } from '../utils/challenge';
 import { useHaptics } from '../hooks/useHaptics';
 import { confirmDeleteAccount, openPrivacyPolicy } from '../utils/accountDeletion';
+import { hasLockInConsent, setLockInConsent } from '../utils/permissionConsent';
 
 type Step = 'loading' | 'disclosure' | 'permissions' | 'choose' | 'solo' | 'squad' | 'create' | 'join' | 'lobby';
 type StartChoice = 'now' | 'tonight' | 'tomorrow';
@@ -32,15 +32,6 @@ interface Props {
 }
 
 const LOBBY_POLL_MS = 3000;
-const CONSENT_KEY = 'tint_lockin_consent_v1';
-
-async function hasConsent(): Promise<boolean> {
-  try {
-    return (await AsyncStorage.getItem(CONSENT_KEY)) === 'yes';
-  } catch {
-    return false;
-  }
-}
 
 function startTimeFor(choice: StartChoice): number | null {
   if (choice === 'now') return null;
@@ -113,7 +104,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
         void begin(local);
         return;
       }
-      setStep((await hasConsent()) ? afterPermissions() : 'disclosure');
+      setStep((await hasLockInConsent()) ? afterPermissions() : 'disclosure');
     })();
   }, [afterPermissions, begin]);
 
@@ -165,9 +156,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
 
   const agree = async () => {
     void buttonPress();
-    try {
-      await AsyncStorage.setItem(CONSENT_KEY, 'yes');
-    } catch {}
+    await setLockInConsent();
     setStep(afterPermissions());
   };
 
@@ -380,6 +369,9 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
               disabled={!(grants.usageAccess && grants.overlay) && isNativeBlockingAvailable()}
               onPress={() => setStep('choose')}
             />
+            <TouchableOpacity onPress={() => setStep('disclosure')} hitSlop={8}>
+              <Text style={cs.link}>Not now</Text>
+            </TouchableOpacity>
           </>
         )}
 

@@ -9,6 +9,7 @@ import { MeditatingFlame } from '../components/MeditatingFlame';
 import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY } from '../data/blockableApps';
 import { openPermissionSettings, checkPermission, BlockingPermission } from '../utils/appBlocking';
 import { useHaptics } from '../hooks/useHaptics';
+import { usePermissionConsentGate } from '../components/PermissionDisclosure';
 
 const MIN_MINS = 15;
 const MAX_MINS = 1080;
@@ -50,6 +51,7 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
   const [overlayGranted, setOverlayGranted] = useState<boolean | null>(null);
   const [usageGranted, setUsageGranted] = useState<boolean | null>(null);
   const { buttonPress } = useHaptics();
+  const { requestWithConsent, disclosureModal } = usePermissionConsentGate();
 
   const dialScale = useRef(new Animated.Value(1)).current;
   const glowOpacity = useRef(new Animated.Value(0)).current;
@@ -84,11 +86,14 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
 
   const handlePermissionPress = async (permission: BlockingPermission) => {
     await buttonPress();
-    try {
-      await openPermissionSettings(permission);
-    } catch {
-      Alert.alert('Not available', 'App blocking can only be set up on an Android build outside Expo Go.');
-    }
+    // First time only: explain why before Android Settings opens.
+    await requestWithConsent(async () => {
+      try {
+        await openPermissionSettings(permission);
+      } catch {
+        Alert.alert('Not available', 'App blocking can only be set up on an Android build outside Expo Go.');
+      }
+    });
   };
 
   const handleLockIn = () => {
@@ -205,6 +210,7 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
           </TouchableOpacity>
         )}
       </View>
+      {disclosureModal}
     </View>
   );
 };
