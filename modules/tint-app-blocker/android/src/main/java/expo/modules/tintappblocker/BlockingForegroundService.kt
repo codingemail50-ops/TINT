@@ -10,9 +10,12 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.RectF
+import android.graphics.Shader
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -743,17 +746,25 @@ class BlockingForegroundService : Service() {
   }
 
   // The app's own launcher icon (the TINT logo) as a bitmap for the
-  // notification's left image. Null if it can't be read -- caller falls
-  // back to the pixel flame.
+  // notification's left image, with rounded corners like the icon on the home
+  // screen (a plain square looked harsh next to the card's rounded edge). The
+  // corners are cut with an anti-aliased shader so they are smooth, and are
+  // transparent so the card colour shows through. Null if it can't be read --
+  // caller falls back to the pixel flame.
   private fun buildLogoBitmap(): Bitmap? {
     return try {
       val drawable = packageManager.getApplicationIcon(ownPackageName)
       val size = 144
-      val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-      val canvas = Canvas(bitmap)
+      val raw = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
       drawable.setBounds(0, 0, size, size)
-      drawable.draw(canvas)
-      bitmap
+      drawable.draw(Canvas(raw))
+
+      val rounded = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+      val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+      paint.shader = BitmapShader(raw, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+      val radius = size * 0.225f
+      Canvas(rounded).drawRoundRect(RectF(0f, 0f, size.toFloat(), size.toFloat()), radius, radius, paint)
+      rounded
     } catch (e: Exception) {
       null
     }
