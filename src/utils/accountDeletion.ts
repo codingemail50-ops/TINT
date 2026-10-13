@@ -16,6 +16,17 @@ import { PRIVACY_POLICY_URL } from '../constants/links';
 import { BLOCKED_APPS_STORAGE_KEY } from '../data/blockableApps';
 import { clearPermissionConsent } from './permissionConsent';
 
+// Whatever else TINT saved under its own names (last-shown dates, wording
+// choices, clock offset, ...) and any saved login session, so nothing of the
+// deleted account is left on the phone. Never throws.
+async function removeLeftoverKeys(): Promise<void> {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const mine = keys.filter(k => k.startsWith('tint_') || k.startsWith('sb-'));
+    if (mine.length > 0) await AsyncStorage.multiRemove(mine);
+  } catch {}
+}
+
 export async function wipeThisDevice(): Promise<void> {
   stopAppBlocking();
   await Promise.all([
@@ -31,6 +42,7 @@ export async function wipeThisDevice(): Promise<void> {
     // The deleted account's agreement to the permission screens.
     clearPermissionConsent(),
   ]);
+  await removeLeftoverKeys();
 }
 
 /** Deletes the signed-in account. Throws with a readable message on failure. */
