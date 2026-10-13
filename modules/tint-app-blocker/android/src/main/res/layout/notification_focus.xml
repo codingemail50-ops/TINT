@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Compact, media-player-style focus notification (see
-    BlockingForegroundService.buildNotification): TINT logo, a big white
-    countdown, one pause/resume control. Nothing else, by design.
+    Compact notification (see BlockingForegroundService.buildNotification):
+    TINT logo, a one-line title saying what is running, a big white countdown,
+    and (focus sessions only) one pause/resume control. The longer explanation
+    line is in notification_focus_big.xml, shown when the notification is
+    expanded.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -11,7 +13,7 @@
     android:gravity="center_vertical"
     android:background="@drawable/tint_notification_bg"
     android:paddingHorizontal="16dp"
-    android:paddingVertical="14dp">
+    android:paddingVertical="12dp">
 
     <ImageView
         android:id="@+id/notif_flame_icon"
@@ -20,15 +22,31 @@
         android:scaleType="fitCenter"
         android:contentDescription="@null" />
 
-    <Chronometer
-        android:id="@+id/notif_timer"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:layout_marginStart="16dp"
-        android:textColor="#FFFFFF"
-        android:textSize="28sp"
-        android:textStyle="bold" />
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/notif_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:textColor="#FCC268"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <Chronometer
+            android:id="@+id/notif_timer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+    </LinearLayout>
 
     <ImageView
         android:id="@+id/notif_toggle"

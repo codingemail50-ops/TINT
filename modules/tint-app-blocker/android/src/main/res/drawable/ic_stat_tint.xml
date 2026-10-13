@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Status-bar icon for the blocking notification: the TINT flame as a plain
+    white silhouette on transparent. Android draws status-bar icons from the
+    shape only (it ignores colour), so a coloured launcher icon would show as a
+    solid white square. Built from the same pixel grid as the in-app logo flame
+    (embers left out so it stays readable at 24dp).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10.8,3.6h1.2v1.2h-1.2zM10.8,4.8h2.4v1.2h-2.4zM9.6,6h3.6v1.2h-3.6zM10.8,7.2h3.6v1.2h-3.6zM9.6,8.4h4.8v1.2h-4.8zM7.2,9.6h1.2v1.2h-1.2zM9.6,9.6h6v1.2h-6zM6,10.8h9.6v1.2h-9.6zM6,12h9.6v1.2h-9.6zM4.8,13.2h10.8v1.2h-10.8zM16.8,13.2h1.2v1.2h-1.2zM3.6,14.4h14.4v1.2h-14.4zM2.4,15.6h16.8v1.2h-16.8zM2.4,16.8h16.8v1.2h-16.8zM2.4,18h16.8v1.2h-16.8zM3.6,19.2h14.4v1.2h-14.4zM4.8,20.4h12v1.2h-12zM6,21.6h9.6v1.2h-9.6zM8.4,22.8h6v1.2h-6z" />
+</vector>

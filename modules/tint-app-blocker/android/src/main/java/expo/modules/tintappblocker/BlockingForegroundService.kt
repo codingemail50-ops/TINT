@@ -67,6 +67,11 @@ class BlockingForegroundService : Service() {
     // reliably reach), which forwards the tap to JS via actionListener below.
     const val ACTION_NOTIF_TOGGLE_PAUSE = "expo.modules.tintappblocker.action.NOTIF_TOGGLE_PAUSE"
     const val ACTION_NOTIF_END = "expo.modules.tintappblocker.action.NOTIF_END"
+    // Fired by the notification's deleteIntent when the user swipes it away.
+    // Android 14+ lets people dismiss a foreground-service notification even
+    // though it is "ongoing"; during a running 7 Day Lock In it is put
+    // straight back (see onStartCommand).
+    const val ACTION_NOTIF_DISMISSED = "expo.modules.tintappblocker.action.NOTIF_DISMISSED"
     // Challenge mode: bring a persisted challenge back after a reboot / kill.
     const val ACTION_RESTORE = "expo.modules.tintappblocker.action.RESTORE"
     // Challenge mode: lift blocking for a fixed number of ms, then resume.
@@ -82,6 +87,9 @@ class BlockingForegroundService : Service() {
     private const val KEY_TITLE = "title"
     private const val KEY_EMERGENCY_UNTIL = "emergency_until_ms"
     private const val NOTIFICATION_REFRESH_MS = 60_000L
+    // A swiped-away challenge notification is re-posted at most this often, so
+    // a misbehaving phone can never make it loop.
+    private const val REPOST_MIN_GAP_MS = 1_000L
     private const val SAME_CHALLENGE_SLACK_MS = 10 * 60_000L
     // Separate file from the challenge config above: that one is wiped when a
     // challenge stops, but the per-day "blocked app opened" counts are what
@@ -391,6 +399,7 @@ class BlockingForegroundService : Service() {
   // A solo challenge can be set to begin later: nothing is blocked before this.
   private var startAtMs: Long = 0L
   private var lastNotificationRefreshMs: Long = 0L
+  private var lastRepostMs: Long = 0L
   // Which blocked package the overlay being shown is for (challenge stats).
   private var overlayForPackage: String? = null
   private var overlayView: View? = null
@@ -494,6 +503,27 @@ class BlockingForegroundService : Service() {
         stopBlockingAndSelf()
         return START_NOT_STICKY
       }
+      // The user swiped the notification away. Only a running 7 Day Lock In
+      // brings it back, and never more than once a second. If this arrived at
+      // a service that is not running a challenge (a stale notification),
+      // there is nothing to show: stop again right away.
+      ACTION_NOTIF_DISMISSED -> {
+        if (!challengeMode) {
+          stopSelf()
+          return START_NOT_STICKY
+        }
+        val nowMs = System.currentTimeMillis()
+        if (nowMs - lastRepostMs >= REPOST_MIN_GAP_MS) {
+          lastRepostMs = nowMs
+          try {
+            startForeground(NOTIFICATION_ID, buildNotification())
+          } catch (e: Exception) {
+            // Foreground promotion refused (OEM battery rules): the 60-second
+            // refresh below still re-posts it.
+          }
+        }
+        return START_STICKY
+      }
     }
 
     resumedActivities.clear()
@@ -572,9 +602,9 @@ class BlockingForegroundService : Service() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       if (manager.getNotificationChannel(CHANNEL_ID) == null) {
         val channel = NotificationChannel(
-          CHANNEL_ID, "Focus session blocking", NotificationManager.IMPORTANCE_LOW
+          CHANNEL_ID, "App blocking", NotificationManager.IMPORTANCE_LOW
         )
-        channel.description = "Shown while TINT is blocking distracting apps during an active focus session."
+        channel.description = "Shown while TINT is blocking the apps you chose, during a focus session or a 7 Day Lock In."
         channel.setShowBadge(false)
         manager.createNotificationChannel(channel)
       }
@@ -596,63 +626,104 @@ class BlockingForegroundService : Service() {
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    // Custom minimal layout (see notification_focus.xml) instead of the
-    // default template's title/body text pair -- that read as a generic
-    // system notice (light card, plain black text) rather than Tint's own
-    // thing. DecoratedCustomViewStyle keeps the OS chrome (small icon, app
-    // name, timestamp, the action buttons below) and lets this content
-    // area have its own dark gradient background.
-    val views = RemoteViews(packageName, R.layout.notification_focus)
-    views.setImageViewBitmap(R.id.notif_flame_icon, logoBitmap ?: flameBitmap)
-    views.setImageViewResource(
-      R.id.notif_toggle,
-      if (isPaused) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause
-    )
-    views.setInt(R.id.notif_toggle, "setColorFilter", 0xFFFFFFFF.toInt())
-    views.setOnClickPendingIntent(R.id.notif_toggle, togglePausePendingIntent)
-    // A challenge can't be paused from the notification.
-    if (challengeMode) views.setViewVisibility(R.id.notif_toggle, View.GONE)
+    val headline = notificationHeadline()
+    val detail = notificationDetail()
 
-    // Chronometer is elapsedRealtime-based (SystemClock.elapsedRealtime()),
-    // not wall-clock epoch millis -- endAtMs is epoch millis (it's compared
-    // against System.currentTimeMillis() elsewhere for the actual block
-    // logic), so it has to be converted to an elapsedRealtime reference
-    // point here or the countdown would show the wrong time entirely.
-    if (challengeMode) {
-      views.setTextViewText(R.id.notif_timer, formatChallengeTimeLeft())
-    } else if (!isPaused && endAtMs > 0L) {
-      val base = SystemClock.elapsedRealtime() + (endAtMs - System.currentTimeMillis())
-      views.setChronometer(R.id.notif_timer, base, null, true)
-      views.setChronometerCountDown(R.id.notif_timer, true)
-    } else if (isPaused) {
-      val totalSec = pausedRemainingMs / 1000
-      // Stop any ticking from a previous update before writing static text.
-      views.setChronometer(R.id.notif_timer, SystemClock.elapsedRealtime(), null, false)
-      views.setTextViewText(R.id.notif_timer, String.format("%02d:%02d", totalSec / 60, totalSec % 60))
-    } else {
-      // Chronometer extends TextView, so this just overwrites its displayed
-      // text with a static label -- safe because setChronometer (and the
-      // start() call it makes internally) is only invoked in the branch
-      // above, never here, so nothing is ticking to overwrite on the next
-      // tick (endAtMs itself isn't adjusted on pause -- a pre-existing,
-      // accepted gap).
-      views.setTextViewText(R.id.notif_timer, "")
+    // Custom layout (see notification_focus.xml) instead of the default
+    // template's plain text -- that read as a generic system notice (light
+    // card, plain black text) rather than Tint's own thing.
+    // DecoratedCustomViewStyle keeps the OS chrome (small icon, app name,
+    // timestamp) and lets this content area have its own dark background.
+    // Two versions: a compact one (title + countdown) and an expanded one that
+    // also carries the line explaining what the service is doing.
+    fun buildViews(layoutRes: Int, withBody: Boolean): RemoteViews {
+      val views = RemoteViews(packageName, layoutRes)
+      views.setImageViewBitmap(R.id.notif_flame_icon, logoBitmap ?: flameBitmap)
+      views.setTextViewText(R.id.notif_title, headline)
+      if (withBody) views.setTextViewText(R.id.notif_body, detail)
+      views.setImageViewResource(
+        R.id.notif_toggle,
+        if (isPaused) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause
+      )
+      views.setInt(R.id.notif_toggle, "setColorFilter", 0xFFFFFFFF.toInt())
+      views.setOnClickPendingIntent(R.id.notif_toggle, togglePausePendingIntent)
+      // A challenge can't be paused from the notification.
+      if (challengeMode) views.setViewVisibility(R.id.notif_toggle, View.GONE)
+
+      // Chronometer is elapsedRealtime-based (SystemClock.elapsedRealtime()),
+      // not wall-clock epoch millis -- endAtMs is epoch millis (it's compared
+      // against System.currentTimeMillis() elsewhere for the actual block
+      // logic), so it has to be converted to an elapsedRealtime reference
+      // point here or the countdown would show the wrong time entirely.
+      if (challengeMode) {
+        views.setTextViewText(R.id.notif_timer, formatChallengeTimeLeft())
+      } else if (!isPaused && endAtMs > 0L) {
+        val base = SystemClock.elapsedRealtime() + (endAtMs - System.currentTimeMillis())
+        views.setChronometer(R.id.notif_timer, base, null, true)
+        views.setChronometerCountDown(R.id.notif_timer, true)
+      } else if (isPaused) {
+        val totalSec = pausedRemainingMs / 1000
+        // Stop any ticking from a previous update before writing static text.
+        views.setChronometer(R.id.notif_timer, SystemClock.elapsedRealtime(), null, false)
+        views.setTextViewText(R.id.notif_timer, String.format("%02d:%02d", totalSec / 60, totalSec % 60))
+      } else {
+        // Chronometer extends TextView, so this just overwrites its displayed
+        // text with a static label -- safe because setChronometer (and the
+        // start() call it makes internally) is only invoked in the branch
+        // above, never here, so nothing is ticking to overwrite on the next
+        // tick (endAtMs itself isn't adjusted on pause -- a pre-existing,
+        // accepted gap).
+        views.setTextViewText(R.id.notif_timer, "")
+      }
+      return views
     }
+    val views = buildViews(R.layout.notification_focus, false)
+    val bigViews = buildViews(R.layout.notification_focus_big, true)
 
-    // Pause/resume lives inside the custom layout now (notif_toggle), so no
-    // addAction buttons -- keeps the card to logo + timer + one control.
+    // Told when the user swipes the notification away (see
+    // ACTION_NOTIF_DISMISSED). Only used for a challenge.
+    val dismissedIntent = Intent(this, BlockingForegroundService::class.java).apply {
+      action = ACTION_NOTIF_DISMISSED
+    }
+    val dismissedPendingIntent = PendingIntent.getService(
+      this, 2, dismissedIntent,
+      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+
+    // Pause/resume lives inside the custom layout (notif_toggle), so no
+    // addAction buttons. Low importance on purpose: it sits quietly in the
+    // tray with no sound, but still shows its icon in the status bar.
     val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-      .setContentTitle(title)
-      .setSmallIcon(applicationInfo.icon)
+      .setContentTitle(headline)
+      .setContentText(detail)
+      .setSmallIcon(R.drawable.ic_stat_tint)
+      .setColor(0xFFF45F01.toInt())
       .setOngoing(true)
       .setOnlyAlertOnce(true)
       .setContentIntent(contentIntent)
       .setPriority(NotificationCompat.PRIORITY_LOW)
+      .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
       .setCustomContentView(views)
-      .setCustomBigContentView(views)
+      .setCustomBigContentView(bigViews)
       .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+    if (challengeMode) builder.setDeleteIntent(dismissedPendingIntent)
 
     return builder.build()
+  }
+
+  // What the notification says is running. Plain words on purpose: this is the
+  // text Google's reviewers and the user see in the tray.
+  private fun notificationHeadline(): String = when {
+    challengeMode && System.currentTimeMillis() < startAtMs -> "7 Day Lock In"
+    challengeMode -> "7 Day Lock In Active"
+    else -> "Focus session active"
+  }
+
+  private fun notificationDetail(): String = when {
+    challengeMode && System.currentTimeMillis() < startAtMs -> "Your selected apps will be blocked once it starts."
+    challengeMode -> "Monitoring your selected apps to protect your focus streak."
+    isPaused -> "Paused. Tap play to resume."
+    else -> "Blocking your selected apps until the timer ends."
   }
 
   // "6d 23h 59m" while there are days left, "5h 12m" on the last day.
