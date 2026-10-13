@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Share, Alert,
-  AppState as RNAppState, ActivityIndicator, Platform, Linking,
+  AppState as RNAppState, ActivityIndicator, Platform, Linking, BackHandler,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as IntentLauncher from 'expo-intent-launcher';
@@ -291,6 +291,30 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
       { text: 'Log out', style: 'destructive', onPress: onLogout },
     ]);
   };
+
+  // The phone's Back button goes to the previous step, the same place the
+  // on-screen links go. On the first step (and while loading) it does nothing
+  // special, so Android leaves the app as usual: nobody is ever trapped, and
+  // no step can send the user in a circle.
+  useEffect(() => {
+    const previous: Partial<Record<Step, Step>> = {
+      permissions: 'disclosure',
+      // The permissions step is skipped when both are already on, so go back
+      // to whichever screen the user actually came from.
+      choose: permissionsReady() ? 'disclosure' : 'permissions',
+      solo: 'choose',
+      squad: 'choose',
+      create: 'squad',
+      join: 'squad',
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      const to = previous[step];
+      if (!to) return false;
+      setStep(to);
+      return true;
+    });
+    return () => sub.remove();
+  }, [step]);
 
   const back = (to: Step) => (
     <TouchableOpacity onPress={() => setStep(to)} style={styles.back} hitSlop={12}>
