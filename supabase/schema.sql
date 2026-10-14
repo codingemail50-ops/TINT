@@ -200,11 +200,11 @@ create table if not exists public.friend_requests (
 
 alter table public.friend_requests enable row level security;
 
--- Either side of a request can see it; only the sender can create one;
--- either side can update it (accept/decline the incoming one, or cancel
--- one you sent) -- the app is responsible for only offering the buttons
--- that make sense for which side of the row the current user is on, RLS
--- here just guards against touching a request that isn't yours at all.
+-- Either side of a request can see it. Only the sender can create one, and a
+-- new one must start out pending. Only the RECIPIENT can accept or decline,
+-- and only status/responded_at can ever be updated (who it is between cannot
+-- be rewritten). Either side can delete one (cancel a sent request, unfriend).
+-- See supabase/migrations/20261014_friend_requests_lockdown.sql.
 drop policy if exists "see requests you're part of" on public.friend_requests;
 create policy "see requests you're part of"
   on public.friend_requests for select
@@ -213,13 +213,17 @@ create policy "see requests you're part of"
 drop policy if exists "send requests as yourself" on public.friend_requests;
 create policy "send requests as yourself"
   on public.friend_requests for insert
-  with check (auth.uid() = from_user);
+  with check (auth.uid() = from_user and status = 'pending' and responded_at is null);
 
 drop policy if exists "respond to requests you're part of" on public.friend_requests;
-create policy "respond to requests you're part of"
+drop policy if exists "recipient responds to requests" on public.friend_requests;
+create policy "recipient responds to requests"
   on public.friend_requests for update
-  using (auth.uid() = from_user or auth.uid() = to_user)
-  with check (auth.uid() = from_user or auth.uid() = to_user);
+  using (auth.uid() = to_user)
+  with check (auth.uid() = to_user and status in ('accepted', 'declined'));
+
+revoke update on public.friend_requests from anon, authenticated;
+grant update (status, responded_at) on public.friend_requests to authenticated;
 
 drop policy if exists "cancel requests you're part of" on public.friend_requests;
 create policy "cancel requests you're part of"
