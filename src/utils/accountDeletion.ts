@@ -12,7 +12,7 @@ import { saveDistractionLog } from './distractionLog';
 import { clearActiveSession } from './activeFocusSession';
 import { stopAppBlocking } from './appBlocking';
 import { clearLocalChallenge, cancelChallengeNotifications } from './challenge';
-import { PRIVACY_POLICY_URL } from '../constants/links';
+import { PRIVACY_POLICY_URL, ACCOUNT_DELETION_URL } from '../constants/links';
 import { BLOCKED_APPS_STORAGE_KEY } from '../data/blockableApps';
 import { clearPermissionConsent } from './permissionConsent';
 
@@ -82,7 +82,11 @@ export function confirmDeleteAccount(onDeleted: () => void): void {
                   await deleteMyAccount();
                   onDeleted();
                 } catch (err) {
-                  Alert.alert("Couldn't delete your account", (err as Error).message);
+                  // Offer the web page too, so a failed delete is never a dead end.
+                  Alert.alert("Couldn't delete your account", (err as Error).message, [
+                    { text: 'OK', style: 'cancel' },
+                    { text: 'Other ways to delete', onPress: openAccountDeletionPage },
+                  ]);
                 }
               },
             },
@@ -91,6 +95,11 @@ export function confirmDeleteAccount(onDeleted: () => void): void {
       },
     ],
   );
+}
+
+/** The web page that explains how to delete an account without the app. */
+export function openAccountDeletionPage(): void {
+  Linking.openURL(ACCOUNT_DELETION_URL).catch(() => {});
 }
 
 export function openPrivacyPolicy(): void {
