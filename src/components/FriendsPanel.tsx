@@ -94,6 +94,7 @@ export const FriendsPanel: React.FC<Props> = ({ userId }) => {
           onSubmitEditing={handleSearch}
           placeholder="Add by exact email..."
           placeholderTextColor={Colors.textMuted}
+          maxLength={254}
           autoCapitalize="none"
           keyboardType="email-address"
           returnKeyType="search"

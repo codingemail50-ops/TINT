@@ -826,6 +826,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
               onChangeText={setNewTaskTitle}
               placeholder="What are you studying?"
               placeholderTextColor={Colors.textMuted}
+              maxLength={100}
               returnKeyType="done"
               onSubmitEditing={() => Keyboard.dismiss()}
             />
@@ -918,6 +919,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
               onChangeText={setEditTitle}
               placeholder="Task title"
               placeholderTextColor={Colors.textMuted}
+              maxLength={100}
             />
             <DurationSlider value={editDuration} onChange={setEditDuration} />
             <TouchableOpacity

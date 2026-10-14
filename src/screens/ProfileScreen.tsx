@@ -258,6 +258,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
               onChangeText={setEditName}
               placeholder="Your name"
               placeholderTextColor={Colors.textMuted}
+              maxLength={24}
             />
             <ScrollView style={styles.avatarGridScroll} keyboardShouldPersistTaps="handled">
               <View style={styles.avatarGrid}>

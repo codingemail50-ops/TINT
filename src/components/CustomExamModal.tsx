@@ -84,6 +84,7 @@ export const CustomExamModal: React.FC<Props> = ({ visible, initial, onClose, on
               onChangeText={setName}
               placeholder="e.g. CLAT, CA Foundation..."
               placeholderTextColor={Colors.textMuted}
+              maxLength={40}
             />
 
             <Text style={styles.label}>Exam date</Text>
@@ -103,6 +104,7 @@ export const CustomExamModal: React.FC<Props> = ({ visible, initial, onClose, on
                   onChangeText={v => updateTask(i, { title: v })}
                   placeholder="Task name"
                   placeholderTextColor={Colors.textMuted}
+                  maxLength={100}
                 />
                 <TextInput
                   style={[styles.input, styles.taskDurationInput]}
@@ -110,6 +112,7 @@ export const CustomExamModal: React.FC<Props> = ({ visible, initial, onClose, on
                   onChangeText={v => updateTask(i, { duration: v.replace(/[^0-9]/g, '') })}
                   placeholder="min"
                   placeholderTextColor={Colors.textMuted}
+                  maxLength={3}
                   keyboardType="number-pad"
                 />
                 <TouchableOpacity
