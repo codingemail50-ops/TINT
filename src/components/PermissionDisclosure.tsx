@@ -14,15 +14,22 @@ import { Modal, View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable 
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { Eyebrow, PrimaryButton } from './ChallengeParts';
 import { openPrivacyPolicy } from '../utils/accountDeletion';
-import { hasPermissionConsent, setPermissionConsent } from '../utils/permissionConsent';
+import { hasPermissionConsent, setPermissionConsent, ConsentPermission } from '../utils/permissionConsent';
+
+const PERMISSION_LABEL: Record<ConsentPermission, string> = {
+  usageAccess: 'Usage access',
+  overlay: 'Display over other apps',
+};
 
 interface Props {
   visible: boolean;
+  /** Which permission is being turned on, shown under the title. */
+  permission: ConsentPermission | null;
   onEnable: () => void;
   onNotNow: () => void;
 }
 
-export const PermissionDisclosure: React.FC<Props> = ({ visible, onEnable, onNotNow }) => (
+export const PermissionDisclosure: React.FC<Props> = ({ visible, permission, onEnable, onNotNow }) => (
   <Modal visible={visible} transparent animationType="fade" onRequestClose={onNotNow}>
     <Pressable style={s.backdrop} onPress={onNotNow}>
       {/* Swallows taps so touching the card itself does not close it. */}
@@ -32,6 +39,11 @@ export const PermissionDisclosure: React.FC<Props> = ({ visible, onEnable, onNot
         <ScrollView style={s.scroll} showsVerticalScrollIndicator={false} contentContainerStyle={s.body}>
           <Eyebrow>Before you turn this on</Eyebrow>
           <Text style={s.title}>Why TINT needs these permissions</Text>
+          {permission ? (
+            <Text style={s.turningOn}>
+              Turning on: <Text style={s.turningOnName}>{PERMISSION_LABEL[permission]}</Text>
+            </Text>
+          ) : null}
           <Text style={s.intro}>
             TINT blocks the apps you choose, during focus sessions and the 7 Day Lock In. To do that, it needs two
             permissions. You turn them on yourself in Android settings.
@@ -83,22 +95,25 @@ export const PermissionDisclosure: React.FC<Props> = ({ visible, onEnable, onNot
  *
  *    const { requestWithConsent, disclosureModal } = usePermissionConsentGate();
  *    ...
- *    requestWithConsent(() => openPermissionSettings(permission));
+ *    requestWithConsent(permission, () => openPermissionSettings(permission));
  *    ...
  *    {disclosureModal}   // render once, anywhere in the screen
  *
- *  Already agreed: runs the action straight away. Not yet: shows the popup
- *  and runs the action only after "Enable". */
+ *  Already agreed for THIS permission: runs the action straight away. Not yet:
+ *  shows the popup and runs the action only after "Enable". */
 export function usePermissionConsentGate() {
-  const [pending, setPending] = useState<{ run: () => void | Promise<void> } | null>(null);
+  const [pending, setPending] = useState<{ permission: ConsentPermission; run: () => void | Promise<void> } | null>(null);
   const handling = useRef(false);
+  // Keep the permission name on screen while the popup fades out.
+  const lastPermission = useRef<ConsentPermission | null>(null);
+  if (pending) lastPermission.current = pending.permission;
 
-  const requestWithConsent = useCallback(async (run: () => void | Promise<void>) => {
-    if (await hasPermissionConsent()) {
+  const requestWithConsent = useCallback(async (permission: ConsentPermission, run: () => void | Promise<void>) => {
+    if (await hasPermissionConsent(permission)) {
       await run();
       return;
     }
-    setPending({ run });
+    setPending({ permission, run });
   }, []);
 
   const close = useCallback(() => setPending(null), []);
@@ -107,17 +122,19 @@ export function usePermissionConsentGate() {
     // A fast double tap must not open Settings twice.
     if (handling.current || !pending) return;
     handling.current = true;
-    const { run } = pending;
+    const { permission, run } = pending;
     setPending(null);
     try {
-      await setPermissionConsent();
+      await setPermissionConsent(permission);
       await run();
     } finally {
       handling.current = false;
     }
   }, [pending]);
 
-  const disclosureModal = <PermissionDisclosure visible={pending !== null} onEnable={enable} onNotNow={close} />;
+  const disclosureModal = (
+    <PermissionDisclosure visible={pending !== null} permission={lastPermission.current} onEnable={enable} onNotNow={close} />
+  );
 
   return { requestWithConsent, disclosureModal };
 }
@@ -138,6 +155,8 @@ const s = StyleSheet.create({
   },
   linkRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: Spacing.xs },
   title: { fontFamily: Fonts.pixel, fontSize: 30, color: Colors.textPrimary, letterSpacing: 0.5 },
+  turningOn: { fontSize: 13, color: Colors.textSecondary, fontFamily: Fonts.regular },
+  turningOnName: { color: Colors.pop, fontFamily: Fonts.semibold },
   intro: { fontSize: 14, color: Colors.textSecondary, lineHeight: 21, fontFamily: Fonts.regular },
   point: { fontSize: 14, color: Colors.textSecondary, lineHeight: 21, fontFamily: Fonts.regular },
   bold: { color: Colors.textPrimary, fontFamily: Fonts.semibold },

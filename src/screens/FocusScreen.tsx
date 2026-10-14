@@ -640,7 +640,7 @@ export const FocusScreen: React.FC<Props> = ({
   const handleGrantPermission = async (permission: BlockingPermission) => {
     await buttonPress();
     // First time only: explain why before Android Settings opens.
-    await requestWithConsent(async () => {
+    await requestWithConsent(permission, async () => {
       try {
         await openPermissionSettings(permission);
       } catch {
@@ -668,7 +668,7 @@ export const FocusScreen: React.FC<Props> = ({
       await setSelfReportedGrant(permission, false);
       return;
     }
-    await requestWithConsent(async () => {
+    await requestWithConsent(permission, async () => {
       try {
         await openPermissionSettings(permission);
       } catch {

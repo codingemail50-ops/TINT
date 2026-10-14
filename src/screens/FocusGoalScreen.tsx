@@ -87,7 +87,7 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
   const handlePermissionPress = async (permission: BlockingPermission) => {
     await buttonPress();
     // First time only: explain why before Android Settings opens.
-    await requestWithConsent(async () => {
+    await requestWithConsent(permission, async () => {
       try {
         await openPermissionSettings(permission);
       } catch {
