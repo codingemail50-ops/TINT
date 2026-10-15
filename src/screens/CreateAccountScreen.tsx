@@ -341,6 +341,7 @@ export const CreateAccountScreen: React.FC<Props> = ({
           <Text style={styles.policyLine}>
             By continuing, you agree to the{' '}
             <Text style={styles.policyLink} onPress={openPrivacyPolicy}>Privacy Policy</Text>.
+            {' '}TINT is for people aged 13 and over, or the minimum legal age for online services in your country.
           </Text>
 
           {mode === 'login' && (
