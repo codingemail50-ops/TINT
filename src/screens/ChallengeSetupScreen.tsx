@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Share, Alert,
-  AppState as RNAppState, ActivityIndicator, Platform, Linking, BackHandler,
+  AppState as RNAppState, ActivityIndicator, Platform, BackHandler,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as IntentLauncher from 'expo-intent-launcher';
-import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { PixelIcon } from '../components/PixelIcon';
@@ -21,6 +20,7 @@ import {
 import { useHaptics } from '../hooks/useHaptics';
 import { confirmDeleteAccount, openPrivacyPolicy } from '../utils/accountDeletion';
 import { hasLockInConsent, setLockInConsent } from '../utils/permissionConsent';
+import { notificationsAllowed, askForNotifications } from '../utils/notificationAccess';
 
 type Step = 'loading' | 'disclosure' | 'permissions' | 'choose' | 'solo' | 'squad' | 'create' | 'join' | 'lobby';
 type StartChoice = 'now' | 'tonight' | 'tomorrow';
@@ -71,7 +71,13 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
   const onStartedRef = useRef(onStarted);
   onStartedRef.current = onStarted;
 
-  const afterPermissions = useCallback((): Step => (permissionsReady() ? 'choose' : 'permissions'), []);
+  // Notifications are required too (native builds only), so this has to ask
+  // Android, which makes it async.
+  const afterPermissions = useCallback(async (): Promise<Step> => {
+    if (!permissionsReady()) return 'permissions';
+    if (isNativeBlockingAvailable() && !(await notificationsAllowed())) return 'permissions';
+    return 'choose';
+  }, []);
 
   const begin = useCallback(async (local: LocalChallenge) => {
     if (startedRef.current) return;
@@ -104,7 +110,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
         void begin(local);
         return;
       }
-      setStep((await hasLockInConsent()) ? afterPermissions() : 'disclosure');
+      setStep((await hasLockInConsent()) ? await afterPermissions() : 'disclosure');
     })();
   }, [afterPermissions, begin]);
 
@@ -114,9 +120,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
       usageAccess: checkPermission('usageAccess') === true,
       overlay: checkPermission('overlay') === true,
     });
-    Notifications.getPermissionsAsync()
-      .then(p => setNotifGranted(p.status === 'granted'))
-      .catch(() => {});
+    void notificationsAllowed().then(setNotifGranted);
   }, []);
   useEffect(() => {
     refreshGrants();
@@ -157,7 +161,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
   const agree = async () => {
     void buttonPress();
     await setLockInConsent();
-    setStep(afterPermissions());
+    setStep(await afterPermissions());
   };
 
   const grant = async (permission: BlockingPermission) => {
@@ -169,20 +173,23 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
     }
   };
 
-  // Android 13+ lets people turn notifications off. The challenge still
-  // runs without them, but its persistent notification can then be hidden
-  // from the notification shade, so this is asked for here, with context.
+  // Required to start a challenge: its notification is how the person sees
+  // it is live. (Blocking itself would still run without it, but Android can
+  // then hide the notification.)
   const askNotifications = async () => {
     void buttonPress();
-    try {
-      const current = await Notifications.getPermissionsAsync();
-      if (current.status !== 'granted' && current.canAskAgain) {
-        await Notifications.requestPermissionsAsync();
-      } else if (current.status !== 'granted') {
-        await Linking.openSettings();
-      }
-    } catch {}
+    await askForNotifications();
     refreshGrants();
+  };
+
+  // A challenge cannot start while notifications are off, even if they were
+  // on earlier in this flow and got switched off since. Sends the person back
+  // to the permissions step. Always false where there is no native blocker.
+  const blockedByNotifications = async (): Promise<boolean> => {
+    if (!isNativeBlockingAvailable() || (await notificationsAllowed())) return false;
+    setNotifGranted(false);
+    setStep('permissions');
+    return true;
   };
 
   const openBatterySettings = async () => {
@@ -210,11 +217,13 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
   };
 
   const startSolo = () => run(async () => {
+    if (await blockedByNotifications()) return;
     const local = await createChallenge('solo', apps, startTimeFor(startChoice));
     await begin(local);
   });
 
   const createSquad = () => run(async () => {
+    if (await blockedByNotifications()) return;
     const local = await createChallenge('squad', apps, null);
     setLobby(local);
     setStep('lobby');
@@ -226,6 +235,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
       return;
     }
     void run(async () => {
+      if (await blockedByNotifications()) return;
       const local = await joinChallenge(code.trim(), apps);
       setLobby(local);
       setStep('lobby');
@@ -301,7 +311,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
       permissions: 'disclosure',
       // The permissions step is skipped when both are already on, so go back
       // to whichever screen the user actually came from.
-      choose: permissionsReady() ? 'disclosure' : 'permissions',
+      choose: permissionsReady() && (!isNativeBlockingAvailable() || notifGranted) ? 'disclosure' : 'permissions',
       solo: 'choose',
       squad: 'choose',
       create: 'squad',
@@ -314,7 +324,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
       return true;
     });
     return () => sub.remove();
-  }, [step]);
+  }, [step, notifGranted]);
 
   const back = (to: Step) => (
     <TouchableOpacity onPress={() => setStep(to)} style={styles.back} hitSlop={12}>
@@ -361,7 +371,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
           <>
             <Eyebrow>Before you start</Eyebrow>
             <Text style={cs.title}>Let TINT block apps</Text>
-            <Text style={cs.sub}>Two Android settings, as explained on the last screen. TINT uses them to see when one of your picked apps is opened, and cover it.</Text>
+            <Text style={cs.sub}>Two Android settings, as explained on the last screen, and notifications. TINT uses the settings to see when one of your picked apps is opened, and cover it.</Text>
             <PermissionRow
               title="Usage access"
               body="Lets TINT see which app is open."
@@ -375,10 +385,9 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
               onPress={() => void grant('overlay')}
             />
             <PermissionRow
-              title="Notifications (recommended)"
-              body="Shows the challenge notification while blocking runs, and your daily reminders. If you turn them off, blocking still works, but Android may hide the notification."
+              title="Notifications (required)"
+              body="Lets you see your 7 Day Lock In is live and how much time is left. TINT also sends two short reminders a day and one when it ends. No ads."
               granted={notifGranted}
-              optional
               onPress={() => void askNotifications()}
             />
             <PermissionRow
@@ -390,7 +399,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
             />
             <PrimaryButton
               label="Continue"
-              disabled={!(grants.usageAccess && grants.overlay) && isNativeBlockingAvailable()}
+              disabled={!(grants.usageAccess && grants.overlay && notifGranted) && isNativeBlockingAvailable()}
               onPress={() => setStep('choose')}
             />
             <TouchableOpacity onPress={() => setStep('disclosure')} hitSlop={8}>

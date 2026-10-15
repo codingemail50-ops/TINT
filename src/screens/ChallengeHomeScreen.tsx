@@ -25,6 +25,7 @@ import {
 import { useHaptics } from '../hooks/useHaptics';
 import { confirmDeleteAccount, openPrivacyPolicy } from '../utils/accountDeletion';
 import { ConfirmDialog, DialogConfig } from '../components/ConfirmDialog';
+import { notificationsAllowed, askForNotifications } from '../utils/notificationAccess';
 
 interface Props {
   /** No challenge on this account, or they chose to go again. */
@@ -70,6 +71,10 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [baseline, setBaseline] = useState<UsageSnapshot | null>(null);
   const [blockingOk, setBlockingOk] = useState(true);
+  // Notifications can be switched off after the challenge starts (in Android
+  // settings, or by swiping a channel off). Blocking keeps running, but the
+  // person can no longer see the "live" notification, so say so.
+  const [notifOff, setNotifOff] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   // The confirmation boxes on this screen (emergency unlock, leaving), shown in
   // TINT's own style instead of Android's system alert.
@@ -131,6 +136,19 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
     });
     return () => sub.remove();
   }, [refresh]);
+
+  // Checked on its own (not inside refresh) so a slow connection never delays
+  // the notifications warning. Re-checked each time the app comes back to the
+  // front, e.g. after the person visits Android settings.
+  useEffect(() => {
+    if (!isNativeBlockingAvailable()) return;
+    const check = () => { void notificationsAllowed().then(ok => setNotifOff(!ok)); };
+    check();
+    const sub = RNAppState.addEventListener('change', s => {
+      if (s === 'active') check();
+    });
+    return () => sub.remove();
+  }, []);
 
   // Squad list stays fresh while the screen is open.
   useEffect(() => {
@@ -376,6 +394,18 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
           </View>
         )}
 
+        {notifOff && (
+          <View style={[cs.card, styles.warning]}>
+            <Text style={styles.warningText}>Notifications are off, so Android may hide the "7 Day Lock In Active" notification. Blocking still works, but you can't see it's live.</Text>
+            <TouchableOpacity
+              onPress={() => { void askForNotifications().then(() => notificationsAllowed()).then(ok => setNotifOff(!ok)); }}
+              hitSlop={8}
+            >
+              <Text style={styles.warningLink}>Turn on notifications</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={styles.statRow}>
           <SmallStat value={local.endAtMs ? formatTimeLeft(local.endAtMs - now, true) : '-'} label="left" />
           <SmallStat value={String(daysCompleted(local, now))} label="day streak" />
@@ -478,6 +508,7 @@ const styles = StyleSheet.create({
   quote: { fontSize: 18, lineHeight: 26, fontFamily: Fonts.semibold, color: Colors.textPrimary },
   warning: { borderColor: Colors.danger },
   warningText: { fontSize: 13, lineHeight: 19, fontFamily: Fonts.medium, color: Colors.danger },
+  warningLink: { fontSize: 14, fontFamily: Fonts.semibold, color: Colors.pop, marginTop: Spacing.sm },
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 4 },
   footerLinks: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginTop: Spacing.md },
   danger: { color: Colors.danger },
