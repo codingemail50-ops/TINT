@@ -64,6 +64,10 @@ class BlockingForegroundService : Service() {
   companion object {
     const val ACTION_START = "expo.modules.tintappblocker.action.START"
     const val ACTION_STOP = "expo.modules.tintappblocker.action.STOP"
+    // A focus session ended (finished, ended early, left). Unlike ACTION_STOP
+    // this never ends a running 7 Day Lock In: it only drops the session's own
+    // apps. See ChallengeGuard.
+    const val ACTION_STOP_SESSION = "expo.modules.tintappblocker.action.STOP_SESSION"
     const val ACTION_SET_PAUSED = "expo.modules.tintappblocker.action.SET_PAUSED"
     // Tapped from the notification's own action buttons — these PendingIntents
     // target this same Service (the only component a notification action can
@@ -401,6 +405,11 @@ class BlockingForegroundService : Service() {
   private var emergencyUntilMs: Long = 0L
   // A solo challenge can be set to begin later: nothing is blocked before this.
   private var startAtMs: Long = 0L
+  // A focus session started while a 7 Day Lock In is running adds its apps
+  // here until the session's end. It never replaces the challenge's settings
+  // above (apps, end time, mode). See ChallengeGuard.
+  private var sessionExtraPackages: Set<String> = emptySet()
+  private var sessionEndAtMs: Long = 0L
   private var lastNotificationRefreshMs: Long = 0L
   private var lastRepostMs: Long = 0L
   // Which blocked package the overlay being shown is for (challenge stats).
@@ -461,9 +470,27 @@ class BlockingForegroundService : Service() {
         stopBlockingAndSelf()
         return START_NOT_STICKY
       }
+      // A focus session ended. A running 7 Day Lock In carries on untouched:
+      // only the session's own extra apps are dropped. With no challenge this
+      // is the same as ACTION_STOP.
+      ACTION_STOP_SESSION -> {
+        sessionExtraPackages = emptySet()
+        sessionEndAtMs = 0L
+        if (challengeMode && endAtMs > System.currentTimeMillis()) return START_STICKY
+        if (!hasActiveChallenge(this)) {
+          stopBlockingAndSelf()
+          return START_NOT_STICKY
+        }
+        // A challenge is saved but this service instance is not running it
+        // (Android restarted the service): fall through and bring it back
+        // below, instead of stopping.
+      }
       // JS-driven pause/resume (from togglePause()) — just refresh what the
       // notification shows, nothing about polling/blocking changes.
       ACTION_SET_PAUSED -> {
+        // A focus session pausing or resuming must never rewrite a running
+        // challenge's end time (that used to stop the challenge early).
+        if (challengeMode) return START_STICKY
         isPaused = intent?.getBooleanExtra(EXTRA_PAUSED, false) ?: false
         endAtMs = intent?.getLongExtra(EXTRA_END_AT_MS, endAtMs) ?: endAtMs
         if (isPaused) pausedRemainingMs = (endAtMs - System.currentTimeMillis()).coerceAtLeast(0L)
@@ -475,6 +502,8 @@ class BlockingForegroundService : Service() {
       // lag) and forward the tap to JS, which drives the actual session
       // pause logic and will confirm back via ACTION_SET_PAUSED.
       ACTION_NOTIF_TOGGLE_PAUSE -> {
+        // The challenge notification has no pause button; ignore a stale tap.
+        if (challengeMode) return START_STICKY
         isPaused = !isPaused
         val nowMs = System.currentTimeMillis()
         if (isPaused) {
@@ -502,6 +531,9 @@ class BlockingForegroundService : Service() {
         return START_STICKY
       }
       ACTION_NOTIF_END -> {
+        // Only a focus session's notification has an End button. A running
+        // challenge is never ended from here.
+        if (challengeMode) return START_STICKY
         actionListener?.invoke("end")
         stopBlockingAndSelf()
         return START_NOT_STICKY
@@ -529,6 +561,30 @@ class BlockingForegroundService : Service() {
       }
     }
 
+    // A focus session starting while a 7 Day Lock In is running: the challenge
+    // keeps its apps, end time and mode, and the session only adds its own
+    // apps on top until its end (see ChallengeGuard). This used to replace the
+    // challenge's settings, and the challenge stopped blocking for good once
+    // the session ended.
+    if (ChallengeGuard.isSessionStart(
+        intent != null, intent?.action, intent?.getBooleanExtra(EXTRA_CHALLENGE, false) ?: false, ACTION_START
+      ) && hasActiveChallenge(this)
+    ) {
+      if (!challengeMode) loadPersistedChallenge()
+      sessionExtraPackages = (intent?.getStringArrayListExtra(EXTRA_PACKAGES) ?: arrayListOf()).toSet()
+      sessionEndAtMs = intent?.getLongExtra(EXTRA_END_AT_MS, 0L) ?: 0L
+      try {
+        startForeground(NOTIFICATION_ID, buildNotification())
+      } catch (e: Exception) {
+        // Same fail-safe as a normal start. The saved challenge is left in
+        // place, so the next app open or reboot brings it back.
+        stopSelf()
+        return START_NOT_STICKY
+      }
+      startPolling()
+      return START_STICKY
+    }
+
     resumedActivities.clear()
     lastQueryEndMs = 0L
     lastBlockedSeenAtMs = 0L
@@ -536,9 +592,11 @@ class BlockingForegroundService : Service() {
     // bring a saved challenge back. Nothing saved and an explicit RESTORE
     // means there's nothing to do. A null intent with nothing saved falls
     // through to the old behavior, unchanged.
-    val restoring = intent == null || intent.action == ACTION_RESTORE
+    // ACTION_STOP_SESSION reaches here only when a challenge is saved but this
+    // service instance is not running it.
+    val restoring = intent == null || intent.action == ACTION_RESTORE || intent.action == ACTION_STOP_SESSION
     val restored = restoring && loadPersistedChallenge()
-    if (intent?.action == ACTION_RESTORE && !restored) {
+    if ((intent?.action == ACTION_RESTORE || intent?.action == ACTION_STOP_SESSION) && !restored) {
       // Started with startForegroundService (BootReceiver), so Android
       // requires startForeground before stopping, or it crashes the app.
       try {
@@ -812,6 +870,12 @@ class BlockingForegroundService : Service() {
           stopBlockingAndSelf()
           return
         }
+        // A focus session's extra apps lapse at the session's end. The
+        // challenge itself keeps running.
+        if (sessionEndAtMs > 0L && System.currentTimeMillis() >= sessionEndAtMs) {
+          sessionExtraPackages = emptySet()
+          sessionEndAtMs = 0L
+        }
         // Challenge countdown is plain text ("6d 23h"), not a ticking
         // chronometer, so it needs an occasional refresh.
         if (challengeMode &&
@@ -898,6 +962,8 @@ class BlockingForegroundService : Service() {
 
   private fun stopBlockingAndSelf() {
     clearPersistedChallenge()
+    sessionExtraPackages = emptySet()
+    sessionEndAtMs = 0L
     stopPolling()
     lastBlockedSeenAtMs = 0L
     removeOverlay()
@@ -912,7 +978,7 @@ class BlockingForegroundService : Service() {
     val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
     if (powerManager != null && !powerManager.isInteractive) return
 
-    if (blockedPackages.isEmpty()) {
+    if (blockedPackages.isEmpty() && sessionExtraPackages.isEmpty()) {
       removeOverlay()
       return
     }
@@ -922,15 +988,20 @@ class BlockingForegroundService : Service() {
     if (!updateForegroundState()) return
     val now = System.currentTimeMillis()
 
-    // Not started yet, or an emergency window: state above keeps tracking,
-    // but nothing is covered.
-    if (now < startAtMs || now < emergencyUntilMs) {
+    // What to cover right now. A challenge that has not started yet, or an
+    // emergency window, lifts the challenge's own apps (state above keeps
+    // tracking); apps added by a focus session stay covered.
+    val blocked = ChallengeGuard.effectiveBlocked(
+      blockedPackages, challengeMode, startAtMs, emergencyUntilMs,
+      sessionExtraPackages, sessionEndAtMs, now
+    )
+    if (blocked.isEmpty()) {
       removeOverlay()
       return
     }
 
     if (lastResumedPackage == ownPackageName) returningToTintUntilMs = 0L
-    val blockedAppOpen = resumedActivities.values.any { blockedPackages.contains(it) }
+    val blockedAppOpen = resumedActivities.values.any { blocked.contains(it) }
 
     when {
       // Just tapped "Return to TINT" and TINT hasn't come up yet — don't
@@ -939,7 +1010,7 @@ class BlockingForegroundService : Service() {
       }
       blockedAppOpen -> {
         lastBlockedSeenAtMs = now
-        overlayForPackage = resumedActivities.values.firstOrNull { blockedPackages.contains(it) }
+        overlayForPackage = resumedActivities.values.firstOrNull { blocked.contains(it) }
         showOverlay()
       }
       // The blocked app really went away (home screen, another app):

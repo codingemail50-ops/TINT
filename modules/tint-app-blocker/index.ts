@@ -17,6 +17,8 @@ type TintAppBlockerNativeModule = {
   getChallengeBlockStats(): string;
   getUsageSummary(packageNames: string[], fromMs: number, toMs: number): string;
   stopBlocking(): void;
+  // Optional: not present in a native build made before it was added.
+  stopSessionBlocking?(): void;
   setPaused(paused: boolean, endAtMs: number): void;
   hasUsageAccess(): boolean;
   hasOverlayPermission(): boolean;
@@ -79,6 +81,15 @@ export function getUsageSummary(
 /** Stops polling, removes any visible overlay, and stops the service. */
 export function stopBlocking(): void {
   NativeModule?.stopBlocking();
+}
+
+/** A focus session ended (finished, ended early, left). Unlike stopBlocking()
+ *  this never ends a running 7 Day Lock In: the service only drops the
+ *  session's own apps, and stops itself only when no challenge is running.
+ *  An older native build without it falls back to stopBlocking(). */
+export function stopSessionBlocking(): void {
+  if (NativeModule?.stopSessionBlocking) NativeModule.stopSessionBlocking();
+  else NativeModule?.stopBlocking();
 }
 
 /** Reflects a JS-side pause/resume into the notification (icon + label +

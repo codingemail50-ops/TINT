@@ -23,7 +23,7 @@ import { BlobDial } from '../components/BlobDial';
 import { scallopPath } from '../utils/scallopPath';
 import {
   openPermissionSettings, getSelfReportedGrants, setSelfReportedGrant, checkPermission,
-  isNativeBlockingAvailable, startAppBlocking, stopAppBlocking, setBlockingPaused,
+  isNativeBlockingAvailable, startAppBlocking, stopSessionBlocking, setBlockingPaused,
   subscribeFocusNotificationAction, BlockingPermission,
 } from '../utils/appBlocking';
 import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY, packageNamesFor } from '../data/blockableApps';
@@ -209,7 +209,8 @@ export const FocusScreen: React.FC<Props> = ({
     setDuration(completedDurationMins);
     setPhase('done');
     await clearActiveSession();
-    stopAppBlocking();
+    // Session over. Never ends a running 7 Day Lock In (see appBlocking.ts).
+    stopSessionBlocking();
 
     // Upsert (not append) — this session may already have a real-time
     // checkpoint entry sitting in the log from before it reached this point
@@ -459,7 +460,8 @@ export const FocusScreen: React.FC<Props> = ({
     setPaused(false);
     setConfirmOpen(false);
     await clearActiveSession();
-    stopAppBlocking();
+    // Session left or ended early. Never ends a running 7 Day Lock In.
+    stopSessionBlocking();
 
     if (mode === 'early') {
       const distractedMins = distractedSecondsRef.current / 60;

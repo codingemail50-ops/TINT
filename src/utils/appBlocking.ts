@@ -122,6 +122,16 @@ export function stopAppBlocking(): void {
   TintAppBlocker.stopBlocking();
 }
 
+/** A focus session ended (finished, ended early, left). Use this, not
+ *  stopAppBlocking(), for anything to do with a focus session: it never ends a
+ *  running 7 Day Lock In. stopAppBlocking() is for what really ends
+ *  everything (leaving or finishing a challenge, logging out, deleting the
+ *  account). */
+export function stopSessionBlocking(): void {
+  if (!isNativeBlockingAvailable()) return;
+  TintAppBlocker.stopSessionBlocking();
+}
+
 /** Reflects a JS-driven pause/resume onto the persistent notification
  *  (icon, label, chronometer). Purely cosmetic — this doesn't itself pause
  *  polling or the block overlay. No-op off Android or when unlinked. */

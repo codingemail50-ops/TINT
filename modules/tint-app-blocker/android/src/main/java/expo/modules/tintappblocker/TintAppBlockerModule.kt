@@ -127,6 +127,24 @@ class TintAppBlockerModule : Module() {
       Unit
     }
 
+    // A focus session ended (finished, ended early, left). Unlike
+    // stopBlocking this never ends a running 7 Day Lock In: the service only
+    // drops the session's own apps, and stops itself only if no challenge is
+    // running. Use stopBlocking for the things that really end everything
+    // (leaving or finishing a challenge, logging out, deleting the account).
+    Function("stopSessionBlocking") {
+      val context = appContext.reactContext ?: return@Function Unit
+      val intent = Intent(context, BlockingForegroundService::class.java).apply {
+        action = BlockingForegroundService.ACTION_STOP_SESSION
+      }
+      try {
+        context.startService(intent)
+      } catch (e: Exception) {
+        // Service already gone (process killed, task swiped) — nothing to stop.
+      }
+      Unit
+    }
+
     // Reflects a JS-driven pause/resume into the notification (icon, label,
     // chronometer) — the JS side remains the source of truth for session
     // state, this just forwards it to update what's on-screen.

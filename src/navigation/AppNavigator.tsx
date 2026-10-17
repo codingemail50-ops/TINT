@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert, AppState as RNAppState } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +16,7 @@ import { ProfileScreen } from '../screens/ProfileScreen';
 import { ChallengeIntroScreen } from '../screens/ChallengeIntroScreen';
 import { ChallengeSetupScreen } from '../screens/ChallengeSetupScreen';
 import { ChallengeHomeScreen } from '../screens/ChallengeHomeScreen';
-import { clearLocalChallenge, cancelChallengeNotifications } from '../utils/challenge';
+import { clearLocalChallenge, cancelChallengeNotifications, loadLocalChallenge, armChallengeBlocking } from '../utils/challenge';
 import { StorageService, AppState, UserProfile, FutureGoal } from '../utils/storage';
 import { ExamType, CustomExam, ClassTwelveStream } from '../data/examPresets';
 import { supabase } from '../lib/supabase';
@@ -294,6 +294,29 @@ const AppNavigatorInner: React.FC = () => {
       Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     }
   }, [bootTargetScreen, splashAnimDone, tabFadeAnim]);
+
+  // Keep a running 7 Day Lock In armed whenever TINT opens or comes back to
+  // the front, for every kind of account. Only challenge-only accounts open on
+  // the Lock In screen (which re-arms it); everyone else lands on the tabs, so
+  // a challenge that Android's battery rules had stopped stayed off until the
+  // Lock In screen happened to be opened. Safe to repeat: re-arming the same
+  // challenge changes nothing, and the phone's own copy is used, so it works
+  // offline. Does nothing when no challenge is saved on this phone.
+  useEffect(() => {
+    const rearm = async () => {
+      try {
+        const local = await loadLocalChallenge();
+        if (local && local.status === 'active') armChallengeBlocking(local);
+      } catch {
+        // Never let this affect startup.
+      }
+    };
+    void rearm();
+    const sub = RNAppState.addEventListener('change', s => {
+      if (s === 'active') void rearm();
+    });
+    return () => sub.remove();
+  }, []);
 
   // Tab screens stay mounted now, so the dev-mode day-skip tool needs an
   // explicit nudge to refresh appState (streak/history are date-dependent) —
