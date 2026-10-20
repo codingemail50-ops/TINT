@@ -12,7 +12,11 @@ import { ErrorBoundary } from './src/components/ErrorBoundary';
 // Font loading is a nice-to-have, not a hard requirement — if it fails or
 // hangs (seen on some devices), the app must still render with system
 // fonts rather than get stuck on a blank screen forever.
-const FONT_LOAD_TIMEOUT_MS = 8000;
+// Was 8 seconds. In a real build the fonts are inside the app and load at
+// once; this only matters when they are slow (Expo Go fetches them from the
+// computer over Wi-Fi). If they are late the app still opens, in the phone's
+// own font for a moment.
+const FONT_LOAD_TIMEOUT_MS = 3000;
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, VT323_400Regular });

@@ -59,6 +59,25 @@ const FORCE_ONBOARDING_ON_LAUNCH = false;
 // actually going to succeed a few seconds later. 20s (was 6-8s) is a
 // deliberately generous bound for exactly that reason.
 const REMOTE_TIMEOUT_MS = 20000;
+
+// The one place startup really has to wait on the network: a phone with no
+// saved account. The splash used to sit on its last frame for up to 40
+// seconds there (two 20-second waits). Now the whole wait shares one short
+// budget, and running out of it shows "Try again" instead of a frozen screen.
+// A phone that already has a saved account never waits at all (it goes
+// straight in and checks the server in the background, with the generous
+// bound above).
+const BOOT_NETWORK_BUDGET_MS = 6000;
+const TIMED_OUT = Symbol('timed-out');
+function raceTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null | typeof TIMED_OUT> {
+  return new Promise(resolve => {
+    const timer = setTimeout(() => resolve(TIMED_OUT), ms);
+    promise.then(
+      value => { clearTimeout(timer); resolve(value); },
+      () => { clearTimeout(timer); resolve(null); },
+    );
+  });
+}
 function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   return new Promise<T>(resolve => {
     const timer = setTimeout(() => resolve(fallback), ms);
@@ -149,6 +168,10 @@ const AppNavigatorInner: React.FC = () => {
   // holds on the animation's final frame instead of an extra loading state.
   const [bootTargetScreen, setBootTargetScreen] = useState<Screen | null>(null);
   const [splashAnimDone, setSplashAnimDone] = useState(false);
+  // True when startup could not reach the server in time (see
+  // BOOT_NETWORK_BUDGET_MS). bootAttempt re-runs the startup check.
+  const [bootSlow, setBootSlow] = useState(false);
+  const [bootAttempt, setBootAttempt] = useState(0);
   // The "Already have an account? Log in" shortcut on step 1 skips straight
   // to createAccount in login mode, without collecting avatar/exam/goal —
   // this flag is what tells createAccount which mode to open in.
@@ -220,6 +243,7 @@ const AppNavigatorInner: React.FC = () => {
       // Must resolve before anything below reads "today" — otherwise a
       // saved dev day-skip offset wouldn't apply until the next reload.
       await loadDevOffset();
+      setBootSlow(false);
 
       if (!FORCE_ONBOARDING_ON_LAUNCH) {
         const localState = await StorageService.getAppState();
@@ -249,7 +273,14 @@ const AppNavigatorInner: React.FC = () => {
 
         // No local user on this device — genuinely nothing to show without
         // asking the network first.
-        const userId = await withTimeout(ensureSession(), REMOTE_TIMEOUT_MS, null);
+        const deadline = Date.now() + BOOT_NETWORK_BUDGET_MS;
+        const timeLeft = () => Math.max(500, deadline - Date.now());
+        const sessionResult = await raceTimeout(ensureSession(), timeLeft());
+        if (sessionResult === TIMED_OUT) {
+          setBootSlow(true);
+          return;
+        }
+        const userId = sessionResult;
         userIdRef.current = userId;
         if (userId) {
           // Was a separate checkUserExists() + loadUserFromSupabase() pair —
@@ -261,7 +292,12 @@ const AppNavigatorInner: React.FC = () => {
           // brand-new-user path over a transient network hiccup.
           // loadUserFromSupabase already returns null for both cases and
           // is the one path actually exercised/trusted elsewhere.
-          const loaded = await withTimeout(loadUserFromSupabase(userId), REMOTE_TIMEOUT_MS, null);
+          const loadedResult = await raceTimeout(loadUserFromSupabase(userId), timeLeft());
+          if (loadedResult === TIMED_OUT) {
+            setBootSlow(true);
+            return;
+          }
+          const loaded = loadedResult;
           if (loaded) {
             setAppState(loaded);
             if (isChallengeOnly(loaded.user)) {
@@ -280,7 +316,9 @@ const AppNavigatorInner: React.FC = () => {
       // creation, then the walkthrough right before landing in the app.
       setBootTargetScreen('avatarExam');
     })();
-  }, []);
+    // bootAttempt: "Try again" on the slow-connection notice re-runs this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bootAttempt]);
 
   // Actually leaves the boot screen once BOTH the async resolution above and
   // the splash animation have finished — whichever takes longer wins. Fast
@@ -701,6 +739,21 @@ const AppNavigatorInner: React.FC = () => {
           {screen === 'boot' && (
             <View style={styles.bootScreen}>
               <SplashAnimation onFinish={() => setSplashAnimDone(true)} />
+              {bootSlow && (
+                <View style={styles.bootSlowBox}>
+                  <Text style={styles.bootSlowTitle}>Taking longer than usual</Text>
+                  <Text style={styles.bootSlowBody}>
+                    We could not reach the server. Check your internet connection.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.bootSlowButton}
+                    onPress={() => setBootAttempt(n => n + 1)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.bootSlowButtonText}>Try again</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           )}
           {screen === 'walkthrough' && (
@@ -872,6 +925,23 @@ const styles = StyleSheet.create({
   // stretch reads as the app being frozen rather than loading.
   bootScreen: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
+  },
+  // "Taking longer than usual" notice, drawn over the bottom of the splash.
+  bootSlowBox: {
+    position: 'absolute', left: 24, right: 24, bottom: 64, alignItems: 'center',
+  },
+  bootSlowTitle: {
+    color: Colors.textPrimary, fontSize: 16, fontWeight: '600', textAlign: 'center',
+  },
+  bootSlowBody: {
+    color: Colors.textSecondary, fontSize: 14, textAlign: 'center', marginTop: 6, lineHeight: 20,
+  },
+  bootSlowButton: {
+    marginTop: 16, paddingHorizontal: 28, paddingVertical: 12,
+    borderRadius: BorderRadius.full, backgroundColor: Colors.pop,
+  },
+  bootSlowButtonText: {
+    color: '#000', fontSize: 15, fontWeight: '700',
   },
   tabScreenSlot: {
     ...StyleSheet.absoluteFillObject,

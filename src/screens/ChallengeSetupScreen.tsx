@@ -32,6 +32,9 @@ interface Props {
 }
 
 const LOBBY_POLL_MS = 3000;
+// How long the first screen waits to learn whether this account is already in
+// a challenge (see the load effect). Was 10 seconds.
+const SERVER_LOOKUP_MS = 3000;
 
 function startTimeFor(choice: StartChoice): number | null {
   if (choice === 'now') return null;
@@ -88,30 +91,55 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
 
   // Pick up where this account left off: a squad lobby it's sitting in, or
   // a challenge that's already running (reinstall / another phone).
+  // The screen the person is on, for the late answer below.
+  const stepRef = useRef<Step>('loading');
+  stepRef.current = step;
+  // After a moment on the spinner, say what is happening.
+  const [slowLoad, setSlowLoad] = useState(false);
   useEffect(() => {
-    void (async () => {
-      let local = await loadLocalChallenge();
-      try {
-        // Bounded: on a bad connection the request can retry for a long
-        // time, and this screen would sit on a spinner.
-        const fetched = await Promise.race([
-          fetchMyLatestChallenge(),
-          new Promise<null>(resolve => setTimeout(() => resolve(null), 10_000)),
-        ]);
-        local = fetched ?? local;
-      } catch {}
+    if (step !== 'loading') { setSlowLoad(false); return; }
+    const t = setTimeout(() => setSlowLoad(true), 1500);
+    return () => clearTimeout(t);
+  }, [step]);
+
+  useEffect(() => {
+    let alive = true;
+    const resume = (local: LocalChallenge | null): boolean => {
       if (local?.status === 'lobby') {
         setLobby(local);
         setApps(local.apps.length ? local.apps : DEFAULT_CHALLENGE_APPS);
         setStep('lobby');
-        return;
+        return true;
       }
       if (local?.status === 'active') {
         void begin(local);
-        return;
+        return true;
       }
+      return false;
+    };
+    void (async () => {
+      let local = await loadLocalChallenge();
+      // The server lookup is capped at a few seconds. It used to hold this
+      // spinner for up to 10, on every visit. A slow server no longer holds
+      // the screen: the first step shows, and if the answer arrives later
+      // with a challenge this account is already in, it takes the person
+      // there (below).
+      const lookup = fetchMyLatestChallenge().catch(() => null);
+      const fetched = await Promise.race([
+        lookup,
+        new Promise<null>(resolve => setTimeout(() => resolve(null), SERVER_LOOKUP_MS)),
+      ]);
+      if (!alive) return;
+      local = fetched ?? local;
+      if (resume(local)) return;
       setStep((await hasLockInConsent()) ? await afterPermissions() : 'disclosure');
+      void lookup.then(late => {
+        if (!alive || !late || startedRef.current) return;
+        const s = stepRef.current;
+        if (s === 'loading' || s === 'disclosure' || s === 'permissions' || s === 'choose') resume(late);
+      });
     })();
+    return () => { alive = false; };
   }, [afterPermissions, begin]);
 
   // Permission screens are in Android Settings: re-check on coming back.
@@ -337,6 +365,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
       <View style={[cs.screen, styles.center]}>
         <StatusBar style="light" />
         <ActivityIndicator color={Colors.pop} />
+        {slowLoad && <Text style={[cs.sub, styles.loadingHint]}>Checking your account...</Text>}
       </View>
     );
   }
@@ -576,6 +605,7 @@ const PermissionRow: React.FC<{ title: string; body: string; granted: boolean; o
 
 const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
+  loadingHint: { marginTop: Spacing.md, textAlign: 'center' },
   back: { marginBottom: -Spacing.sm, alignSelf: 'flex-start' },
   choice: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   choiceIcon: {

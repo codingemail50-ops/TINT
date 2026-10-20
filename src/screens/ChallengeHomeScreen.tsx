@@ -36,7 +36,11 @@ interface Props {
 }
 
 const MEMBER_POLL_MS = 15_000;
-const NETWORK_TIMEOUT_MS = 10_000;
+// Was 10 seconds for each of the two waits below (up to 20 on a spinner when
+// the phone has no saved copy of the challenge). With a saved copy nothing
+// waits at all: it shows at once and these only refresh it.
+const CLOCK_TIMEOUT_MS = 2_000;
+const NETWORK_TIMEOUT_MS = 4_000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -76,6 +80,13 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
   // person can no longer see the "live" notification, so say so.
   const [notifOff, setNotifOff] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  // While there is no saved copy and the server is slow, say what is happening.
+  const [slowLoad, setSlowLoad] = useState(false);
+  useEffect(() => {
+    if (local) { setSlowLoad(false); return; }
+    const t = setTimeout(() => setSlowLoad(true), 1500);
+    return () => clearTimeout(t);
+  }, [local]);
   // The confirmation boxes on this screen (emergency unlock, leaving), shown in
   // TINT's own style instead of Android's system alert.
   const [dialog, setDialog] = useState<DialogConfig | null>(null);
@@ -97,7 +108,7 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
       if (current.status === 'active') armChallengeBlocking(current);
       setLocal(current);
     }
-    await withTimeout(syncServerClock(), NETWORK_TIMEOUT_MS, undefined);
+    await withTimeout(syncServerClock(), CLOCK_TIMEOUT_MS, undefined);
     try {
       const fetched = current ? refreshChallenge(current) : fetchMyLatestChallenge();
       current = await withTimeout(fetched, NETWORK_TIMEOUT_MS, current);
@@ -194,6 +205,7 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
       <View style={[cs.screen, styles.center]}>
         <StatusBar style="light" />
         <ActivityIndicator color={Colors.pop} />
+        {slowLoad && <Text style={[cs.sub, { marginTop: 16, textAlign: 'center' }]}>Loading your 7 Day Lock In...</Text>}
       </View>
     );
   }
