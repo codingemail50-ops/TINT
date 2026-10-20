@@ -379,13 +379,13 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
             <Eyebrow>Before you start</Eyebrow>
             <Text style={cs.title}>How the 7 Day Lock In works</Text>
             <View style={cs.card}>
-              <Text style={styles.discLine}>• <Text style={styles.discBold}>Blocking runs all day, for 7 days.</Text> Even when TINT isn't open, it keeps running in the background, with a notification that stays up when notifications are allowed. It restarts itself if your phone restarts.</Text>
-              <Text style={styles.discLine}>• <Text style={styles.discBold}>To do this, TINT watches which app is open.</Text> It uses Android's Usage access to see when one of the apps you picked is opened, and Display over other apps to cover it. TINT doesn't upload a list of your apps or what you open.</Text>
-              <Text style={styles.discLine}>• <Text style={styles.discBold}>What is saved to your account:</Text> how many times you tried to open each blocked app, each day. And, for those apps only, how many times and for how long you used them in the 7 days before you start. This is only used for your end-of-challenge report. Only you can see it.</Text>
-              <Text style={styles.discLine}>• <Text style={styles.discBold}>Squad members can see</Text> your username, avatar, the apps you picked, whether you're still in or have left, when you joined or left, and when your phone last checked in.</Text>
-              <Text style={styles.discLine}>• <Text style={styles.discBold}>TINT's leaderboard.</Text> Your username and avatar can appear to other TINT users on the leaderboard, with your streak and focus minutes.</Text>
-              <Text style={styles.discLine}>• <Text style={styles.discBold}>You're always in control.</Text> You get 2 emergency unlocks of 5 minutes, and you can leave the challenge any time. You can delete your account any time.</Text>
+              <Text style={styles.discLine}>• <Text style={styles.discBold}>It runs all day, for 7 days,</Text> even when TINT is closed, with a notification up while it runs. It restarts if your phone restarts.</Text>
+              <Text style={styles.discLine}>• <Text style={styles.discBold}>How it blocks:</Text> Usage access shows TINT which app is open, and Display over other apps covers the ones you picked. TINT doesn't upload a list of your apps or what you open.</Text>
+              <Text style={styles.discLine}>• <Text style={styles.discBold}>Saved to your account,</Text> only you can see it, for your end report: how many times you tried to open each blocked app each day, and, for those apps only, how many times and how long you used them in the 7 days before you start.</Text>
+              <Text style={styles.discLine}>• <Text style={styles.discBold}>Others can see:</Text> squad members see your username, avatar, picked apps, whether you're in or have left, when you joined or left, and when your phone last checked in. The leaderboard shows your username, avatar, streak and focus minutes.</Text>
+              <Text style={styles.discLine}>• <Text style={styles.discBold}>You're in control:</Text> 2 emergency unlocks of 5 minutes, leave any time, delete your account any time.</Text>
             </View>
+            <Text style={styles.discConsent}>By tapping "I agree", you allow TINT to use these permissions and save this data for the 7 Day Lock In.</Text>
             <PrimaryButton label="I agree, continue" onPress={() => void agree()} />
             <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
               <Text style={cs.link}>Read the privacy policy</Text>
@@ -642,6 +642,7 @@ const styles = StyleSheet.create({
   memberName: { flex: 1, fontSize: 15, fontFamily: Fonts.semibold, color: Colors.textPrimary },
   waiting: { textAlign: 'center' },
   discLine: { fontSize: 14, lineHeight: 21, fontFamily: Fonts.regular, color: Colors.textSecondary },
+  discConsent: { fontSize: 13, lineHeight: 19, fontFamily: Fonts.medium, color: Colors.textPrimary },
   discBold: { fontFamily: Fonts.bold, color: Colors.textPrimary },
   footerLinks: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, flexWrap: 'wrap' },
   danger: { color: Colors.danger },

@@ -57,8 +57,8 @@ export async function setLockInConsent(): Promise<void> {
   await write(LOCKIN_KEY);
 }
 
-/** Called when the account is deleted (not on logout, so a returning user
- *  is not asked again). */
+/** Called when the account is deleted or logged out, so the next account on
+ *  this phone is shown the disclosures again. */
 export async function clearPermissionConsent(): Promise<void> {
   try {
     await AsyncStorage.multiRemove([...Object.values(POPUP_KEYS), OLD_POPUP_KEY, LOCKIN_KEY]);

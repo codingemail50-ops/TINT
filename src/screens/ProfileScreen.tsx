@@ -14,7 +14,7 @@ import { FriendsPanel } from '../components/FriendsPanel';
 import { saveFocusLog, saveBestFlameMins } from '../utils/focusLog';
 import { saveDistractionLog } from '../utils/distractionLog';
 import { clearActiveSession } from '../utils/activeFocusSession';
-import { confirmDeleteAccount, openPrivacyPolicy } from '../utils/accountDeletion';
+import { confirmDeleteAccount, openPrivacyPolicy, clearLeftoversOnLogout } from '../utils/accountDeletion';
 import { supabase } from '../lib/supabase';
 import { FocusGoalScreen } from './FocusGoalScreen';
 import { CustomExamModal } from '../components/CustomExamModal';
@@ -121,6 +121,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
       saveDistractionLog([]),
       saveBestFlameMins(0),
       clearActiveSession(),
+      clearLeftoversOnLogout(),
     ]);
     onLogout();
   };

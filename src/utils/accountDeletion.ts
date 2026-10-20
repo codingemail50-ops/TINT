@@ -27,6 +27,21 @@ async function removeLeftoverKeys(): Promise<void> {
   } catch {}
 }
 
+/** What logging out must also remove, beyond the profile and logs: the saved
+ *  7 Day Lock In (otherwise the next app open re-arms blocking for a phone
+ *  nobody is signed in on, and the next account inherits it), its reminders,
+ *  the picked focus apps, and the agreement to the permission screens (so the
+ *  next account on this phone is shown them again). The challenge itself stays
+ *  on the server, so signing back in restores it. Never throws. */
+export async function clearLeftoversOnLogout(): Promise<void> {
+  await Promise.all([
+    clearLocalChallenge(),
+    cancelChallengeNotifications(),
+    AsyncStorage.removeItem(BLOCKED_APPS_STORAGE_KEY).catch(() => {}),
+    clearPermissionConsent(),
+  ]).catch(() => {});
+}
+
 export async function wipeThisDevice(): Promise<void> {
   stopAppBlocking();
   await Promise.all([

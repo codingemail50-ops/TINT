@@ -17,6 +17,7 @@ import { ChallengeIntroScreen } from '../screens/ChallengeIntroScreen';
 import { ChallengeSetupScreen } from '../screens/ChallengeSetupScreen';
 import { ChallengeHomeScreen } from '../screens/ChallengeHomeScreen';
 import { clearLocalChallenge, cancelChallengeNotifications, loadLocalChallenge, armChallengeBlocking } from '../utils/challenge';
+import { clearLeftoversOnLogout } from '../utils/accountDeletion';
 import { StorageService, AppState, UserProfile, FutureGoal } from '../utils/storage';
 import { ExamType, CustomExam, ClassTwelveStream } from '../data/examPresets';
 import { supabase } from '../lib/supabase';
@@ -448,6 +449,7 @@ const AppNavigatorInner: React.FC = () => {
       clearActiveSession(),
       clearLocalChallenge(),
       cancelChallengeNotifications(),
+      clearLeftoversOnLogout(),
     ]);
     handleLogout();
   };
