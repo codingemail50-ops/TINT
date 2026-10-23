@@ -38,30 +38,32 @@ export const Eyebrow: React.FC<{ children: React.ReactNode }> = ({ children }) =
   <Text style={ps.eyebrow}>{children}</Text>
 );
 
-/** The blockable apps, one per row, in a box that scrolls. The box is the
- *  same height the old grid of chips took, so what comes after it stays put. */
-export const AppPicker: React.FC<{ selected: string[]; onChange: (ids: string[]) => void }> = ({ selected, onChange }) => (
-  <View style={ps.appListBox}>
+/** The blockable apps, one per row, in a box that scrolls. By default the box
+ *  is the same height the old grid of chips took, so what comes after it stays
+ *  put. With `fill` it takes whatever space its parent has left (parent must
+ *  have a height). */
+export const AppPicker: React.FC<{ selected: string[]; onChange: (ids: string[]) => void; fill?: boolean }> = ({ selected, onChange, fill }) => (
+  <View style={fill ? ps.appListBoxFill : ps.appListBox}>
     <ScrollView
       nestedScrollEnabled
       showsVerticalScrollIndicator
       persistentScrollbar
-      contentContainerStyle={ps.appList}
+      contentContainerStyle={[ps.appList, fill && ps.appListCompact]}
     >
       {BLOCKABLE_APPS.map(app => {
         const on = selected.includes(app.id);
         return (
           <TouchableOpacity
             key={app.id}
-            style={[ps.appRow, on && ps.appRowOn]}
+            style={[ps.appRow, fill && ps.appRowCompact, on && ps.appRowOn]}
             onPress={() => onChange(on ? selected.filter(id => id !== app.id) : [...selected, app.id])}
             activeOpacity={0.75}
           >
-            <Ionicons name={app.icon} size={20} color={on ? '#000' : Colors.textSecondary} />
+            <Ionicons name={app.icon} size={fill ? 18 : 20} color={on ? '#000' : Colors.textSecondary} />
             <Text style={[ps.appRowText, on && ps.appRowTextOn]} numberOfLines={1}>{app.label}</Text>
             <Ionicons
               name={on ? 'checkmark-circle' : 'ellipse-outline'}
-              size={22}
+              size={fill ? 20 : 22}
               color={on ? '#000' : Colors.textMuted}
             />
           </TouchableOpacity>
@@ -298,12 +300,18 @@ const ps = StyleSheet.create({
     height: 216, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border,
     backgroundColor: Colors.surface, overflow: 'hidden',
   },
+  appListBoxFill: {
+    flex: 1, minHeight: 96, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: Colors.surface, overflow: 'hidden',
+  },
   appList: { padding: 8, gap: 8 },
+  appListCompact: { padding: 6, gap: 6 },
   appRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12, height: 48,
     paddingHorizontal: 14, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border,
     backgroundColor: Colors.surfaceElevated,
   },
+  appRowCompact: { height: 40, paddingHorizontal: 12, gap: 10 },
   appRowOn: { backgroundColor: Colors.pop, borderColor: Colors.pop },
   appRowText: { flex: 1, fontSize: 15, fontFamily: Fonts.semibold, color: Colors.textSecondary },
   appRowTextOn: { color: '#000' },

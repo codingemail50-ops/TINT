@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, AppState as RNAppState } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, AppState as RNAppState, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -7,7 +7,8 @@ import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { BlobDial } from '../components/BlobDial';
 import { MeditatingFlame } from '../components/MeditatingFlame';
 import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY } from '../data/blockableApps';
-import { openPermissionSettings, checkPermission, BlockingPermission } from '../utils/appBlocking';
+import { openPermissionSettings, checkPermission, isNativeBlockingAvailable, BlockingPermission } from '../utils/appBlocking';
+import { AppPicker } from '../components/ChallengeParts';
 import { useHaptics } from '../hooks/useHaptics';
 import { usePermissionConsentGate } from '../components/PermissionDisclosure';
 import { tintAlert } from '../utils/dialog';
@@ -38,10 +39,15 @@ interface Props {
 
 // Screen 3 of onboarding (also reused from the Profile screen to change the
 // goal later) — the same squiggly-blob shape as the Focus timer, grey,
-// dragged to set the daily goal, plus a preview of which apps will be
-// blocked during a focus session (the full toggle picker lives on the
-// Focus screen itself — this is just a glance + a way to grant the OS
-// permission early).
+// dragged to set the daily goal, plus the two blocking permissions and the
+// apps to block during focus sessions.
+//
+// During sign-up (no onBack) "Lock This In" stays off until both permissions
+// are on, and the apps are a scrolling list the person edits right here (saved
+// the same place the Focus screen reads them). When reused from the Profile
+// screen (onBack set) it only changes the goal: no gate, and the apps stay a
+// read-only preview, because the Focus tab is already open and would not see
+// a change made here.
 export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, onComplete, onBack, onLogin }) => {
   const [mins, setMins] = useState(initialMins);
   const [blockedApps, setBlockedApps] = useState<string[]>(DEFAULT_BLOCKED_APPS);
@@ -53,6 +59,15 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
   const [usageGranted, setUsageGranted] = useState<boolean | null>(null);
   const { buttonPress } = useHaptics();
   const { requestWithConsent, disclosureModal } = usePermissionConsentGate();
+  const { height: screenH } = useWindowDimensions();
+  // Smaller phones get a smaller dial, so the app list below it keeps room.
+  const dialSize = screenH >= 700 ? 180 : 150;
+  const signUp = !onBack;
+  // Gate only where blocking can really work (a phone build). In Expo Go or the
+  // web preview there is nothing to grant, so nobody gets stuck.
+  const needsPermissions = signUp && isNativeBlockingAvailable();
+  const permissionsDone = overlayGranted === true && usageGranted === true;
+  const canLockIn = !needsPermissions || permissionsDone;
 
   const dialScale = useRef(new Animated.Value(1)).current;
   const glowOpacity = useRef(new Animated.Value(0)).current;
@@ -85,6 +100,11 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
     return () => sub.remove();
   }, []);
 
+  const changeBlockedApps = (ids: string[]) => {
+    setBlockedApps(ids);
+    AsyncStorage.setItem(BLOCKED_APPS_STORAGE_KEY, JSON.stringify(ids)).catch(() => {});
+  };
+
   const handlePermissionPress = async (permission: BlockingPermission) => {
     await buttonPress();
     // First time only: explain why before Android Settings opens.
@@ -98,7 +118,7 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
   };
 
   const handleLockIn = () => {
-    if (locking) return;
+    if (locking || !canLockIn) return;
     setLocking(true);
     buttonPress();
     // Glows + zooms in, holds, then snaps back with a spring overshoot —
@@ -133,14 +153,14 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
           <Text style={styles.titleRegular}>What's your</Text>
           <Text style={styles.titlePixel}>Focus Goal?</Text>
         </View>
-        <MeditatingFlame size={92} />
+        <MeditatingFlame size={80} />
       </View>
 
       <View style={styles.dialWrap}>
-        <Animated.View style={[styles.glow, { opacity: glowOpacity, transform: [{ scale: dialScale }] }]} />
+        <Animated.View style={[styles.glow, { width: dialSize * 1.25, height: dialSize * 1.25, borderRadius: dialSize, opacity: glowOpacity, transform: [{ scale: dialScale }] }]} />
         <Animated.View style={{ transform: [{ scale: dialScale }] }}>
           <BlobDial
-            size={230}
+            size={dialSize}
             minValue={MIN_MINS}
             maxValue={MAX_MINS}
             step={STEP_MINS}
@@ -184,23 +204,40 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
             <Text style={styles.permissionAction}>Allow</Text>
           )}
         </TouchableOpacity>
-        <View style={styles.appIconsRow}>
-          {blockedApps.map(id => {
-            const app = BLOCKABLE_APPS.find(a => a.id === id);
-            if (!app) return null;
-            return (
-              <View key={id} style={[styles.appChip, { backgroundColor: app.color }]}>
-                <Ionicons name={app.icon} size={18} color="#fff" />
-              </View>
-            );
-          })}
-        </View>
+        {needsPermissions && !permissionsDone ? (
+          <Text style={styles.gateHint}>Allow both to continue.</Text>
+        ) : null}
+        {!signUp ? (
+          <View style={styles.appIconsRow}>
+            {blockedApps.map(id => {
+              const app = BLOCKABLE_APPS.find(a => a.id === id);
+              if (!app) return null;
+              return (
+                <View key={id} style={[styles.appChip, { backgroundColor: app.color }]}>
+                  <Ionicons name={app.icon} size={18} color="#fff" />
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
       </View>
 
-      <View style={{ flex: 1 }} />
+      {signUp ? (
+        <View style={styles.pickerSection}>
+          <Text style={styles.permissionsHeading}>Apps to block in focus sessions</Text>
+          <AppPicker selected={blockedApps} onChange={changeBlockedApps} fill />
+        </View>
+      ) : (
+        <View style={{ flex: 1 }} />
+      )}
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.lockBtn} onPress={handleLockIn} activeOpacity={0.85} disabled={locking}>
+        <TouchableOpacity
+          style={[styles.lockBtn, !canLockIn && styles.lockBtnOff]}
+          onPress={handleLockIn}
+          activeOpacity={0.85}
+          disabled={locking || !canLockIn}
+        >
           <View style={styles.lockGradient}>
             <Text style={styles.lockText}>Lock This In</Text>
           </View>
@@ -221,19 +258,21 @@ const styles = StyleSheet.create({
   backBtn: { position: 'absolute', top: 58, left: Spacing.xl, zIndex: 2 },
   backText: { fontSize: 15, color: Colors.textSecondary, fontFamily: Fonts.medium },
   header: {
-    paddingTop: 90, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.md,
+    paddingTop: 72, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.sm,
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
   },
   titleBlock: { flex: 1, paddingRight: Spacing.md },
   titleRegular: { fontSize: 22, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.3 },
   titlePixel: { fontFamily: Fonts.pixel, fontSize: 40, color: Colors.pop, letterSpacing: 0.5, marginTop: -4 },
-  dialWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.lg },
+  dialWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.md },
   glow: {
     position: 'absolute', width: 230 * 1.25, height: 230 * 1.25, borderRadius: 230,
     backgroundColor: Colors.pop, shadowColor: Colors.pop, shadowOpacity: 0.9, shadowRadius: 40, elevation: 20,
   },
-  divider: { height: 1, backgroundColor: Colors.border, marginHorizontal: Spacing.xl, marginBottom: Spacing.lg },
-  blockSection: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.md, gap: Spacing.sm },
+  divider: { height: 1, backgroundColor: Colors.border, marginHorizontal: Spacing.xl, marginBottom: Spacing.md },
+  blockSection: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.sm, gap: Spacing.sm },
+  pickerSection: { flex: 1, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.sm, gap: Spacing.sm },
+  gateHint: { fontSize: 12, fontFamily: Fonts.medium, color: Colors.pop, textAlign: 'center' },
   permissionsHeading: {
     fontSize: 12, fontFamily: Fonts.semibold, color: Colors.textMuted,
     textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2,
@@ -241,14 +280,15 @@ const styles = StyleSheet.create({
   permissionRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: Colors.surfaceElevated, borderRadius: BorderRadius.full,
-    borderWidth: 2, borderColor: Colors.border, paddingVertical: 12, paddingHorizontal: 16,
+    borderWidth: 2, borderColor: Colors.border, paddingVertical: 10, paddingHorizontal: 16,
   },
   permissionText: { flex: 1, fontSize: 15, fontFamily: Fonts.bold, color: Colors.textPrimary },
   permissionAction: { fontSize: 13, fontFamily: Fonts.semibold, color: Colors.pop },
   appIconsRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
   appChip: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  footer: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl, paddingTop: Spacing.sm, gap: Spacing.sm },
+  footer: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.lg, paddingTop: Spacing.sm, gap: Spacing.sm },
   lockBtn: { borderRadius: BorderRadius.md, overflow: 'hidden' },
+  lockBtnOff: { opacity: 0.35 },
   lockGradient: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.pop },
   lockText: { fontSize: 17, fontFamily: Fonts.bold, color: '#000', letterSpacing: 0.2 },
   loginLink: { textAlign: 'center', fontSize: 13, color: Colors.textSecondary, fontFamily: Fonts.regular },

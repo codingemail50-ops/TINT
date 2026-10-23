@@ -22,10 +22,41 @@ const GRANTED_KEY = 'tint_permission_self_reported';
 
 export type BlockingPermission = 'usageAccess' | 'overlay';
 
+// While Android Settings is open for a permission, TINT watches for the moment
+// it is switched on and brings itself back to the front, so the person lands
+// on the screen with the tick showing instead of having to press Back. Best
+// effort: if Android refuses to bring the app forward, or the person leaves
+// Settings without allowing it, nothing happens and Back still works. One
+// watcher per permission; it gives up after two minutes.
+const RETURN_WATCH_MS = 120_000;
+const returnWatchers: Partial<Record<BlockingPermission, ReturnType<typeof setInterval>>> = {};
+
+function returnToAppWhenGranted(permission: BlockingPermission): void {
+  if (!isNativeBlockingAvailable()) return;
+  const old = returnWatchers[permission];
+  if (old) clearInterval(old);
+  const startedAt = Date.now();
+  const id = setInterval(() => {
+    if (Date.now() - startedAt > RETURN_WATCH_MS) {
+      clearInterval(id);
+      delete returnWatchers[permission];
+      return;
+    }
+    if (checkPermission(permission) === true) {
+      clearInterval(id);
+      delete returnWatchers[permission];
+      try { IntentLauncher.openApplication(ANDROID_PACKAGE_NAME); } catch {}
+    }
+  }, 700);
+  returnWatchers[permission] = id;
+}
+
 export async function openPermissionSettings(permission: BlockingPermission): Promise<void> {
   if (Platform.OS !== 'android') {
     throw new Error('App-blocking permissions are Android-only — iOS uses the separate Screen Time / FamilyControls API.');
   }
+  // Start watching before Settings opens (the call below only finishes when Settings closes).
+  returnToAppWhenGranted(permission);
   switch (permission) {
     case 'usageAccess':
       // Unlike overlay, Android doesn't officially guarantee this deep-links
