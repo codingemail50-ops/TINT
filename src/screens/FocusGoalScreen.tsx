@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { BlobDial } from '../components/BlobDial';
-import { MeditatingFlame } from '../components/MeditatingFlame';
 import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY } from '../data/blockableApps';
 import { openPermissionSettings, checkPermission, isNativeBlockingAvailable, BlockingPermission } from '../utils/appBlocking';
 import { AppPicker } from '../components/ChallengeParts';
@@ -61,7 +60,7 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
   const { requestWithConsent, disclosureModal } = usePermissionConsentGate();
   const { height: screenH } = useWindowDimensions();
   // Smaller phones get a smaller dial, so the app list below it keeps room.
-  const dialSize = screenH >= 700 ? 180 : 150;
+  const dialSize = screenH >= 780 ? 220 : screenH >= 700 ? 195 : 150;
   const signUp = !onBack;
   // Gate only where blocking can really work (a phone build). In Expo Go or the
   // web preview there is nothing to grant, so nobody gets stuck.
@@ -149,11 +148,9 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
       )}
 
       <View style={styles.header}>
-        <View style={styles.titleBlock}>
-          <Text style={styles.titleRegular}>What's your</Text>
-          <Text style={styles.titlePixel}>Focus Goal?</Text>
-        </View>
-        <MeditatingFlame size={80} />
+        <Text style={styles.titleRegular} allowFontScaling={false}>What's your</Text>
+        {/* Shrinks a little on a narrow phone rather than wrapping or crowding the white words. */}
+        <Text style={styles.titlePixel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} allowFontScaling={false}>Focus Goal?</Text>
       </View>
 
       <View style={styles.dialWrap}>
@@ -258,12 +255,11 @@ const styles = StyleSheet.create({
   backBtn: { position: 'absolute', top: 58, left: Spacing.xl, zIndex: 2 },
   backText: { fontSize: 15, color: Colors.textSecondary, fontFamily: Fonts.medium },
   header: {
-    paddingTop: 72, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.sm,
-    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
+    paddingTop: 68, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.md,
+    flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: Spacing.md,
   },
-  titleBlock: { flex: 1, paddingRight: Spacing.md },
-  titleRegular: { fontSize: 22, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.3 },
-  titlePixel: { fontFamily: Fonts.pixel, fontSize: 40, color: Colors.pop, letterSpacing: 0.5, marginTop: -4 },
+  titleRegular: { fontSize: 18, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.3 },
+  titlePixel: { flex: 1, textAlign: 'right', fontFamily: Fonts.pixel, fontSize: 34, color: Colors.pop, letterSpacing: 0.5 },
   dialWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.md },
   glow: {
     position: 'absolute', width: 230 * 1.25, height: 230 * 1.25, borderRadius: 230,
