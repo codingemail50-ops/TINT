@@ -16,6 +16,8 @@ interface Props {
   onChange: (value: number) => void;
   formatValue?: (value: number) => string;
   unitLabel?: string;
+  /** Scales the hint arrow (its distance from the dial, thickness and head). 1 is the default look. */
+  arrowScale?: number;
 }
 
 // Physical rotation needed per detent, and how much a raw finger-angle delta
@@ -46,7 +48,7 @@ function pointOnCircle(cx: number, cy: number, r: number, angleDeg: number) {
 // accumulator decides when that motion has covered enough ground to
 // actually bump the value by one step and fire a haptic tick.
 export const BlobDial: React.FC<Props> = ({
-  size = 240, minValue, maxValue, step, value, onChange, formatValue, unitLabel,
+  size = 240, minValue, maxValue, step, value, onChange, formatValue, unitLabel, arrowScale = 1,
 }) => {
   const blobPath = useRef(scallopPath(size / 2, size / 2, size * 0.36, 15, size * 0.02).d).current;
   // Matches the scallop's peak radius (rBase + amp) at its topmost point,
@@ -135,9 +137,9 @@ export const BlobDial: React.FC<Props> = ({
   // (not tucked against its rim) so it reads as its own arrow pointing at
   // the dial rather than another ring on it.
   const center = size / 2;
-  const hintRadius = dotRadius + size * 0.16;
-  const hintStrokeWidth = Math.max(5, size * 0.028);
-  const arrowSize = size * 0.075;
+  const hintRadius = dotRadius + size * 0.16 * arrowScale;
+  const hintStrokeWidth = Math.max(3.5, size * 0.028 * arrowScale * (arrowScale < 1 ? 0.85 : 1));
+  const arrowSize = size * 0.075 * arrowScale;
   // The arc sits at hintRadius from center, deliberately outside the dial's
   // own rim (dotRadius) — but hintRadius is already bigger than size/2, and
   // the arrowhead's diagonal tips (up to arrowSize*sqrt(2) further out

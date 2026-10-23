@@ -58,7 +58,13 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
   const [usageGranted, setUsageGranted] = useState<boolean | null>(null);
   const { buttonPress } = useHaptics();
   const { requestWithConsent, disclosureModal } = usePermissionConsentGate();
-  const { height: screenH } = useWindowDimensions();
+  const { height: screenH, width: screenW } = useWindowDimensions();
+  // Both title words look the same height. The pixel font is shorter than the
+  // plain one at the same number, so it gets a bigger number (29 vs 22). Both
+  // shrink a little on a narrow phone so they always fit on one line.
+  const titleScale = Math.min(1.1, Math.max(0.8, (screenW - 80) / 280));
+  const whiteSize = Math.round(22 * titleScale);
+  const pixelSize = Math.round(29 * titleScale);
   // Smaller phones get a smaller dial, so the app list below it keeps room.
   const dialSize = screenH >= 780 ? 220 : screenH >= 700 ? 195 : 150;
   const signUp = !onBack;
@@ -148,9 +154,9 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
       )}
 
       <View style={styles.header}>
-        <Text style={styles.titleRegular} allowFontScaling={false}>What's your</Text>
+        <Text style={[styles.titleRegular, { fontSize: whiteSize }]} allowFontScaling={false}>What's your</Text>
         {/* Shrinks a little on a narrow phone rather than wrapping or crowding the white words. */}
-        <Text style={styles.titlePixel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} allowFontScaling={false}>Focus Goal?</Text>
+        <Text style={[styles.titlePixel, { fontSize: pixelSize }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} allowFontScaling={false}>Focus Goal?</Text>
       </View>
 
       <View style={styles.dialWrap}>
@@ -165,6 +171,7 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
             onChange={setMins}
             formatValue={formatGoal}
             unitLabel="per day"
+            arrowScale={0.78}
           />
         </Animated.View>
       </View>
