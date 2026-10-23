@@ -3,7 +3,7 @@
 // numbers/eyebrows, Inter for everything else.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, ActivityIndicator, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { BLOCKABLE_APPS } from '../data/blockableApps';
@@ -38,23 +38,36 @@ export const Eyebrow: React.FC<{ children: React.ReactNode }> = ({ children }) =
   <Text style={ps.eyebrow}>{children}</Text>
 );
 
-/** Toggle grid of the blockable apps. */
+/** The blockable apps, one per row, in a box that scrolls. The box is the
+ *  same height the old grid of chips took, so what comes after it stays put. */
 export const AppPicker: React.FC<{ selected: string[]; onChange: (ids: string[]) => void }> = ({ selected, onChange }) => (
-  <View style={ps.appGrid}>
-    {BLOCKABLE_APPS.map(app => {
-      const on = selected.includes(app.id);
-      return (
-        <TouchableOpacity
-          key={app.id}
-          style={[ps.appChip, on && ps.appChipOn]}
-          onPress={() => onChange(on ? selected.filter(id => id !== app.id) : [...selected, app.id])}
-          activeOpacity={0.75}
-        >
-          <Ionicons name={app.icon} size={16} color={on ? '#000' : Colors.textSecondary} />
-          <Text style={[ps.appChipText, on && ps.appChipTextOn]} numberOfLines={1}>{app.label}</Text>
-        </TouchableOpacity>
-      );
-    })}
+  <View style={ps.appListBox}>
+    <ScrollView
+      nestedScrollEnabled
+      showsVerticalScrollIndicator
+      persistentScrollbar
+      contentContainerStyle={ps.appList}
+    >
+      {BLOCKABLE_APPS.map(app => {
+        const on = selected.includes(app.id);
+        return (
+          <TouchableOpacity
+            key={app.id}
+            style={[ps.appRow, on && ps.appRowOn]}
+            onPress={() => onChange(on ? selected.filter(id => id !== app.id) : [...selected, app.id])}
+            activeOpacity={0.75}
+          >
+            <Ionicons name={app.icon} size={20} color={on ? '#000' : Colors.textSecondary} />
+            <Text style={[ps.appRowText, on && ps.appRowTextOn]} numberOfLines={1}>{app.label}</Text>
+            <Ionicons
+              name={on ? 'checkmark-circle' : 'ellipse-outline'}
+              size={22}
+              color={on ? '#000' : Colors.textMuted}
+            />
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
   </View>
 );
 
@@ -281,16 +294,19 @@ const ps = StyleSheet.create({
     fontFamily: Fonts.pixel, fontSize: 18, color: Colors.pop,
     letterSpacing: 1.5, textTransform: 'uppercase',
   },
-  appGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  appChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingVertical: 9, paddingHorizontal: 12,
-    borderRadius: BorderRadius.full, borderWidth: 2, borderColor: Colors.border,
+  appListBox: {
+    height: 216, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: Colors.surface, overflow: 'hidden',
+  },
+  appList: { padding: 8, gap: 8 },
+  appRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, height: 48,
+    paddingHorizontal: 14, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.border,
     backgroundColor: Colors.surfaceElevated,
   },
-  appChipOn: { backgroundColor: Colors.pop, borderColor: Colors.pop },
-  appChipText: { fontSize: 13, fontFamily: Fonts.semibold, color: Colors.textSecondary },
-  appChipTextOn: { color: '#000' },
+  appRowOn: { backgroundColor: Colors.pop, borderColor: Colors.pop },
+  appRowText: { flex: 1, fontSize: 15, fontFamily: Fonts.semibold, color: Colors.textSecondary },
+  appRowTextOn: { color: '#000' },
   barRow: { flexDirection: 'row', gap: 6 },
   barSegment: {
     flex: 1, height: 12, borderRadius: 3, overflow: 'hidden',

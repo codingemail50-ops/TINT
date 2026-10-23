@@ -19,10 +19,10 @@ import {
 } from '../utils/challenge';
 import { useHaptics } from '../hooks/useHaptics';
 import { confirmDeleteAccount, openPrivacyPolicy } from '../utils/accountDeletion';
-import { hasLockInConsent, setLockInConsent } from '../utils/permissionConsent';
+import { usePermissionConsentGate } from '../components/PermissionDisclosure';
 import { notificationsAllowed, askForNotifications } from '../utils/notificationAccess';
 
-type Step = 'loading' | 'disclosure' | 'permissions' | 'choose' | 'solo' | 'squad' | 'create' | 'join' | 'lobby';
+type Step = 'loading' | 'permissions' | 'choose' | 'solo' | 'squad' | 'create' | 'join' | 'lobby';
 type StartChoice = 'now' | 'tonight' | 'tomorrow';
 
 interface Props {
@@ -68,6 +68,8 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
   const [grants, setGrants] = useState({ usageAccess: false, overlay: false });
   const [notifGranted, setNotifGranted] = useState(false);
   const { buttonPress } = useHaptics();
+  // The popup that explains each blocking permission before Android Settings opens.
+  const { requestWithConsent, disclosureModal } = usePermissionConsentGate('lockin');
   const startedRef = useRef(false);
   // Kept in a ref so `begin` (and the effects that use it) keep one stable
   // identity while the parent re-renders.
@@ -132,11 +134,11 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
       if (!alive) return;
       local = fetched ?? local;
       if (resume(local)) return;
-      setStep((await hasLockInConsent()) ? await afterPermissions() : 'disclosure');
+      setStep(await afterPermissions());
       void lookup.then(late => {
         if (!alive || !late || startedRef.current) return;
         const s = stepRef.current;
-        if (s === 'loading' || s === 'disclosure' || s === 'permissions' || s === 'choose') resume(late);
+        if (s === 'loading' || s === 'permissions' || s === 'choose') resume(late);
       });
     })();
     return () => { alive = false; };
@@ -186,19 +188,17 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
     };
   }, [step, lobby, begin]);
 
-  const agree = async () => {
-    void buttonPress();
-    await setLockInConsent();
-    setStep(await afterPermissions());
-  };
-
+  // Tapping Allow first shows the "why TINT asks for this" popup (once per
+  // permission on this phone); Android Settings opens only after "Enable".
   const grant = async (permission: BlockingPermission) => {
     void buttonPress();
-    try {
-      await openPermissionSettings(permission);
-    } catch {
-      Alert.alert('Not available', 'This permission can only be granted on the Android app.');
-    }
+    await requestWithConsent(permission, async () => {
+      try {
+        await openPermissionSettings(permission);
+      } catch {
+        Alert.alert('Not available', 'This permission can only be granted on the Android app.');
+      }
+    });
   };
 
   // Required to start a challenge: its notification is how the person sees
@@ -336,10 +336,9 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
   // no step can send the user in a circle.
   useEffect(() => {
     const previous: Partial<Record<Step, Step>> = {
-      permissions: 'disclosure',
-      // The permissions step is skipped when both are already on, so go back
-      // to whichever screen the user actually came from.
-      choose: permissionsReady() && (!isNativeBlockingAvailable() || notifGranted) ? 'disclosure' : 'permissions',
+      // The permissions step is skipped when everything is already on, so
+      // "choose" is then the first step and has nothing before it.
+      choose: permissionsReady() && (!isNativeBlockingAvailable() || notifGranted) ? undefined : 'permissions',
       solo: 'choose',
       squad: 'choose',
       create: 'squad',
@@ -374,33 +373,11 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
     <View style={cs.screen}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={cs.content} keyboardShouldPersistTaps="handled">
-        {step === 'disclosure' && (
-          <>
-            <Eyebrow>Before you start</Eyebrow>
-            <Text style={cs.title}>How the 7 Day Lock In works</Text>
-            <View style={cs.card}>
-              <Text style={styles.discLine}>• <Text style={styles.discBold}>It runs all day, for 7 days,</Text> even when TINT is closed, with a notification up while it runs. It restarts if your phone restarts.</Text>
-              <Text style={styles.discLine}>• <Text style={styles.discBold}>How it blocks:</Text> Usage access shows TINT which app is open, and Display over other apps covers the ones you picked. TINT doesn't upload a list of your apps or what you open.</Text>
-              <Text style={styles.discLine}>• <Text style={styles.discBold}>Saved to your account,</Text> only you can see it, for your end report: how many times you tried to open each blocked app each day, and, for those apps only, how many times and how long you used them in the 7 days before you start.</Text>
-              <Text style={styles.discLine}>• <Text style={styles.discBold}>Others can see:</Text> squad members see your username, avatar, picked apps, whether you're in or have left, when you joined or left, and when your phone last checked in. The leaderboard shows your username, avatar, streak and focus minutes.</Text>
-              <Text style={styles.discLine}>• <Text style={styles.discBold}>You're in control:</Text> 2 emergency unlocks of 5 minutes, leave any time, delete your account any time.</Text>
-            </View>
-            <Text style={styles.discConsent}>By tapping "I agree", you allow TINT to use these permissions and save this data for the 7 Day Lock In.</Text>
-            <PrimaryButton label="I agree, continue" onPress={() => void agree()} />
-            <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
-              <Text style={cs.link}>Read the privacy policy</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={confirmLogout} hitSlop={8}>
-              <Text style={cs.link}>Not now</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
         {step === 'permissions' && (
           <>
             <Eyebrow>Before you start</Eyebrow>
             <Text style={cs.title}>Let TINT block apps</Text>
-            <Text style={cs.sub}>Two Android settings, as explained on the last screen, and notifications. TINT uses the settings to see when one of your picked apps is opened, and cover it.</Text>
+            <Text style={cs.sub}>Two Android settings, and notifications. TINT uses the settings to see when one of your picked apps is opened, and cover it. Tap Allow on each to see why it's needed.</Text>
             <PermissionRow
               title="Usage access"
               body="Lets TINT see which app is open."
@@ -431,7 +408,10 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
               disabled={!(grants.usageAccess && grants.overlay && notifGranted) && isNativeBlockingAvailable()}
               onPress={() => setStep('choose')}
             />
-            <TouchableOpacity onPress={() => setStep('disclosure')} hitSlop={8}>
+            <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
+              <Text style={cs.link}>Read the privacy policy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={confirmLogout} hitSlop={8}>
               <Text style={cs.link}>Not now</Text>
             </TouchableOpacity>
           </>
@@ -572,6 +552,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
           </>
         )}
       </ScrollView>
+      {disclosureModal}
     </View>
   );
 };
@@ -641,9 +622,6 @@ const styles = StyleSheet.create({
   },
   memberName: { flex: 1, fontSize: 15, fontFamily: Fonts.semibold, color: Colors.textPrimary },
   waiting: { textAlign: 'center' },
-  discLine: { fontSize: 14, lineHeight: 21, fontFamily: Fonts.regular, color: Colors.textSecondary },
-  discConsent: { fontSize: 13, lineHeight: 19, fontFamily: Fonts.medium, color: Colors.textPrimary },
-  discBold: { fontFamily: Fonts.bold, color: Colors.textPrimary },
   footerLinks: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, flexWrap: 'wrap' },
   danger: { color: Colors.danger },
 });
