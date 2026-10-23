@@ -263,10 +263,10 @@ const styles = StyleSheet.create({
   backText: { fontSize: 15, color: Colors.textSecondary, fontFamily: Fonts.medium },
   header: {
     paddingTop: 68, paddingHorizontal: Spacing.xl, paddingBottom: Spacing.md,
-    flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: Spacing.md,
+    flexDirection: 'row', alignItems: 'baseline', justifyContent: 'flex-start', gap: Spacing.sm,
   },
   titleRegular: { fontSize: 18, fontFamily: Fonts.bold, color: Colors.textPrimary, letterSpacing: -0.3 },
-  titlePixel: { flex: 1, textAlign: 'right', fontFamily: Fonts.pixel, fontSize: 34, color: Colors.pop, letterSpacing: 0.5 },
+  titlePixel: { flexShrink: 1, fontFamily: Fonts.pixel, fontSize: 34, color: Colors.pop, letterSpacing: 0.5 },
   dialWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.md },
   glow: {
     position: 'absolute', width: 230 * 1.25, height: 230 * 1.25, borderRadius: 230,
