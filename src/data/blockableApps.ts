@@ -28,7 +28,8 @@ export const BLOCKABLE_APPS: BlockableApp[] = [
   { id: 'telegram', label: 'Telegram', icon: 'paper-plane', color: '#26A5E4', packageName: 'org.telegram.messenger' },
 ];
 
-export const DEFAULT_BLOCKED_APPS = ['instagram', 'youtube'];
+// Nothing is ticked to start with: each person picks the apps they want blocked.
+export const DEFAULT_BLOCKED_APPS: string[] = [];
 
 export const BLOCKED_APPS_STORAGE_KEY = 'tint_blocked_apps';
 

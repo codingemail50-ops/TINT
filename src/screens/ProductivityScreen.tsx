@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
-import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Typography, Fonts, TAB_BAR_CLEARANCE } from '../constants/theme';
 import { AppState } from '../utils/storage';
 import { FocusLogEntry, loadFocusLog, FocusTimeframe, FocusBucket, getFocusSummary, getFocusHeatmap, computeFocusStats } from '../utils/focusLog';
 import { DistractionLogEntry, loadDistractionLog } from '../utils/distractionLog';
@@ -181,7 +181,6 @@ const chartSt = StyleSheet.create({
 // ── Focus heatmap, binary orange (focused) / grey (no show) ──────────────────
 const HEAT_CELL = 14;
 const HEAT_GAP = 3;
-const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 const StreakHeatmap: React.FC<{ focusLog: FocusLogEntry[] }> = ({ focusLog }) => {
   const heatVals = useMemo(() => getFocusHeatmap(focusLog), [focusLog]);
@@ -204,13 +203,6 @@ const StreakHeatmap: React.FC<{ focusLog: FocusLogEntry[] }> = ({ focusLog }) =>
 
   return (
     <View style={heatSt.wrapper}>
-      <View style={[heatSt.dayLabels, { gap: HEAT_GAP }]}>
-        {DAY_LABELS.map((d, i) => (
-          <View key={i} style={{ height: HEAT_CELL, justifyContent: 'center' }}>
-            <Text style={heatSt.dayLabel}>{i % 2 === 1 ? d : ''}</Text>
-          </View>
-        ))}
-      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={[heatSt.grid, { gap: HEAT_GAP }]}>
           {grid.map((col, ci) => (
@@ -232,8 +224,6 @@ const StreakHeatmap: React.FC<{ focusLog: FocusLogEntry[] }> = ({ focusLog }) =>
 
 const heatSt = StyleSheet.create({
   wrapper: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
-  dayLabels: { paddingTop: 2 },
-  dayLabel: { fontSize: 9, color: Colors.textMuted, width: 10, textAlign: 'right', fontFamily: Fonts.regular },
   grid: { flexDirection: 'row' },
   col: { flexDirection: 'column' },
   cell: { borderRadius: 3, alignItems: 'center', justifyContent: 'center' },
@@ -477,7 +467,7 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 56 },
+  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 56, paddingBottom: TAB_BAR_CLEARANCE },
 
   title: { ...Typography.displayMedium, color: Colors.pop },
   subtitle: { ...Typography.bodyMedium, color: Colors.textSecondary, marginTop: 4, marginBottom: Spacing.lg },

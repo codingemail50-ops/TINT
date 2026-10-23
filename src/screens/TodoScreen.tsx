@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Typography, Fonts, TAB_BAR_CLEARANCE } from '../constants/theme';
 import { Task, getCombinedPreset, ExamType } from '../data/examPresets';
 import { StorageService, AppState } from '../utils/storage';
 import { TaskItem } from '../components/TaskItem';
@@ -1004,7 +1004,7 @@ const styles = StyleSheet.create({
 
   // Scroll / list
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md },
+  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: Spacing.md, paddingBottom: TAB_BAR_CLEARANCE },
   heroFlame: { alignItems: 'center', justifyContent: 'center', paddingTop: 79, paddingBottom: 0 },
   listHeader: {
     flexDirection: 'row',

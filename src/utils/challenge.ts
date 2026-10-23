@@ -27,7 +27,8 @@ export const MAX_SQUAD = 6;
 export const EMERGENCY_LIMIT = 2;
 export const EMERGENCY_MS = 5 * 60_000;
 export const CHALLENGE_TITLE = '7 Day Lock In';
-export const DEFAULT_CHALLENGE_APPS = ['instagram', 'youtube', 'snapchat', 'facebook'];
+// Nothing is ticked to start with: each person picks the apps they want blocked.
+export const DEFAULT_CHALLENGE_APPS: string[] = [];
 
 const DAY_MS = 86_400_000;
 const LOCAL_KEY = 'tint_challenge_local';

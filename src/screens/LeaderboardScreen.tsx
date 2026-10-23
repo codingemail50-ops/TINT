@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Fonts, TAB_BAR_CLEARANCE } from '../constants/theme';
 import { LeaderboardEntry, LeaderboardPeriod, minsForPeriod } from '../data/leaderboard';
 import { LeaderboardCard } from '../components/LeaderboardCard';
 import { LeaderboardPodium } from '../components/LeaderboardPodium';
@@ -204,7 +204,7 @@ export const LeaderboardScreen: React.FC<Props> = ({ appState, userId }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 56 },
+  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 56, paddingBottom: TAB_BAR_CLEARANCE },
 
   title: { fontSize: 32, fontFamily: Fonts.pixel, color: Colors.textPrimary, letterSpacing: 0.5, marginBottom: Spacing.md },
 

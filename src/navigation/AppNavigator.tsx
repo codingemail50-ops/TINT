@@ -7,6 +7,7 @@ import { Colors, Typography, BorderRadius } from '../constants/theme';
 import { WalkthroughScreen } from '../screens/WalkthroughScreen';
 import { AvatarExamScreen } from '../screens/AvatarExamScreen';
 import { FocusGoalScreen } from '../screens/FocusGoalScreen';
+import { AvatarPrompt } from '../components/AvatarPrompt';
 import { CreateAccountScreen } from '../screens/CreateAccountScreen';
 import { TodoScreen } from '../screens/TodoScreen';
 import { FocusScreen } from '../screens/FocusScreen';
@@ -188,6 +189,11 @@ const AppNavigatorInner: React.FC = () => {
   const draftRef = useRef<OnboardingDraft>({ avatar: 'star', examTypes: [], dailyFocusGoalMins: 60, name: '', email: '' });
   // A challenge user, already signed in, picking exams to use regular TINT.
   const upgradingFromChallengeRef = useRef(false);
+  // The optional "Choose your avatar" pop-up, shown once after moving from the Lock In to studying.
+  const [avatarPromptOpen, setAvatarPromptOpen] = useState(false);
+  // Waiting for the app's own daily pop-ups (today's message, the recap) to be
+  // closed first, so two pop-ups never sit on top of each other.
+  const [avatarPending, setAvatarPending] = useState(false);
 
   // Once per app-open (guarded by the ref, same pattern as the recap check
   // below), pops today's motivational postcard if it hasn't been shown yet.
@@ -425,17 +431,30 @@ const AppNavigatorInner: React.FC = () => {
     setScreen('createAccount');
   };
 
+  // "Use TINT for studying" after leaving or finishing a Lock In. The account
+  // already exists, so there is no avatar/exam step: it goes straight into the
+  // same walkthrough and focus-goal screens as a new signup. The avatar they
+  // already have is kept (the default star unless they picked another), and a
+  // pop-up in the app offers to change it. With no exam picked they get the
+  // hidden 'General' exam, which marks this as a studying account so it does
+  // not reopen on the Lock In screen (see isChallengeOnly).
   const handleUpgradeFromChallenge = () => {
     const user = appState.user;
-    if (user) {
-      draftRef.current.name = user.name;
-      draftRef.current.email = user.email;
-      draftRef.current.avatar = user.avatar;
-      draftRef.current.dailyFocusGoalMins = user.dailyFocusGoalMins ?? 60;
+    if (!user) {
+      setScreen('avatarExam');
+      return;
     }
-    draftRef.current.challengePath = false;
+    const d = draftRef.current;
+    d.name = user.name;
+    d.email = user.email;
+    d.avatar = user.avatar || 'star';
+    d.dailyFocusGoalMins = user.dailyFocusGoalMins ?? 60;
+    d.examTypes = (user.examTypes?.length ?? 0) > 0 ? (user.examTypes as ExamType[]) : ['GENERAL'];
+    d.customExam = user.customExam;
+    d.classTwelveStream = user.classTwelveStream;
+    d.challengePath = false;
     upgradingFromChallengeRef.current = true;
-    setScreen('avatarExam');
+    setScreen('walkthrough');
   };
 
   // Same clean-up as the Profile screen's log out, plus the challenge's own
@@ -499,6 +518,7 @@ const AppNavigatorInner: React.FC = () => {
   };
 
   const finishOnboarding = (user: UserProfile) => {
+    const cameFromChallenge = upgradingFromChallengeRef.current;
     upgradingFromChallengeRef.current = false;
     // Defensive, same as logout's clearing — local storage isn't namespaced
     // per-account, so without this a brand-new signup on a device someone
@@ -518,6 +538,7 @@ const AppNavigatorInner: React.FC = () => {
         setAppState(state);
         setShowTabs(true);
         setScreen('todo');
+        if (cameFromChallenge) setAvatarPending(true);
         Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
 
         if (!userIdRef.current) {
@@ -672,6 +693,14 @@ const AppNavigatorInner: React.FC = () => {
     setLoginShortcut(false);
     setScreen('avatarExam');
   };
+
+  // Show the avatar pop-up a moment after the app is on screen, but only once
+  // the daily message and recap are not showing (if one appears, this waits).
+  useEffect(() => {
+    if (!avatarPending || !showTabs || motivationMessage || recapData) return;
+    const t = setTimeout(() => { setAvatarPending(false); setAvatarPromptOpen(true); }, 1500);
+    return () => clearTimeout(t);
+  }, [avatarPending, showTabs, motivationMessage, recapData]);
 
   const handleStateChange = (newState: AppState) => {
     StorageService.saveAppState(newState);
@@ -910,6 +939,15 @@ const AppNavigatorInner: React.FC = () => {
         message={motivationMessage}
         goalText={appState.user?.futureGoal?.text ?? null}
         onClose={() => setMotivationMessage(null)}
+      />
+      <AvatarPrompt
+        visible={avatarPromptOpen && showTabs}
+        current={appState.user?.avatar ?? 'star'}
+        onSave={avatar => {
+          setAvatarPromptOpen(false);
+          if (appState.user) handleStateChange({ ...appState, user: { ...appState.user, avatar } });
+        }}
+        onSkip={() => setAvatarPromptOpen(false)}
       />
     </View>
   );

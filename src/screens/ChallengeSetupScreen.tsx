@@ -17,6 +17,7 @@ import {
 import { useHaptics } from '../hooks/useHaptics';
 import { confirmDeleteAccount, openPrivacyPolicy } from '../utils/accountDeletion';
 import { usePermissionConsentGate } from '../components/PermissionDisclosure';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { notificationsAllowed, askForNotifications } from '../utils/notificationAccess';
 import { tintAlert } from '../utils/dialog';
 
@@ -68,6 +69,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
   const { buttonPress } = useHaptics();
   // The popup that explains each blocking permission before Android Settings opens.
   const { requestWithConsent, disclosureModal } = usePermissionConsentGate('lockin');
+  const insets = useSafeAreaInsets();
   const startedRef = useRef(false);
   // Kept in a ref so `begin` (and the effects that use it) keep one stable
   // identity while the parent re-renders.
@@ -321,6 +323,10 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
     } catch {}
   };
 
+  // How many of the 3 are on; where blocking cannot run (Expo Go, web) nothing is required.
+  const permsAllowed = [grants.usageAccess, grants.overlay, notifGranted].filter(Boolean).length;
+  const permsDone = !isNativeBlockingAvailable() || permsAllowed === 3;
+
   const confirmLogout = () => {
     tintAlert('Log out?', 'You can log back in any time.', [
       { text: 'Cancel', style: 'cancel' },
@@ -375,7 +381,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
           <>
             <Eyebrow>Before you start</Eyebrow>
             <Text style={cs.title}>Let TINT block apps</Text>
-            <Text style={cs.sub}>Two Android settings, and notifications. TINT uses the settings to see when one of your picked apps is opened, and cover it. Tap Allow on each to see why it's needed.</Text>
+            <Text style={cs.sub}>Turn these 3 on so TINT can cover the apps you pick. Tap Allow on each one to see why it's needed.</Text>
             <PermissionRow
               title="Usage access"
               body="Lets TINT see which app is open."
@@ -400,11 +406,6 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
               granted={false}
               optional
               onPress={() => void openBatterySettings()}
-            />
-            <PrimaryButton
-              label="Continue"
-              disabled={!(grants.usageAccess && grants.overlay && notifGranted) && isNativeBlockingAvailable()}
-              onPress={() => setStep('choose')}
             />
             <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
               <Text style={cs.link}>Read the privacy policy</Text>
@@ -550,6 +551,23 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
           </>
         )}
       </ScrollView>
+      {/* Stays in view while the list above scrolls, so the way forward is always
+          on screen: dimmed until all 3 are on, then it lights up. */}
+      {step === 'permissions' && (
+        <View style={[styles.stickyFooter, { paddingBottom: Math.max(insets.bottom, Spacing.md) + Spacing.sm }]}>
+          {permsDone ? (
+            <View style={styles.allSetRow}>
+              <Ionicons name="checkmark-circle" size={18} color={Colors.pop} />
+              <Text style={styles.allSetText}>All set. Tap Continue to pick your apps.</Text>
+            </View>
+          ) : (
+            <Text style={styles.permCount}>{permsAllowed} of 3 allowed. Allow all 3 to continue.</Text>
+          )}
+          <View style={permsDone ? styles.continueGlow : undefined}>
+            <PrimaryButton label="Continue" disabled={!permsDone} onPress={() => setStep('choose')} />
+          </View>
+        </View>
+      )}
       {disclosureModal}
     </View>
   );
@@ -584,6 +602,17 @@ const PermissionRow: React.FC<{ title: string; body: string; granted: boolean; o
 
 const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
+  stickyFooter: {
+    paddingHorizontal: Spacing.xl, paddingTop: Spacing.sm, gap: Spacing.sm,
+    borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.background,
+  },
+  permCount: { textAlign: 'center', fontSize: 13, fontFamily: Fonts.medium, color: Colors.textSecondary },
+  allSetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  allSetText: { fontSize: 13, fontFamily: Fonts.semibold, color: Colors.pop },
+  continueGlow: {
+    borderRadius: BorderRadius.md, shadowColor: Colors.pop, shadowOpacity: 0.7, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 }, elevation: 10,
+  },
   loadingHint: { marginTop: Spacing.md, textAlign: 'center' },
   back: { marginBottom: -Spacing.sm, alignSelf: 'flex-start' },
   choice: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },

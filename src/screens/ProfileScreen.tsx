@@ -6,9 +6,9 @@ import {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, BorderRadius, Fonts, Typography } from '../constants/theme';
+import { Colors, Spacing, BorderRadius, Fonts, Typography, TAB_BAR_CLEARANCE } from '../constants/theme';
 import { PixelIcon } from '../components/PixelIcon';
-import { AVATARS, EXAM_TYPES, ExamType, CustomExam, ClassTwelveStream, CLASS_TWELVE_STREAMS } from '../data/examPresets';
+import { AVATARS, EXAM_TYPES, PICKABLE_EXAM_TYPES, ExamType, CustomExam, ClassTwelveStream, CLASS_TWELVE_STREAMS } from '../data/examPresets';
 import { AppState, StorageService } from '../utils/storage';
 import { FriendsPanel } from '../components/FriendsPanel';
 import { saveFocusLog, saveBestFlameMins } from '../utils/focusLog';
@@ -62,7 +62,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
   };
 
   const openEditExam = () => {
-    setEditExamTypes(new Set((appState.user?.examTypes ?? []) as ExamType[]));
+    setEditExamTypes(new Set(((appState.user?.examTypes ?? []) as ExamType[]).filter(id => id !== 'GENERAL')));
     setEditCustomExam(appState.user?.customExam ?? null);
     setEditClassTwelveStream(appState.user?.classTwelveStream ?? 'Science');
     setEditExamOpen(true);
@@ -298,7 +298,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
             <Text style={styles.editTitle}>Studying For</Text>
             <ScrollView style={styles.examScroll} keyboardShouldPersistTaps="handled">
               <View style={styles.examGrid}>
-                {EXAM_TYPES.map(exam => {
+                {PICKABLE_EXAM_TYPES.map(exam => {
                   const checked = editExamTypes.has(exam.id);
                   return (
                     <TouchableOpacity
@@ -376,7 +376,7 @@ export const ProfileScreen: React.FC<Props> = ({ appState, userId, onStateChange
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 56, paddingBottom: Spacing.xl },
+  scrollContent: { paddingHorizontal: Spacing.xl, paddingTop: 56, paddingBottom: Spacing.xl + TAB_BAR_CLEARANCE },
   closeBtn: {
     alignSelf: 'flex-end', width: 34, height: 34, borderRadius: BorderRadius.sm,
     borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center',

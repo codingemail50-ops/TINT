@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, ScrollV
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
-import { EXAM_TYPES, ExamType, AVATARS, CustomExam, ClassTwelveStream, CLASS_TWELVE_STREAMS } from '../data/examPresets';
+import { PICKABLE_EXAM_TYPES, ExamType, AVATARS, CustomExam, ClassTwelveStream, CLASS_TWELVE_STREAMS } from '../data/examPresets';
 import { AvatarWall } from '../components/AvatarWall';
 import { PixelIcon } from '../components/PixelIcon';
 import { CustomExamModal } from '../components/CustomExamModal';
@@ -37,7 +37,7 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onChall
   const [classTwelveStream, setClassTwelveStream] = useState<ClassTwelveStream | null>(null);
   const [customExam, setCustomExam] = useState<CustomExam | null>(null);
   const [customExamModalOpen, setCustomExamModalOpen] = useState(false);
-  const examPunch = useRef(EXAM_TYPES.map(() => new Animated.Value(1))).current;
+  const examPunch = useRef(PICKABLE_EXAM_TYPES.map(() => new Animated.Value(1))).current;
 
   const { buttonPress, dialTick } = useHaptics();
 
@@ -150,7 +150,7 @@ export const AvatarExamScreen: React.FC<Props> = ({ onComplete, onLogin, onChall
         )}
         <Text style={examS.sectionLabel}>What's Your Exam?</Text>
         <View style={examS.grid}>
-          {EXAM_TYPES.map((exam, index) => {
+          {PICKABLE_EXAM_TYPES.map((exam, index) => {
             const checked = selectedExams.has(exam.id);
             return (
               <Animated.View key={exam.id} style={{ transform: [{ scale: examPunch[index] }], width: (W - Spacing.xl * 2 - 10) / 2 }}>

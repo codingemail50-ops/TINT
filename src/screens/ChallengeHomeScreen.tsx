@@ -70,6 +70,23 @@ function formatClock(ms: number): string {
 // The running 7 Day Lock In: day X of 7, the progress bar, time left,
 // urges resisted, a quote for where they are in the week, the squad, the
 // emergency unlock, and leaving. Also the finished and left screens.
+// Privacy policy and Delete account: quiet, grey and at the very bottom of the
+// screen (the spacer pushes them down on a tall phone), so nobody taps them by
+// accident. Delete account is still here, because the app must offer it.
+const FooterLinks: React.FC<{ onDelete: () => void }> = ({ onDelete }) => (
+  <>
+    <View style={styles.footerSpacer} />
+    <View style={styles.footerLinks}>
+      <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
+        <Text style={styles.footerLink}>Privacy policy</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onDelete} hitSlop={8}>
+        <Text style={styles.footerLink}>Delete account</Text>
+      </TouchableOpacity>
+    </View>
+  </>
+);
+
 export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onAccountDeleted }) => {
   const [local, setLocal] = useState<LocalChallenge | null>(null);
   const [members, setMembers] = useState<MemberRow[]>([]);
@@ -317,7 +334,7 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
     return (
       <View style={cs.screen}>
         <StatusBar style="light" />
-        <ScrollView contentContainerStyle={cs.content}>
+        <ScrollView contentContainerStyle={[cs.content, styles.contentGrow]}>
           <View ref={cardRef} collapsable={false} style={[cs.card, styles.reportCard]}>
             <LogoFlame size={96} />
             <Eyebrow>7 Day Lock In · Complete</Eyebrow>
@@ -342,14 +359,7 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
           <TouchableOpacity onPress={() => void goAgain()} hitSlop={8}>
             <Text style={cs.link}>Do another 7 days</Text>
           </TouchableOpacity>
-          <View style={styles.footerLinks}>
-            <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
-              <Text style={cs.link}>Privacy policy</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => confirmDeleteAccount(onAccountDeleted)} hitSlop={8}>
-              <Text style={[cs.link, styles.danger]}>Delete account</Text>
-            </TouchableOpacity>
-          </View>
+          <FooterLinks onDelete={() => confirmDeleteAccount(onAccountDeleted)} />
         </ScrollView>
       </View>
     );
@@ -360,20 +370,13 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
     return (
       <View style={cs.screen}>
         <StatusBar style="light" />
-        <ScrollView contentContainerStyle={cs.content}>
+        <ScrollView contentContainerStyle={[cs.content, styles.contentGrow]}>
           <Eyebrow>Challenge ended</Eyebrow>
           <Text style={cs.title}>You made it to day {local.quitDay ?? day}.</Text>
           <Text style={cs.sub}>Every hour you held counts. You resisted {total} urge{total === 1 ? '' : 's'}. Try again when you're ready.</Text>
           <PrimaryButton label="Start again" onPress={() => void goAgain()} />
           <SecondaryButton label="Use TINT for studying" onPress={onUpgrade} />
-          <View style={styles.footerLinks}>
-            <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
-              <Text style={cs.link}>Privacy policy</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => confirmDeleteAccount(onAccountDeleted)} hitSlop={8}>
-              <Text style={[cs.link, styles.danger]}>Delete account</Text>
-            </TouchableOpacity>
-          </View>
+          <FooterLinks onDelete={() => confirmDeleteAccount(onAccountDeleted)} />
         </ScrollView>
       </View>
     );
@@ -384,7 +387,7 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
   return (
     <View style={cs.screen}>
       <StatusBar style="light" />
-      <ScrollView contentContainerStyle={cs.content}>
+      <ScrollView contentContainerStyle={[cs.content, styles.contentGrow]}>
         <Eyebrow>7 Day Lock In</Eyebrow>
         <View style={styles.titleRow}>
           {started ? (
@@ -461,16 +464,9 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
         )}
 
         <TouchableOpacity onPress={pressLeave} hitSlop={8}>
-          <Text style={cs.link}>Leave challenge</Text>
+          <Text style={[cs.link, styles.leaveLink]}>Leave challenge</Text>
         </TouchableOpacity>
-        <View style={styles.footerLinks}>
-          <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
-            <Text style={cs.link}>Privacy policy</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => confirmDeleteAccount(onAccountDeleted)} hitSlop={8}>
-            <Text style={[cs.link, styles.danger]}>Delete account</Text>
-          </TouchableOpacity>
-        </View>
+        <FooterLinks onDelete={() => confirmDeleteAccount(onAccountDeleted)} />
       </ScrollView>
 
       <Modal visible={leaveOpen} transparent animationType="fade" onRequestClose={() => setLeaveOpen(false)}>
@@ -522,7 +518,11 @@ const styles = StyleSheet.create({
   warningText: { fontSize: 13, lineHeight: 19, fontFamily: Fonts.medium, color: Colors.danger },
   warningLink: { fontSize: 14, fontFamily: Fonts.semibold, color: Colors.pop, marginTop: Spacing.sm },
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 4 },
-  footerLinks: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginTop: Spacing.md },
+  contentGrow: { flexGrow: 1 },
+  footerSpacer: { flex: 1, minHeight: Spacing.xxl },
+  footerLinks: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.xl, paddingTop: Spacing.md },
+  footerLink: { fontSize: 12, fontFamily: Fonts.regular, color: Colors.textMuted },
+  leaveLink: { color: Colors.danger, fontFamily: Fonts.semibold },
   danger: { color: Colors.danger },
   memberAvatar: {
     width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surfaceElevated,

@@ -149,3 +149,7 @@ export const Typography = {
 
   displayHeavy: { fontFamily: Fonts.semibold, fontSize: 28, letterSpacing: -0.3 },
 };
+
+/** Height the floating tab bar covers at the bottom of the tab screens: scrolling
+ *  content ends this far above the screen edge so its last line is never hidden. */
+export const TAB_BAR_CLEARANCE = 100;

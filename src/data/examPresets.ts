@@ -1,4 +1,9 @@
-export type ExamType = 'JEE' | 'NEET' | 'CLASS12' | 'CLASS10' | 'UCEED' | 'NID' | 'NIFT' | 'IPMAT';
+// 'GENERAL' is not offered in the exam pickers. It is what someone gets when they
+// move from the 7 Day Lock In to everyday studying without picking an exam: it
+// marks the account as a studying account (an account with no exam at all is
+// treated as Lock In only) and syncs like any other exam. It comes with no
+// preset tasks; they add their own, or pick a real exam in Profile later.
+export type ExamType = 'JEE' | 'NEET' | 'CLASS12' | 'CLASS10' | 'UCEED' | 'NID' | 'NIFT' | 'IPMAT' | 'GENERAL';
 
 export type ClassTwelveStream = 'Science' | 'Commerce' | 'Humanities';
 export const CLASS_TWELVE_STREAMS: ClassTwelveStream[] = ['Science', 'Commerce', 'Humanities'];
@@ -31,7 +36,7 @@ export interface CustomExam {
 // entrances), then the two board exams, then the design entrances, IPMAT,
 // with "Other" rendered separately (and last) by whichever screen renders
 // this list rather than living here.
-export const EXAM_TYPES: { id: ExamType; label: string; icon: string; description: string; color: string }[] = [
+export const EXAM_TYPES: { id: ExamType; label: string; icon: string; description: string; color: string; hidden?: boolean }[] = [
   { id: 'JEE',    label: 'JEE',      icon: 'flash',         description: 'Joint Entrance Exam — Mains & Advanced', color: '#3B82F6' },
   { id: 'NEET',   label: 'NEET',     icon: 'medkit',        description: 'National Eligibility cum Entrance Test — Medical', color: '#EF4444' },
   { id: 'CLASS12', label: 'Class 12', icon: 'school',       description: 'Class 12 board exams', color: '#22C55E' },
@@ -40,9 +45,14 @@ export const EXAM_TYPES: { id: ExamType; label: string; icon: string; descriptio
   { id: 'NID',    label: 'NID',      icon: 'color-palette', description: 'National Institute of Design Entrance', color: '#EC4899' },
   { id: 'NIFT',   label: 'NIFT',     icon: 'shirt',         description: 'National Institute of Fashion Technology', color: '#F59E0B' },
   { id: 'IPMAT',  label: 'IPMAT',    icon: 'calculator',    description: 'Integrated Program in Management Aptitude Test', color: '#6366F1' },
+  { id: 'GENERAL', label: 'General', icon: 'book',          description: 'Everyday studying', color: '#9CA3AF', hidden: true },
 ];
 
+/** The exams a person can choose from. */
+export const PICKABLE_EXAM_TYPES = EXAM_TYPES.filter(e => !e.hidden);
+
 const BASE_TASKS: Record<ExamType, Task[]> = {
+  GENERAL: [],
   // Problem-heavy by design — JEE rewards volume. Numbers in the titles
   // (25 problems, 30 minutes of PYQs) are starting points; duration and
   // title are editable per-task like any other task in the app, so a
