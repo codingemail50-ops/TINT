@@ -1,8 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +9,7 @@ import { useHaptics } from '../hooks/useHaptics';
 import { AvatarWall } from '../components/AvatarWall';
 import { GoogleSignin, isSuccessResponse, isErrorWithCode, statusCodes } from '../utils/googleAuth';
 import { openPrivacyPolicy } from '../utils/accountDeletion';
+import { tintAlert } from '../utils/dialog';
 
 // Public (non-secret) Web OAuth client id from Google Cloud Console — see
 // PRIORITY 2 in the EAS audit for the full Google Cloud/Supabase setup this
@@ -162,7 +160,7 @@ export const CreateAccountScreen: React.FC<Props> = ({
     await buttonPress();
 
     if (!GoogleSignin || !GOOGLE_WEB_CLIENT_ID) {
-      Alert.alert(
+      tintAlert(
         'Not available in this build',
         !GoogleSignin
           ? 'Google Sign-In needs a full Android build (not Expo Go or the web preview) to work.'

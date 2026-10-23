@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert, AppState as RNAppState } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, AppState as RNAppState } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,6 +40,7 @@ import {
   saveNewUserToSupabase,
   lastLoadUserError,
 } from '../utils/supabaseStorage';
+import { tintAlert } from '../utils/dialog';
 
 // Supabase auth is fully wired up — returning users go straight back into
 // the app instead of onboarding. (This used to force onboarding on every
@@ -537,13 +538,13 @@ const AppNavigatorInner: React.FC = () => {
           // real cause instead of vanishing into a console no one can see on
           // a release build.
           if (!result.success) {
-            Alert.alert(
+            tintAlert(
               'Your account needs one more step',
               `Signed up, but your profile couldn't be saved yet: ${result.error ?? 'unknown error'}. You may need to sign up again once this is fixed, or check your connection.`
             );
           }
         } else if (!userIdRef.current) {
-          Alert.alert(
+          tintAlert(
             'Your account needs one more step',
             'Signed up, but no account id was available to save your profile against — please check your connection and try signing up again.'
           );
@@ -633,7 +634,7 @@ const AppNavigatorInner: React.FC = () => {
       // identical from here, which is exactly why login bouncing back to
       // onboarding was impossible to diagnose without device logs.
       if (lastLoadUserError) {
-        Alert.alert('Couldn\'t log in', `Your account exists, but loading its data failed: ${lastLoadUserError}. Check your connection and try again.`);
+        tintAlert('Couldn\'t log in', `Your account exists, but loading its data failed: ${lastLoadUserError}. Check your connection and try again.`);
         return;
       }
       // No profile row, and this wasn't a Google sign-in (googleEmail is
@@ -647,7 +648,7 @@ const AppNavigatorInner: React.FC = () => {
       // genuinely can be a real first-time user with no profile row yet,
       // so that path still correctly falls through to onboarding below.
       if (!googleEmail) {
-        Alert.alert(
+        tintAlert(
           'Account not fully set up',
           'This account was never finished signing up, so there\'s no profile to log into. Please sign up instead.'
         );

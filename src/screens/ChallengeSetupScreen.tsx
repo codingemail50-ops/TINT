@@ -1,8 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Share, Alert,
-  AppState as RNAppState, ActivityIndicator, Platform, BackHandler,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Share, AppState as RNAppState, ActivityIndicator, Platform, BackHandler } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +18,7 @@ import { useHaptics } from '../hooks/useHaptics';
 import { confirmDeleteAccount, openPrivacyPolicy } from '../utils/accountDeletion';
 import { usePermissionConsentGate } from '../components/PermissionDisclosure';
 import { notificationsAllowed, askForNotifications } from '../utils/notificationAccess';
+import { tintAlert } from '../utils/dialog';
 
 type Step = 'loading' | 'permissions' | 'choose' | 'solo' | 'squad' | 'create' | 'join' | 'lobby';
 type StartChoice = 'now' | 'tonight' | 'tomorrow';
@@ -169,7 +167,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
         const [fresh, list] = await Promise.all([refreshChallenge(lobby), fetchMembers(lobby.id)]);
         if (!alive) return;
         if (!fresh) {
-          Alert.alert('Squad closed', 'The person who made this squad closed it.');
+          tintAlert('Squad closed', 'The person who made this squad closed it.');
           setLobby(null);
           setStep('choose');
           return;
@@ -196,7 +194,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
       try {
         await openPermissionSettings(permission);
       } catch {
-        Alert.alert('Not available', 'This permission can only be granted on the Android app.');
+        tintAlert('Not available', 'This permission can only be granted on the Android app.');
       }
     });
   };
@@ -231,14 +229,14 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
   const run = async (fn: () => Promise<void>) => {
     if (busy) return;
     if (apps.length === 0) {
-      Alert.alert('Pick at least one app', 'Choose the apps you want blocked for the 7 days.');
+      tintAlert('Pick at least one app', 'Choose the apps you want blocked for the 7 days.');
       return;
     }
     setBusy(true);
     try {
       await fn();
     } catch (err) {
-      Alert.alert("Couldn't do that", challengeErrorMessage(err));
+      tintAlert("Couldn't do that", challengeErrorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -259,7 +257,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
 
   const joinSquad = () => {
     if (code.trim().length < 6) {
-      Alert.alert('Enter the code', 'Squad codes are 6 letters and numbers.');
+      tintAlert('Enter the code', 'Squad codes are 6 letters and numbers.');
       return;
     }
     void run(async () => {
@@ -273,7 +271,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
   const pressStart = () => {
     if (!lobby) return;
     void buttonPress();
-    Alert.alert(
+    tintAlert(
       'Start the 7 days?',
       'Everyone in the squad starts now, and nobody else can join after this.',
       [
@@ -292,7 +290,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
 
   const leave = () => {
     if (!lobby) return;
-    Alert.alert(
+    tintAlert(
       lobby.isCreator ? 'Close this squad?' : 'Leave this squad?',
       lobby.isCreator ? 'Everyone waiting in the lobby will be removed.' : 'You can join again with the code.',
       [
@@ -324,7 +322,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
   };
 
   const confirmLogout = () => {
-    Alert.alert('Log out?', 'You can log back in any time.', [
+    tintAlert('Log out?', 'You can log back in any time.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Log out', style: 'destructive', onPress: onLogout },
     ]);

@@ -3,7 +3,7 @@
 // challenge memberships and stats), then wipes this device the same way
 // logging out does.
 
-import { Alert, Linking } from 'react-native';
+import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { StorageService } from './storage';
@@ -15,6 +15,7 @@ import { clearLocalChallenge, cancelChallengeNotifications } from './challenge';
 import { PRIVACY_POLICY_URL, ACCOUNT_DELETION_URL } from '../constants/links';
 import { BLOCKED_APPS_STORAGE_KEY } from '../data/blockableApps';
 import { clearPermissionConsent } from './permissionConsent';
+import { tintAlert } from './dialog';
 
 // Whatever else TINT saved under its own names (last-shown dates, wording
 // choices, clock offset, ...) and any saved login session, so nothing of the
@@ -76,7 +77,7 @@ export async function deleteMyAccount(): Promise<void> {
 
 /** Two-step confirm, then delete. Calls onDeleted once it's gone. */
 export function confirmDeleteAccount(onDeleted: () => void): void {
-  Alert.alert(
+  tintAlert(
     'Delete your account?',
     'This permanently deletes your TINT account and everything in it: your profile, streaks, focus history, friends and challenges. This cannot be undone.',
     [
@@ -84,7 +85,7 @@ export function confirmDeleteAccount(onDeleted: () => void): void {
       {
         text: 'Continue',
         style: 'destructive',
-        onPress: () => Alert.alert(
+        onPress: () => tintAlert(
           'Are you sure?',
           'Your account will be deleted right now.',
           [
@@ -98,7 +99,7 @@ export function confirmDeleteAccount(onDeleted: () => void): void {
                   onDeleted();
                 } catch (err) {
                   // Offer the web page too, so a failed delete is never a dead end.
-                  Alert.alert("Couldn't delete your account", (err as Error).message, [
+                  tintAlert("Couldn't delete your account", (err as Error).message, [
                     { text: 'OK', style: 'cancel' },
                     { text: 'Other ways to delete', onPress: openAccountDeletionPage },
                   ]);
@@ -119,7 +120,7 @@ export function openAccountDeletionPage(): void {
 
 export function openPrivacyPolicy(): void {
   if (!PRIVACY_POLICY_URL) {
-    Alert.alert('Privacy policy', 'The privacy policy page is not available yet.');
+    tintAlert('Privacy policy', 'The privacy policy page is not available yet.');
     return;
   }
   Linking.openURL(PRIVACY_POLICY_URL).catch(() => {});

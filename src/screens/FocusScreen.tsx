@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity, Pressable, Alert,
-  Animated, AppState as RNAppState, AppStateStatus,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, Animated, AppState as RNAppState, AppStateStatus } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
@@ -29,6 +26,7 @@ import {
 import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY, packageNamesFor } from '../data/blockableApps';
 import { ensureNotificationPermission, notifySessionComplete } from '../utils/sessionNotifications';
 import { usePermissionConsentGate } from '../components/PermissionDisclosure';
+import { tintAlert } from '../utils/dialog';
 
 const DEFAULT_DURATION = 25;
 const HOLD_MS = 2000;
@@ -646,7 +644,7 @@ export const FocusScreen: React.FC<Props> = ({
       try {
         await openPermissionSettings(permission);
       } catch {
-        Alert.alert('Not available', 'This permission can only be granted on an Android build outside Expo Go.');
+        tintAlert('Not available', 'This permission can only be granted on an Android build outside Expo Go.');
       }
     });
   };

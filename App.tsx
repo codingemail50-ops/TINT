@@ -8,6 +8,7 @@ import { VT323_400Regular } from '@expo-google-fonts/vt323';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { Colors } from './src/constants/theme';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { DialogHost } from './src/components/DialogHost';
 
 // Font loading is a nice-to-have, not a hard requirement — if it fails or
 // hangs (seen on some devices), the app must still render with system
@@ -43,6 +44,8 @@ export default function App() {
       <GestureHandlerRootView style={styles.root}>
         <SafeAreaProvider>
           <AppNavigator />
+          {/* Every message box in the app, drawn in TINT's own look (see utils/dialog.ts). */}
+          <DialogHost />
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

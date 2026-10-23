@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Alert, AppState as RNAppState } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, AppState as RNAppState } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,6 +10,7 @@ import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY } from '
 import { openPermissionSettings, checkPermission, BlockingPermission } from '../utils/appBlocking';
 import { useHaptics } from '../hooks/useHaptics';
 import { usePermissionConsentGate } from '../components/PermissionDisclosure';
+import { tintAlert } from '../utils/dialog';
 
 const MIN_MINS = 15;
 const MAX_MINS = 1080;
@@ -91,7 +92,7 @@ export const FocusGoalScreen: React.FC<Props> = ({ initialMins = DEFAULT_MINS, o
       try {
         await openPermissionSettings(permission);
       } catch {
-        Alert.alert('Not available', 'App blocking can only be set up on an Android build outside Expo Go.');
+        tintAlert('Not available', 'App blocking can only be set up on an Android build outside Expo Go.');
       }
     });
   };
