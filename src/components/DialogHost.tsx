@@ -53,14 +53,18 @@ export const DialogHost: React.FC = () => {
 
   return (
     <Modal visible={current !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={dismiss}>
-      <Pressable style={s.backdrop} onPress={dismiss}>
-        {/* Swallows taps so touching the card itself does not close it. */}
-        <Pressable style={[challengeStyles.card, s.card]} onPress={() => {}}>
+      <View style={s.backdrop}>
+        {/* Tapping outside the card closes it. This is a sibling UNDER the card,
+            not a Pressable wrapped around it: a touchable parent grabbed the
+            drag from the scroll list inside, so the list would not scroll on a
+            real phone. */}
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={dismiss} />
+        <View style={[challengeStyles.card, s.card]}>
           {d && (
             <>
               <Text style={s.title}>{d.title}</Text>
               {d.message ? (
-                <ScrollView style={s.messageBox} showsVerticalScrollIndicator>
+                <ScrollView style={s.messageBox} showsVerticalScrollIndicator nestedScrollEnabled>
                   <Text style={challengeStyles.sub}>{d.message}</Text>
                 </ScrollView>
               ) : null}
@@ -86,8 +90,8 @@ export const DialogHost: React.FC = () => {
               ) : null}
             </>
           )}
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 };

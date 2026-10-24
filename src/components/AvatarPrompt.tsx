@@ -24,12 +24,16 @@ export const AvatarPrompt: React.FC<Props> = ({ visible, current, onSave, onSkip
   const close = () => { setPicked(null); onSkip(); };
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={close}>
-      <Pressable style={s.backdrop} onPress={close}>
-        {/* Swallows taps so touching the card itself does not close it. */}
-        <Pressable style={[challengeStyles.card, s.card]} onPress={() => {}}>
+      <View style={s.backdrop}>
+        {/* Tapping outside the card closes it. This is a sibling UNDER the card,
+            not a Pressable wrapped around it: a touchable parent grabbed the
+            drag from the scroll list inside, so the list would not scroll on a
+            real phone. */}
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={close} />
+        <View style={[challengeStyles.card, s.card]}>
           <Text style={s.title}>Choose your avatar</Text>
           <Text style={challengeStyles.sub}>This is how you show up to friends and on the leaderboard. You can change it any time in Profile.</Text>
-          <ScrollView style={s.gridBox} contentContainerStyle={s.grid} showsVerticalScrollIndicator>
+          <ScrollView style={s.gridBox} contentContainerStyle={s.grid} showsVerticalScrollIndicator nestedScrollEnabled>
             {AVATARS.map(a => (
               <TouchableOpacity
                 key={a}
@@ -48,8 +52,8 @@ export const AvatarPrompt: React.FC<Props> = ({ visible, current, onSave, onSkip
           <TouchableOpacity onPress={close} hitSlop={8}>
             <Text style={s.skip}>Maybe later</Text>
           </TouchableOpacity>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 };

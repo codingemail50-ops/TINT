@@ -695,6 +695,17 @@ export const FocusScreen: React.FC<Props> = ({
       if (e.translationY > 70 && onMinimize) runOnJS(onMinimize)();
     });
 
+  // Pause/resume from the button. Fires on touch-down; the press that follows
+  // (and the browser, which only reports a press) is ignored for a moment so
+  // one tap never toggles twice.
+  const lastPauseTapAt = useRef(0);
+  const onPauseTap = () => {
+    const t = Date.now();
+    if (t - lastPauseTapAt.current < 400) return;
+    lastPauseTapAt.current = t;
+    togglePause();
+  };
+
   const totalSeconds = duration * 60;
   const pct = totalSeconds > 0 ? (totalSeconds - timeLeft) / totalSeconds : 0;
   const traceDashoffset = TRACE_LENGTH * (1 - pct);
@@ -837,29 +848,46 @@ export const FocusScreen: React.FC<Props> = ({
           </Text>
 
           <View style={styles.hero}>
-            <Animated.View style={[
-              styles.blobWrap,
-              { opacity: blobEnterAnim, transform: [{ scale: blobEnterAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] },
-            ]}>
-              <Svg width={BLOB_WRAP} height={BLOB_WRAP} viewBox={`0 0 ${BLOB_SIZE} ${BLOB_SIZE}`}>
-                <Path d={BLOB_PATH} fill={Colors.gray[100]} />
-                <Path
-                  d={TRACE_PATH}
-                  fill="none"
-                  stroke={Colors.gray[500]}
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeDasharray={TRACE_LENGTH}
-                  strokeDashoffset={traceDashoffset}
-                />
-              </Svg>
-              <View style={styles.blobContent}>
-                <Text style={styles.blobTime}>{formatMMSS(timeLeft)}</Text>
-                <TouchableOpacity style={styles.pauseCircle} onPress={togglePause} activeOpacity={0.75}>
+            {/* The shape grows in; the time and the pause button sit in a plain
+                wrapper on top of it, NOT inside the animated one. A button
+                inside a view with a running transform animation can stop
+                receiving taps on a real phone, which is how the in-app pause
+                button went dead while the notification's Pause still worked. */}
+            <View style={styles.blobWrap}>
+              <Animated.View style={[
+                styles.blobWrap,
+                { opacity: blobEnterAnim, transform: [{ scale: blobEnterAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] },
+              ]}>
+                <Svg width={BLOB_WRAP} height={BLOB_WRAP} viewBox={`0 0 ${BLOB_SIZE} ${BLOB_SIZE}`}>
+                  <Path d={BLOB_PATH} fill={Colors.gray[100]} />
+                  <Path
+                    d={TRACE_PATH}
+                    fill="none"
+                    stroke={Colors.gray[500]}
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeDasharray={TRACE_LENGTH}
+                    strokeDashoffset={traceDashoffset}
+                  />
+                </Svg>
+              </Animated.View>
+              <View style={styles.blobContent} pointerEvents="box-none">
+                <Animated.Text style={[styles.blobTime, { opacity: blobEnterAnim }]}>{formatMMSS(timeLeft)}</Animated.Text>
+                {/* Acts on touch-down, so a finger that drifts a little (or a
+                    swipe gesture starting nearby) cannot cancel the tap. */}
+                <TouchableOpacity
+                  style={styles.pauseCircle}
+                  onPressIn={onPauseTap}
+                  onPress={onPauseTap}
+                  hitSlop={12}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={paused ? 'Resume' : 'Pause'}
+                >
                   <Ionicons name={paused ? 'play' : 'pause'} size={20} color={Colors.gray[100]} />
                 </TouchableOpacity>
               </View>
-            </Animated.View>
+            </View>
           </View>
         </View>
         </GestureDetector>

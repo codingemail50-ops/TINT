@@ -55,23 +55,21 @@ export const PermissionDisclosure: React.FC<Props> = ({ visible, permission, con
   const showHint = overflowing && !atEnd;
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onNotNow}>
-      <Pressable
-        style={[s.backdrop, { paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + Spacing.md }]}
-        onPress={onNotNow}
-      >
-        {/* Swallows taps so touching the card itself does not close it. The
-            card never grows past the visible screen, so the buttons are always
-            on screen. */}
-        <Pressable
-          style={[s.card, { maxHeight: height - insets.top - insets.bottom - Spacing.md * 2 }]}
-          onPress={() => {}}
-        >
+      <View style={[s.backdrop, { paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + Spacing.md }]}>
+        {/* Tapping outside the card closes it. This is a sibling UNDER the
+            card, not a Pressable wrapped around it: a touchable parent grabbed
+            the drag from the scroll list inside, so the text would not scroll
+            on a real phone. The card never grows past the visible screen, so
+            the buttons are always on screen. */}
+        <Pressable style={StyleSheet.absoluteFillObject} onPress={onNotNow} />
+        <View style={[s.card, { maxHeight: height - insets.top - insets.bottom - Spacing.md * 2 }]}>
           {/* Only the explanation scrolls. The agree line and the buttons stay
               pinned in view, so "Enable" and "Not now" are always reachable. */}
           <ScrollView
             style={s.scroll}
             contentContainerStyle={s.body}
             showsVerticalScrollIndicator
+            nestedScrollEnabled
             persistentScrollbar
             onLayout={e => setBodyH(e.nativeEvent.layout.height)}
             onContentSizeChange={(_, h) => setContentH(h)}
@@ -120,8 +118,8 @@ export const PermissionDisclosure: React.FC<Props> = ({ visible, permission, con
               </TouchableOpacity>
             </View>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 };
@@ -189,7 +187,7 @@ const s = StyleSheet.create({
     padding: Spacing.lg, paddingTop: Spacing.md, gap: Spacing.md,
     borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.surface,
   },
-  linkRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: Spacing.xs },
+  linkRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', columnGap: Spacing.lg, rowGap: Spacing.sm, paddingHorizontal: Spacing.xs },
   title: { fontFamily: Fonts.pixel, fontSize: 26, color: Colors.textPrimary, letterSpacing: 0.5 },
   moreHint: { textAlign: 'center', fontSize: 12, color: Colors.pop, fontFamily: Fonts.medium },
   turningOnName: { color: Colors.pop, fontFamily: Fonts.semibold },
