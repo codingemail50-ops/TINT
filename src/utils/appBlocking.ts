@@ -16,7 +16,7 @@ import * as TintAppBlocker from 'tint-app-blocker';
 // Matches app.json's android.package — used for the overlay-permission
 // intent, which needs a package-specific URI to jump straight to this
 // app's toggle instead of a generic settings list.
-const ANDROID_PACKAGE_NAME = 'com.tint.app';
+const ANDROID_PACKAGE_NAME = 'com.tint.focus';
 
 const GRANTED_KEY = 'tint_permission_self_reported';
 
