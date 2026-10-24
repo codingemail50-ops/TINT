@@ -12,7 +12,8 @@
 // tap, until the user has agreed once.
 
 import React, { useCallback, useRef, useState } from 'react';
-import { Modal, View, Text, StyleSheet, ScrollView, TouchableOpacity, Pressable, useWindowDimensions } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, Pressable, useWindowDimensions } from 'react-native';
+import { GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { Eyebrow, PrimaryButton } from './ChallengeParts';
@@ -55,7 +56,8 @@ export const PermissionDisclosure: React.FC<Props> = ({ visible, permission, con
   const showHint = overflowing && !atEnd;
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onNotNow}>
-      <View style={[s.backdrop, { paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + Spacing.md }]}>
+      {/* A Modal is its own window, so it needs its own gesture-handler root for the scroll list inside. */}
+      <GestureHandlerRootView style={[s.backdrop, { paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + Spacing.md }]}>
         {/* Tapping outside the card closes it. This is a sibling UNDER the
             card, not a Pressable wrapped around it: a touchable parent grabbed
             the drag from the scroll list inside, so the text would not scroll
@@ -119,7 +121,7 @@ export const PermissionDisclosure: React.FC<Props> = ({ visible, permission, con
             </View>
           </View>
         </View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 };

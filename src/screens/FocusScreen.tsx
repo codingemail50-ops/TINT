@@ -686,25 +686,20 @@ export const FocusScreen: React.FC<Props> = ({
   // the Focus tab's own session and a task-linked one, wherever onMinimize
   // is wired up. failOffsetX lets a mostly-horizontal drag fall through to
   // AppNavigator's own tab-swipe gesture instead of being claimed here.
+  // activeOffsetY(15) = start only after a 15 point drag DOWN. It was written
+  // as [15, 999], but an array is a "dead zone" that must contain 0 (first
+  // value 0 or less, second 0 or more): with 15 first, the gesture started on
+  // the tiniest finger movement and cancelled every button on this screen
+  // (pause, close, minimise) on a real phone. A mouse in a browser never moves
+  // between press and release, so a browser test cannot show it.
   const swipeMinimizeGesture = Gesture.Pan()
     .enabled(phase === 'active' && !!onMinimize)
-    .activeOffsetY([15, 999])
+    .activeOffsetY(15)
     .failOffsetX([-30, 30])
     .onEnd(e => {
       'worklet';
       if (e.translationY > 70 && onMinimize) runOnJS(onMinimize)();
     });
-
-  // Pause/resume from the button. Fires on touch-down; the press that follows
-  // (and the browser, which only reports a press) is ignored for a moment so
-  // one tap never toggles twice.
-  const lastPauseTapAt = useRef(0);
-  const onPauseTap = () => {
-    const t = Date.now();
-    if (t - lastPauseTapAt.current < 400) return;
-    lastPauseTapAt.current = t;
-    togglePause();
-  };
 
   const totalSeconds = duration * 60;
   const pct = totalSeconds > 0 ? (totalSeconds - timeLeft) / totalSeconds : 0;
@@ -848,46 +843,29 @@ export const FocusScreen: React.FC<Props> = ({
           </Text>
 
           <View style={styles.hero}>
-            {/* The shape grows in; the time and the pause button sit in a plain
-                wrapper on top of it, NOT inside the animated one. A button
-                inside a view with a running transform animation can stop
-                receiving taps on a real phone, which is how the in-app pause
-                button went dead while the notification's Pause still worked. */}
-            <View style={styles.blobWrap}>
-              <Animated.View style={[
-                styles.blobWrap,
-                { opacity: blobEnterAnim, transform: [{ scale: blobEnterAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] },
-              ]}>
-                <Svg width={BLOB_WRAP} height={BLOB_WRAP} viewBox={`0 0 ${BLOB_SIZE} ${BLOB_SIZE}`}>
-                  <Path d={BLOB_PATH} fill={Colors.gray[100]} />
-                  <Path
-                    d={TRACE_PATH}
-                    fill="none"
-                    stroke={Colors.gray[500]}
-                    strokeWidth={2.5}
-                    strokeLinecap="round"
-                    strokeDasharray={TRACE_LENGTH}
-                    strokeDashoffset={traceDashoffset}
-                  />
-                </Svg>
-              </Animated.View>
-              <View style={styles.blobContent} pointerEvents="box-none">
-                <Animated.Text style={[styles.blobTime, { opacity: blobEnterAnim }]}>{formatMMSS(timeLeft)}</Animated.Text>
-                {/* Acts on touch-down, so a finger that drifts a little (or a
-                    swipe gesture starting nearby) cannot cancel the tap. */}
-                <TouchableOpacity
-                  style={styles.pauseCircle}
-                  onPressIn={onPauseTap}
-                  onPress={onPauseTap}
-                  hitSlop={12}
-                  activeOpacity={0.75}
-                  accessibilityRole="button"
-                  accessibilityLabel={paused ? 'Resume' : 'Pause'}
-                >
+            <Animated.View style={[
+              styles.blobWrap,
+              { opacity: blobEnterAnim, transform: [{ scale: blobEnterAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] },
+            ]}>
+              <Svg width={BLOB_WRAP} height={BLOB_WRAP} viewBox={`0 0 ${BLOB_SIZE} ${BLOB_SIZE}`}>
+                <Path d={BLOB_PATH} fill={Colors.gray[100]} />
+                <Path
+                  d={TRACE_PATH}
+                  fill="none"
+                  stroke={Colors.gray[500]}
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeDasharray={TRACE_LENGTH}
+                  strokeDashoffset={traceDashoffset}
+                />
+              </Svg>
+              <View style={styles.blobContent}>
+                <Text style={styles.blobTime}>{formatMMSS(timeLeft)}</Text>
+                <TouchableOpacity style={styles.pauseCircle} onPress={togglePause} activeOpacity={0.75}>
                   <Ionicons name={paused ? 'play' : 'pause'} size={20} color={Colors.gray[100]} />
                 </TouchableOpacity>
               </View>
-            </View>
+            </Animated.View>
           </View>
         </View>
         </GestureDetector>

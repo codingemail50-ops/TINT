@@ -9,7 +9,8 @@
 // run the cancel button if there is one, otherwise they just close a plain notice.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, Pressable, ScrollView } from 'react-native';
+import { Modal, View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { GestureHandlerRootView, ScrollView } from 'react-native-gesture-handler';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { PrimaryButton, SecondaryButton, challengeStyles } from './ChallengeParts';
 import { registerDialogHost, DialogSpec, DialogButton } from '../utils/dialog';
@@ -53,7 +54,8 @@ export const DialogHost: React.FC = () => {
 
   return (
     <Modal visible={current !== null} transparent animationType="fade" statusBarTranslucent onRequestClose={dismiss}>
-      <View style={s.backdrop}>
+      {/* A Modal is its own window, so it needs its own gesture-handler root for the scroll list inside. */}
+      <GestureHandlerRootView style={s.backdrop}>
         {/* Tapping outside the card closes it. This is a sibling UNDER the card,
             not a Pressable wrapped around it: a touchable parent grabbed the
             drag from the scroll list inside, so the list would not scroll on a
@@ -91,7 +93,7 @@ export const DialogHost: React.FC = () => {
             </>
           )}
         </View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 };
