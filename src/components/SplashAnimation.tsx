@@ -9,6 +9,12 @@ interface Props {
    *  for as long as it stays mounted, so a slow boot never exposes a gap
    *  behind a self-timed fade-out. */
   onFinish: () => void;
+  /** Fires once, the moment the flame and its sparks are gone and only the
+   *  phrase's zoom is left (about half a second before onFinish). The zoom and
+   *  the breathing after it run on the phone's own animation layer, so they
+   *  stay smooth even while the app is busy loading the next screen. The
+   *  caller can start that loading now and hide its cost behind the zoom. */
+  onReveal?: () => void;
 }
 
 const BACKGROUND = '#080808';
@@ -342,11 +348,20 @@ const T_END = T_ZOOM + ZOOM_MS;
 // Far enough that the tallest lick clears the bottom of the grid.
 const MAX_SHIFT = ROWS - HEADROOM + 2;
 
-export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
+export const SplashAnimation: React.FC<Props> = ({ onFinish, onReveal }) => {
   const [frame, setFrame] = useState<Frame>(EMPTY_FRAME);
   const tintOpacity = useRef(new Animated.Value(1)).current;
   const phraseOpacity = useRef(new Animated.Value(0)).current;
   const phraseScale = useRef(new Animated.Value(1)).current;
+  // Slow in-and-out "breathing" that keeps the held phrase alive. One looping
+  // value (0 -> 1) mapped to a scale, so the whole loop runs on the animation
+  // layer and keeps going even if the app is busy for a moment.
+  const breath = useRef(new Animated.Value(0)).current;
+  const breathScale = breath.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: [1, 1.0142, 1.0283, 1.0142, 1],
+  });
+  const anims = useRef<Animated.CompositeAnimation[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -412,30 +427,30 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
         setFrame(sparks.length ? buildFrame(NO_FLAME, NO_FLAME, 0, sparks) : EMPTY_FRAME);
       }
 
+      // Flame and sparks are done: clear them (nothing may be left frozen mid-air
+      // if the app gets busy), start the zoom and breathing on the animation
+      // layer, tell the caller it can start loading the next screen, and stop
+      // ticking. The only thing left to do is announce the end.
       if (t >= T_ZOOM && !zoomed) {
         zoomed = true;
-        Animated.timing(phraseScale, {
+        sparks = [];
+        setFrame(EMPTY_FRAME);
+        const zoom = Animated.timing(phraseScale, {
           toValue: 1.06,
           duration: ZOOM_MS,
           easing: Easing.out(Easing.ease),
           useNativeDriver: true,
-        }).start(() => {
-          // The screen only actually switches once boot's own async user/
-          // session check also resolves (see the comment on bootTargetScreen
-          // in AppNavigator) -- on a slow network that can run past T_END,
-          // and this animation was leaving the zoomed phrase sitting
-          // completely still for however long that took, which read as the
-          // splash having frozen/hung rather than still working. A slow
-          // breathing loop keeps it visibly alive for however long the wait
-          // turns out to be, instead of a dead frame.
-          if (cancelled) return;
-          Animated.loop(
-            Animated.sequence([
-              Animated.timing(phraseScale, { toValue: 1.09, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-              Animated.timing(phraseScale, { toValue: 1.06, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-            ])
-          ).start();
+          isInteraction: false,
         });
+        const loop = Animated.loop(
+          Animated.timing(breath, { toValue: 1, duration: 1800, easing: Easing.linear, useNativeDriver: true, isInteraction: false }),
+        );
+        anims.current = [zoom, loop];
+        zoom.start();
+        loop.start();
+        onReveal?.();
+        timer = setTimeout(() => { if (!cancelled) onFinish(); }, Math.max(0, T_END - (Date.now() - started)));
+        return;
       }
 
       if (t >= T_END) { onFinish(); return; }
@@ -443,7 +458,11 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
     };
 
     timer = setTimeout(tick, STEP_MS);
-    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      anims.current.forEach(a => a.stop());
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -452,7 +471,7 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish }) => {
       <View style={styles.stage}>
         <Animated.Text style={[styles.tint, { opacity: tintOpacity }]}>TINT</Animated.Text>
 
-        <Animated.View style={[styles.phraseWrap, { opacity: phraseOpacity, transform: [{ scale: phraseScale }] }]}>
+        <Animated.View style={[styles.phraseWrap, { opacity: phraseOpacity, transform: [{ scale: phraseScale }, { scale: breathScale }] }]}>
           <Text style={styles.phraseLine}>THERE IS</Text>
           <Text style={styles.phraseLine}>NO TOMORROW</Text>
         </Animated.View>

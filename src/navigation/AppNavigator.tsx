@@ -171,6 +171,12 @@ const AppNavigatorInner: React.FC = () => {
   // holds on the animation's final frame instead of an extra loading state.
   const [bootTargetScreen, setBootTargetScreen] = useState<Screen | null>(null);
   const [splashAnimDone, setSplashAnimDone] = useState(false);
+  // The splash's flame is out and only its zoom is left: the next screen may
+  // start loading now, underneath the splash (see the effects below).
+  const [splashReveal, setSplashReveal] = useState(false);
+  // The splash has faded out and is gone.
+  const [splashGone, setSplashGone] = useState(false);
+  const splashFade = useRef(new Animated.Value(1)).current;
   // True when startup could not reach the server in time (see
   // BOOT_NETWORK_BUDGET_MS). bootAttempt re-runs the startup check.
   const [bootSlow, setBootSlow] = useState(false);
@@ -210,7 +216,7 @@ const AppNavigatorInner: React.FC = () => {
   // since appState updates constantly from ordinary task toggles) whether
   // yesterday's recap hasn't been shown yet, and pops it if so.
   useEffect(() => {
-    if (!showTabs || recapCheckedRef.current || !appState.user) return;
+    if (!showTabs || !splashGone || recapCheckedRef.current || !appState.user) return;
     recapCheckedRef.current = true;
     void (async () => {
       const focusLog = await loadFocusLog();
@@ -221,7 +227,7 @@ const AppNavigatorInner: React.FC = () => {
         void checkMotivation();
       }
     })();
-  }, [showTabs, appState]);
+  }, [showTabs, splashGone, appState]);
 
   // Resolves session/local state while the boot screen's splash animation
   // plays — sets bootTargetScreen (not screen directly) so the gating
@@ -328,18 +334,36 @@ const AppNavigatorInner: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bootAttempt]);
 
-  // Actually leaves the boot screen once BOTH the async resolution above and
-  // the splash animation have finished — whichever takes longer wins. Fast
-  // network: the animation still plays out in full instead of getting cut
-  // short. Slow network: the animation just holds on its final frame (see
-  // SplashAnimation) instead of an extra bare loading state after it.
+  // Starts loading the first real screen once BOTH the async resolution above
+  // and the splash's flame sequence have finished (whichever takes longer
+  // wins). The splash does not leave yet: it stays on top, finishing its zoom
+  // and breathing on the animation layer, while the new screen loads under it.
+  // Loading it can freeze the app for a moment; hidden behind the splash, that
+  // reads as the splash still playing, not as a pause.
   useEffect(() => {
-    if (!bootTargetScreen || !splashAnimDone) return;
+    if (!bootTargetScreen || !splashReveal) return;
     setScreen(bootTargetScreen);
     if (bootTargetScreen === 'todo') {
       Animated.timing(tabFadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
     }
-  }, [bootTargetScreen, splashAnimDone, tabFadeAnim]);
+  }, [bootTargetScreen, splashReveal, tabFadeAnim]);
+
+  // Once the new screen is in place and the splash has finished its full
+  // 2.5 seconds, wait for the app to settle, then fade the splash out.
+  const splashLeavingRef = useRef(false);
+  const bootDone = screen !== 'boot';
+  useEffect(() => {
+    if (!bootDone || !splashAnimDone || splashLeavingRef.current) return;
+    splashLeavingRef.current = true;
+    // A short beat for the new screen's first draw, then the fade. (Not
+    // InteractionManager: the splash's endless breathing would keep it waiting
+    // for ever.)
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        Animated.timing(splashFade, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => setSplashGone(true));
+      });
+    }, 120);
+  }, [bootDone, splashAnimDone, splashFade]);
 
   // Keep a running 7 Day Lock In armed whenever TINT opens or comes back to
   // the front, for every kind of account. Only challenge-only accounts open on
@@ -768,26 +792,6 @@ const AppNavigatorInner: React.FC = () => {
     <View style={styles.root}>
       <GestureDetector gesture={swipeGesture}>
         <View style={styles.swipeArea}>
-          {screen === 'boot' && (
-            <View style={styles.bootScreen}>
-              <SplashAnimation onFinish={() => setSplashAnimDone(true)} />
-              {bootSlow && (
-                <View style={styles.bootSlowBox}>
-                  <Text style={styles.bootSlowTitle}>Taking longer than usual</Text>
-                  <Text style={styles.bootSlowBody}>
-                    We could not reach the server. Check your internet connection.
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.bootSlowButton}
-                    onPress={() => setBootAttempt(n => n + 1)}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.bootSlowButtonText}>Try again</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          )}
           {screen === 'walkthrough' && (
             <WalkthroughScreen onDone={handleWalkthroughDone} />
           )}
@@ -848,7 +852,7 @@ const AppNavigatorInner: React.FC = () => {
               flow, so losing an in-progress session for the rare case where
               one happens to be running when it's opened is an acceptable
               trade for not crashing. */}
-          {showTabs && !ONBOARDING_SCREENS.has(screen) && (
+          {showTabs && splashReveal && !ONBOARDING_SCREENS.has(screen) && (
             <View style={[styles.tabScreenSlot, screen !== 'todo' && styles.hidden]}>
               <TodoScreen
                 appState={appState}
@@ -860,7 +864,7 @@ const AppNavigatorInner: React.FC = () => {
               />
             </View>
           )}
-          {showTabs && !ONBOARDING_SCREENS.has(screen) && (
+          {showTabs && splashReveal && !ONBOARDING_SCREENS.has(screen) && (
             <View style={[styles.tabScreenSlot, screen !== 'focus' && styles.hidden]}>
               <FocusScreen
                 userId={userIdRef.current ?? undefined}
@@ -940,6 +944,31 @@ const AppNavigatorInner: React.FC = () => {
         goalText={appState.user?.futureGoal?.text ?? null}
         onClose={() => setMotivationMessage(null)}
       />
+      {!splashGone && (
+        <Animated.View
+          pointerEvents={screen === 'boot' ? 'auto' : 'none'}
+          style={[styles.splashOverlay, { opacity: splashFade }]}
+        >
+          <View style={styles.bootScreen}>
+            <SplashAnimation onReveal={() => setSplashReveal(true)} onFinish={() => setSplashAnimDone(true)} />
+            {bootSlow && screen === 'boot' && (
+              <View style={styles.bootSlowBox}>
+                <Text style={styles.bootSlowTitle}>Taking longer than usual</Text>
+                <Text style={styles.bootSlowBody}>
+                  We could not reach the server. Check your internet connection.
+                </Text>
+                <TouchableOpacity
+                  style={styles.bootSlowButton}
+                  onPress={() => setBootAttempt(n => n + 1)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.bootSlowButtonText}>Try again</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </Animated.View>
+      )}
       <AvatarPrompt
         visible={avatarPromptOpen && showTabs}
         current={appState.user?.avatar ?? 'star'}
@@ -966,6 +995,10 @@ const styles = StyleSheet.create({
   // stretch reads as the app being frozen rather than loading.
   bootScreen: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
+  },
+  // The splash sits on top of everything until the first screen is ready.
+  splashOverlay: {
+    ...StyleSheet.absoluteFillObject, zIndex: 100, elevation: 100, backgroundColor: '#080808',
   },
   // "Taking longer than usual" notice, drawn over the bottom of the splash.
   bootSlowBox: {

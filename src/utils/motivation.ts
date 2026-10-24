@@ -7,6 +7,8 @@ const LAST_SHOWN_KEY = 'tint_motivation_last_shown';
 interface LastShown {
   dateKey: string;
   index: number;
+  /** Positions already shown in the current round (see below). */
+  seen?: number[];
 }
 
 async function readLastShown(): Promise<LastShown | null> {
@@ -16,18 +18,24 @@ async function readLastShown(): Promise<LastShown | null> {
   } catch { return null; }
 }
 
-// Once per calendar day: walks the content bank in order (wrapping back to
-// the start), so the whole set surfaces before anything repeats, instead of
-// picking randomly and risking the same line twice in a row. Returns null
-// once today's message has already been shown.
+// Once per calendar day, picked at random. Every message is shown once before
+// any comes round again (a new round then starts), and the same message is
+// never shown on two days in a row. Returns null once today's message has
+// already been shown. A fresh install starts at a random message too, not
+// always the first.
 export async function getTodaysMotivationalMessage(): Promise<MotivationalMessage | null> {
   const todayKey = devNow().toDateString();
   const last = await readLastShown();
   if (last?.dateKey === todayKey) return null;
 
-  const nextIndex = last ? (last.index + 1) % MOTIVATIONAL_MESSAGES.length : 0;
+  const total = MOTIVATIONAL_MESSAGES.length;
+  let seen = Array.isArray(last?.seen) ? last!.seen!.filter(i => Number.isInteger(i) && i >= 0 && i < total) : [];
+  if (seen.length >= total) seen = [];
+  let pool = Array.from({ length: total }, (_, i) => i).filter(i => !seen.includes(i));
+  if (pool.length > 1 && last && typeof last.index === 'number') pool = pool.filter(i => i !== last.index);
+  const nextIndex = pool[Math.floor(Math.random() * pool.length)];
   try {
-    await AsyncStorage.setItem(LAST_SHOWN_KEY, JSON.stringify({ dateKey: todayKey, index: nextIndex }));
+    await AsyncStorage.setItem(LAST_SHOWN_KEY, JSON.stringify({ dateKey: todayKey, index: nextIndex, seen: [...seen, nextIndex] }));
   } catch {}
   return MOTIVATIONAL_MESSAGES[nextIndex];
 }
