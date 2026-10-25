@@ -26,7 +26,8 @@ import {
 import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY, packageNamesFor } from '../data/blockableApps';
 import { ensureNotificationPermission, notifySessionComplete } from '../utils/sessionNotifications';
 import { usePermissionConsentGate } from '../components/PermissionDisclosure';
-import { loadLocalChallenge } from '../utils/challenge';
+import { lockInDay, LOCK_IN_ON_MESSAGE } from '../utils/challenge';
+import { useLockInRunning } from '../hooks/useLockInRunning';
 import { tintAlert } from '../utils/dialog';
 
 const DEFAULT_DURATION = 25;
@@ -126,14 +127,12 @@ type Phase = 'setup' | 'active' | 'done';
 export const FocusScreen: React.FC<Props> = ({
   userId, externalTask, onExternalFinish, onExternalExit, visible = true, sessionSource = 'tab', onMinimize, onOpenLockIn,
 }) => {
-  // Is a 7 Day Lock In running on this phone? Changes the button's wording.
-  const [lockInRunning, setLockInRunning] = useState(false);
-  useEffect(() => {
-    if (!onOpenLockIn || !visible) return;
-    let alive = true;
-    void loadLocalChallenge().then(c => { if (alive) setLockInRunning(c?.status === 'active'); }).catch(() => {});
-    return () => { alive = false; };
-  }, [onOpenLockIn, visible]);
+  // Is a 7 Day Lock In running on this phone? While it is, the dial and Start
+  // button are switched off (one blocker at a time), and the Lock In button
+  // changes its wording.
+  const runningLockIn = useLockInRunning(!!onOpenLockIn && visible);
+  const lockInRunning = !!runningLockIn;
+  const lockInDayNo = runningLockIn ? lockInDay(runningLockIn) : null;
   const [phase, setPhase] = useState<Phase>(externalTask ? 'active' : 'setup');
   const [duration, setDuration] = useState(externalTask?.durationMins ?? DEFAULT_DURATION);
   const [timeLeft, setTimeLeft] = useState((externalTask?.durationMins ?? DEFAULT_DURATION) * 60);
@@ -506,6 +505,7 @@ export const FocusScreen: React.FC<Props> = ({
   // materializes in with a small scale/fade — reads as the dial
   // "transforming" into the timer rather than a plain screen swap.
   const handleStart = async () => {
+    if (lockInRunning) { tintAlert('7 Day Lock In is on', LOCK_IN_ON_MESSAGE); return; }
     await buttonPress();
     dialFadeAnim.setValue(1);
     Animated.sequence([
@@ -733,21 +733,42 @@ export const FocusScreen: React.FC<Props> = ({
 
           {phase === 'setup' && (
             <>
+              {/* While a 7 Day Lock In is running the dial and Start button are
+                  switched off, with a note saying why. */}
+              <View>
+                <View pointerEvents={lockInRunning ? 'none' : 'auto'} style={lockInRunning ? styles.dialOff : undefined}>
               <Animated.View style={[styles.dialSection, { opacity: dialFadeAnim }]}>
-                <BlobDial
-                  size={BLOB_WRAP}
-                  minValue={5}
-                  maxValue={1080}
-                  step={5}
-                  value={duration}
-                  onChange={d => { setDuration(d); setTimeLeft(d * 60); }}
-                  formatValue={formatDuration}
-                  unitLabel="focus"
-                />
-              </Animated.View>
+                  <BlobDial
+                    size={BLOB_WRAP}
+                    minValue={5}
+                    maxValue={1080}
+                    step={5}
+                    value={duration}
+                    onChange={d => { setDuration(d); setTimeLeft(d * 60); }}
+                    formatValue={formatDuration}
+                    unitLabel="focus"
+                  />
+                </Animated.View>
+                </View>
+                {lockInRunning && (
+                  <View style={styles.dialOffNote} pointerEvents="none">
+                    <Text style={styles.dialOffTitle}>7 Day Lock In is on</Text>
+                    <Text style={styles.dialOffBody}>
+                      Focus sessions are off until it ends{lockInDayNo ? ` (day ${lockInDayNo} of ${runningLockIn!.days})` : ''}.
+                    </Text>
+                  </View>
+                )}
+              </View>
 
-              <TouchableOpacity style={styles.startBtn} onPress={handleStart} activeOpacity={0.8}>
-                <Text style={styles.startBtnText}>Start Focus Session</Text>
+              <TouchableOpacity
+                style={[styles.startBtn, lockInRunning && styles.startBtnOff]}
+                onPress={handleStart}
+                activeOpacity={0.8}
+                disabled={lockInRunning}
+              >
+                <Text style={[styles.startBtnText, lockInRunning && styles.startBtnTextOff]}>
+                  {lockInRunning ? 'Off during your 7 Day Lock In' : 'Start Focus Session'}
+                </Text>
               </TouchableOpacity>
 
               <View style={styles.statsRow}>
@@ -949,6 +970,12 @@ const styles = StyleSheet.create({
   subtitle: { ...Typography.bodyMedium, color: Colors.textSecondary, marginTop: 4, marginBottom: Spacing.xl },
 
   dialSection: { alignItems: 'center', marginBottom: Spacing.lg },
+  dialOff: { opacity: 0.2 },
+  dialOffNote: { position: 'absolute', top: 0, bottom: Spacing.lg, left: 0, right: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.xl, gap: 6 },
+  dialOffTitle: { ...Typography.headlineSmall, color: Colors.textPrimary, fontSize: 20, textAlign: 'center' },
+  dialOffBody: { fontFamily: Fonts.medium, fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
+  startBtnOff: { backgroundColor: Colors.surfaceElevated },
+  startBtnTextOff: { color: Colors.textMuted },
 
   startBtn: {
     backgroundColor: Colors.pop,

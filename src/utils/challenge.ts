@@ -129,6 +129,26 @@ function toPhoneMs(serverMs: number): number {
 
 // ── local copy ──────────────────────────────────────────────────────────
 
+/** Is this challenge running right now? Started (a "tonight" or "tomorrow"
+ *  start that has not come yet does not count) and not yet over. While one is
+ *  running, focus sessions are switched off: the Lock In already blocks the
+ *  apps, and two timers blocking at once makes no sense. */
+export function isLockInRunning(c: LocalChallenge | null | undefined): c is LocalChallenge {
+  if (!c || c.status !== 'active') return false;
+  const now = serverNow();
+  if (c.startAtMs !== null && c.startAtMs > now) return false;
+  if (c.endAtMs !== null && c.endAtMs <= now) return false;
+  return true;
+}
+
+/** Day number of a running challenge (1 to days), or null when unknown. */
+export function lockInDay(c: LocalChallenge): number | null {
+  if (c.startAtMs === null) return null;
+  return Math.max(1, Math.min(c.days, Math.floor((serverNow() - c.startAtMs) / 86_400_000) + 1));
+}
+
+export const LOCK_IN_ON_MESSAGE = 'Your 7 Day Lock In is running, so focus sessions are off until it ends. The Lock In is already blocking your apps.';
+
 export async function loadLocalChallenge(): Promise<LocalChallenge | null> {
   await loadClockOffset();
   try {

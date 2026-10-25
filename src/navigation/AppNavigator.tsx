@@ -27,9 +27,10 @@ import { FocusMiniPlayer } from '../components/FocusMiniPlayer';
 import { loadDevOffset, subscribeDevClock } from '../utils/devClock';
 import { saveFocusLog, loadFocusLog, saveBestFlameMins } from '../utils/focusLog';
 import { saveDistractionLog } from '../utils/distractionLog';
-import { clearActiveSession } from '../utils/activeFocusSession';
+import { clearActiveSession, loadActiveSession } from '../utils/activeFocusSession';
 import { stopAppBlocking, syncExamCountdowns } from '../utils/appBlocking';
 import { examCountdownItems } from '../data/examDates';
+import { updateLockInCredit } from '../utils/lockInCredit';
 import { buildYesterdayRecap, hasShownRecapFor, markRecapShown, DailyRecapData } from '../utils/dailyRecap';
 import { DailyRecapCard } from '../components/DailyRecapCard';
 import { getTodaysMotivationalMessage } from '../utils/motivation';
@@ -40,6 +41,7 @@ import {
   loadUserFromSupabase,
   syncAppStateToSupabase,
   saveNewUserToSupabase,
+  syncFocusLog,
   lastLoadUserError,
 } from '../utils/supabaseStorage';
 import { tintAlert } from '../utils/dialog';
@@ -412,11 +414,34 @@ const AppNavigatorInner: React.FC = () => {
   const regularAccount = !!appState.user && !isChallengeOnly(appState.user);
   const openLockInFromFocus = async () => {
     const local = await loadLocalChallenge().catch(() => null);
+    // One blocker at a time: a Lock In cannot start while a focus session is running.
+    if (!(local && local.status !== 'lobby') && (await loadActiveSession().catch(() => null))) {
+      tintAlert('A focus session is running', 'Finish or end it first, then start your 7 Day Lock In.');
+      return;
+    }
     if (local && local.status !== 'lobby') setScreen('challengeHome');   // running, finished or left
     else if (local) setScreen('challengeSetup');                          // an unfinished squad lobby
     else setScreen('challengeIntro');                                     // first time: intro slides, then permissions
   };
   const leaveLockIn = () => setScreen('focus');
+
+  // A regular account with a 7 Day Lock In running earns leaderboard focus time
+  // (12 hours a day, see utils/lockInCredit.ts). Worked out when the app opens
+  // or comes back, when the screen changes (e.g. right after a Lock In starts)
+  // and every two minutes, and sent to the leaderboard when it grows. Accounts
+  // made through the Lock In button only earn nothing.
+  useEffect(() => {
+    if (!regularAccount) return;
+    const run = async () => {
+      const grew = await updateLockInCredit().catch(() => false);
+      const uid = userIdRef.current;
+      if (grew && uid) void syncFocusLog(uid, await loadFocusLog());
+    };
+    void run();
+    const timer = setInterval(() => void run(), 120_000);
+    const sub = RNAppState.addEventListener('change', s => { if (s === 'active') void run(); });
+    return () => { clearInterval(timer); sub.remove(); };
+  }, [regularAccount, screen]);
 
   // Best-effort, quiet save of onboarding progress so far — called after
   // every remaining onboarding step (not just the last one). Before this,
@@ -888,7 +913,10 @@ const AppNavigatorInner: React.FC = () => {
               />
             </View>
           )}
-          {showTabs && splashReveal && !ONBOARDING_SCREENS.has(screen) && (
+          {/* Mounted only once the splash is gone: the Focus tab is not what
+              opens first, and mounting it together with Today under the splash
+              was a second heavy screen competing with the animation. */}
+          {showTabs && splashGone && !ONBOARDING_SCREENS.has(screen) && (
             <View style={[styles.tabScreenSlot, screen !== 'focus' && styles.hidden]}>
               <FocusScreen
                 userId={userIdRef.current ?? undefined}

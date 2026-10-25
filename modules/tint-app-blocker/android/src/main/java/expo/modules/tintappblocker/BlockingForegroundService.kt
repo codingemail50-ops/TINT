@@ -1140,16 +1140,21 @@ class BlockingForegroundService : Service() {
     }
   }
 
-  // One line per exam the person picked ("UCEED in 83 days"), nearest first,
-  // then the ones with no date yet ("NEET UG: not announced"), at most four. Counted now, when the block screen appears, from the dates
-  // the app saved on the phone, so it stays right through a 7 Day Lock In
-  // even if TINT itself is closed. Empty when there is nothing to show.
-  private fun examCountdownText(): String {
+  // One card per exam the person picked, nearest first, then the ones with no
+  // date yet, at most four. Each is (EXAM NAME, "84 days" or a note such as
+  // "Not announced"), and whether the value is a countdown. Counted now, when
+  // the block screen appears, from the dates the app saved on the phone, so it
+  // stays right through a 7 Day Lock In even if TINT itself is closed. Days
+  // only, no hours or seconds, so nothing here has to keep ticking. Empty when
+  // there is nothing to show.
+  private data class ExamCard(val label: String, val value: String, val countdown: Boolean)
+
+  private fun examCards(): List<ExamCard> {
     return try {
-      val raw = getSharedPreferences(EXAM_PREFS_NAME, Context.MODE_PRIVATE).getString("items", null) ?: return ""
+      val raw = getSharedPreferences(EXAM_PREFS_NAME, Context.MODE_PRIVATE).getString("items", null) ?: return emptyList()
       val arr = org.json.JSONArray(raw)
       val now = System.currentTimeMillis()
-      val lines = ArrayList<String>()
+      val cards = ArrayList<ExamCard>()
       for (i in 0 until arr.length()) {
         val o = arr.getJSONObject(i)
         val name = o.optString("name", "")
@@ -1158,16 +1163,78 @@ class BlockingForegroundService : Service() {
         if (name.isEmpty()) continue
         if (at > now) {
           val days = ((at - now + 86_399_999L) / 86_400_000L).toInt()
-          lines.add(if (days == 1) "$name in 1 day" else "$name in $days days")
+          cards.add(ExamCard(name.uppercase(), if (days == 1) "1 day" else "$days days", true))
         } else if (at == 0L && note.isNotEmpty()) {
-          lines.add("$name: $note")
+          cards.add(ExamCard(name.uppercase(), note, false))
         }
-        if (lines.size == 4) break
+        if (cards.size == 4) break
       }
-      lines.joinToString("\n")
+      cards
     } catch (e: Exception) {
-      ""
+      emptyList()
     }
+  }
+
+  // The same pixel font the app uses for its timers and countdowns, shipped
+  // with this module (assets/fonts). Falls back to a plain monospace face.
+  private fun pixelTypeface(): android.graphics.Typeface {
+    return try {
+      android.graphics.Typeface.createFromAsset(assets, "fonts/VT323-Regular.ttf")
+    } catch (e: Exception) {
+      android.graphics.Typeface.MONOSPACE
+    }
+  }
+
+  // The countdown cards, built the way the Today screen's are: a dark rounded
+  // card with a small bold label above a big pixel-font number.
+  private fun buildExamCards(): LinearLayout? {
+    val cards = examCards()
+    if (cards.isEmpty()) return null
+    val d = resources.displayMetrics.density
+    val pixel = pixelTypeface()
+    val column = LinearLayout(this).apply {
+      orientation = LinearLayout.VERTICAL
+      gravity = Gravity.CENTER_HORIZONTAL
+    }
+    for ((index, c) in cards.withIndex()) {
+      val card = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER_HORIZONTAL
+        background = android.graphics.drawable.GradientDrawable().apply {
+          setColor(0xFF1A1A1A.toInt())
+          cornerRadius = 14f * d
+          setStroke((1f * d).toInt().coerceAtLeast(1), 0xFF292929.toInt())
+        }
+        setPadding((16 * d).toInt(), (12 * d).toInt(), (16 * d).toInt(), (12 * d).toInt())
+      }
+      card.addView(TextView(this).apply {
+        text = c.label
+        textSize = 12f
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
+        letterSpacing = 0.08f
+        setTextColor(0xFFD6D6D6.toInt())
+        gravity = Gravity.CENTER
+      })
+      card.addView(TextView(this).apply {
+        text = c.value
+        if (c.countdown) {
+          typeface = pixel
+          textSize = 36f
+          setTextColor(0xFFFFFFFF.toInt())
+        } else {
+          typeface = android.graphics.Typeface.DEFAULT_BOLD
+          textSize = 15f
+          setTextColor(0xFFA5A5A5.toInt())
+        }
+        gravity = Gravity.CENTER
+        includeFontPadding = false
+        setPadding(0, (4 * d).toInt(), 0, 0)
+      })
+      val lp = LinearLayout.LayoutParams((300 * d).toInt(), LinearLayout.LayoutParams.WRAP_CONTENT)
+      if (index > 0) lp.topMargin = (10 * d).toInt()
+      column.addView(card, lp)
+    }
+    return column
   }
 
   private fun showOverlay() {
@@ -1214,18 +1281,12 @@ class BlockingForegroundService : Service() {
       textSize = 14f
       setTextColor(0xFFAAAAAA.toInt())
       gravity = Gravity.CENTER
-      setPadding(0, 24, 0, 48)
+      setPadding(0, 24, 0, 40)
     })
-    val examText = examCountdownText()
-    if (examText.isNotEmpty()) {
-      layout.addView(TextView(this).apply {
-        text = examText
-        textSize = 18f
-        setTextColor(0xFFFF6A00.toInt())
-        gravity = Gravity.CENTER
-        setLineSpacing(0f, 1.2f)
-        setPadding(0, 0, 0, 48)
-      })
+    buildExamCards()?.let { cards ->
+      layout.addView(cards)
+      // Space between the cards and the button.
+      layout.addView(View(this), LinearLayout.LayoutParams(1, (28 * resources.displayMetrics.density).toInt()))
     }
     layout.addView(Button(this).apply {
       text = "Return to TINT"

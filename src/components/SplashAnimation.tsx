@@ -19,6 +19,23 @@ interface Props {
 
 const BACKGROUND = '#080808';
 
+// The phrase's breathing: one cycle every 1.8 s, laid out as one long table so
+// it needs a single native animation (see `breath` below). 63 s is far longer
+// than the splash is ever on screen.
+const BREATH_CYCLE_MS = 1800;
+const BREATH_CYCLES = 35;
+const BREATH_TOTAL_MS = BREATH_CYCLES * BREATH_CYCLE_MS;
+const BREATH_INPUT: number[] = [];
+const BREATH_OUTPUT: number[] = [];
+for (let c = 0; c < BREATH_CYCLES; c++) {
+  for (let q = 0; q < 4; q++) {
+    BREATH_INPUT.push((c * 4 + q) / (BREATH_CYCLES * 4));
+    BREATH_OUTPUT.push([1, 1.0142, 1.0283, 1.0142][q]);
+  }
+}
+BREATH_INPUT.push(1);
+BREATH_OUTPUT.push(1);
+
 // Seven-step ramp, outermost first. Each successive shade is drawn as a
 // smaller inset of the one before it, so the lightest necessarily covers the
 // least area: dark outer edge -> orange body -> bright interior -> pale core.
@@ -353,14 +370,18 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish, onReveal }) => {
   const tintOpacity = useRef(new Animated.Value(1)).current;
   const phraseOpacity = useRef(new Animated.Value(0)).current;
   const phraseScale = useRef(new Animated.Value(1)).current;
-  // Slow in-and-out "breathing" that keeps the held phrase alive. One looping
-  // value (0 -> 1) mapped to a scale, so the whole loop runs on the animation
-  // layer and keeps going even if the app is busy for a moment.
+  // Slow in-and-out "breathing" that keeps the held phrase alive. ONE long
+  // native animation (0 -> 1 over BREATH_TOTAL_MS) mapped through a table that
+  // goes up and down once per BREATH_CYCLE_MS, so the whole thing runs on the
+  // animation layer from a single start call. It used to be a looping value,
+  // which is restarted from the app code at the end of every cycle: if the app
+  // was busy loading the next screen at that moment, the breathing froze for as
+  // long as the app was busy (the "pause" on the phrase).
   const breath = useRef(new Animated.Value(0)).current;
-  const breathScale = breath.interpolate({
-    inputRange: [0, 0.25, 0.5, 0.75, 1],
-    outputRange: [1, 1.0142, 1.0283, 1.0142, 1],
-  });
+  const breathScale = useRef(breath.interpolate({
+    inputRange: BREATH_INPUT,
+    outputRange: BREATH_OUTPUT,
+  })).current;
   const anims = useRef<Animated.CompositeAnimation[]>([]);
 
   useEffect(() => {
@@ -442,9 +463,7 @@ export const SplashAnimation: React.FC<Props> = ({ onFinish, onReveal }) => {
           useNativeDriver: true,
           isInteraction: false,
         });
-        const loop = Animated.loop(
-          Animated.timing(breath, { toValue: 1, duration: 1800, easing: Easing.linear, useNativeDriver: true, isInteraction: false }),
-        );
+        const loop = Animated.timing(breath, { toValue: 1, duration: BREATH_TOTAL_MS, easing: Easing.linear, useNativeDriver: true, isInteraction: false });
         anims.current = [zoom, loop];
         zoom.start();
         loop.start();

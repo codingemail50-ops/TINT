@@ -21,6 +21,8 @@ import { countIncomingRequests } from '../utils/supabaseStorage';
 import { FocusLogEntry, loadFocusLog, computeFocusStats, subscribeFocusLog, loadBestFlameMins, saveBestFlameMins } from '../utils/focusLog';
 import { DistractionLogEntry, loadDistractionLog, computeDistractedToday, subscribeDistractionLog } from '../utils/distractionLog';
 import { loadActiveSession } from '../utils/activeFocusSession';
+import { isLockInRunning, loadLocalChallenge, LOCK_IN_ON_MESSAGE } from '../utils/challenge';
+import { tintAlert } from '../utils/dialog';
 import { now as devNow, subscribeDevClock } from '../utils/devClock';
 import { useFocusSessionStatus } from '../context/FocusSessionContext';
 
@@ -441,7 +443,12 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     }
     if (timerTaskId && timerTaskId !== id) return; // one focus session at a time
     buttonPress();
-    setTimerTaskId(id);
+    // One blocker at a time: no task timer while a 7 Day Lock In is running.
+    void (async () => {
+      const local = await loadLocalChallenge().catch(() => null);
+      if (isLockInRunning(local)) { tintAlert('7 Day Lock In is on', LOCK_IN_ON_MESSAGE); return; }
+      setTimerTaskId(id);
+    })();
   }, [tasks, timerTaskId, applyCompletion]);
 
   const triggerTrophy = async () => {

@@ -98,7 +98,7 @@ class TintAppBlockerModule : Module() {
     // Per-day counts of how many times a blocked app was opened during a
     // challenge: {"20261010": {"com.instagram.android": 12, ...}, ...}.
     // The person's exam dates, kept on the phone only, so the block screen can
-    // say "UCEED in 83 days" (see BlockingForegroundService.examCountdownText).
+    // say "UCEED in 83 days" (see BlockingForegroundService.examCards).
     Function("setExamCountdowns") { json: String ->
       val context = appContext.reactContext ?: return@Function Unit
       context.getSharedPreferences(BlockingForegroundService.EXAM_PREFS_NAME, Context.MODE_PRIVATE)

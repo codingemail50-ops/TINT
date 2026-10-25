@@ -81,15 +81,15 @@ export interface ExamCountdownItem {
   note?: string;
 }
 
-/** What the block screen shows, for the exams the person picked (and their own
+/** What the block screen shows (one card each: name, then days or a note), for the exams the person picked (and their own
  *  custom exam with its date). Saved on the phone; the days are counted when
  *  the block screen appears. */
 export function examCountdownItems(examTypes: string[] | undefined, customExam?: CustomExam | null, now = Date.now()): ExamCountdownItem[] {
   const items: ExamCountdownItem[] = [];
   for (const e of eventsFor(examTypes, now)) {
     if (e.start && e.start.getTime() > now) items.push({ name: e.short, atMs: e.start.getTime() });
-    else if (e.start) items.push({ name: e.short, atMs: 0, note: 'on now' });
-    else items.push({ name: e.short, atMs: 0, note: e.id === 'nift' ? 'tentative, March–April 2027' : 'not announced' });
+    else if (e.start) items.push({ name: e.short, atMs: 0, note: 'Exam day is here!' });
+    else items.push({ name: e.short, atMs: 0, note: e.id === 'nift' ? 'Tentative: March–April 2027' : 'Not announced' });
   }
   if (customExam?.name && customExam.date) {
     const t = new Date(`${customExam.date}T09:00:00`).getTime();

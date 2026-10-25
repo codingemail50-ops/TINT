@@ -15,6 +15,7 @@ import { clearLocalChallenge, cancelChallengeNotifications } from './challenge';
 import { PRIVACY_POLICY_URL, ACCOUNT_DELETION_URL } from '../constants/links';
 import { BLOCKED_APPS_STORAGE_KEY } from '../data/blockableApps';
 import { clearPermissionConsent } from './permissionConsent';
+import { clearLockInCredit } from './lockInCredit';
 import { tintAlert } from './dialog';
 
 // Whatever else TINT saved under its own names (last-shown dates, wording
@@ -40,6 +41,7 @@ export async function clearLeftoversOnLogout(): Promise<void> {
     cancelChallengeNotifications(),
     AsyncStorage.removeItem(BLOCKED_APPS_STORAGE_KEY).catch(() => {}),
     clearPermissionConsent(),
+    clearLockInCredit(),
   ]).catch(() => {});
 }
 

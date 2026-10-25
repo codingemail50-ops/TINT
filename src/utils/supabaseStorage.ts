@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { AppState, UserProfile, computeLifetimeConsistency } from './storage';
 import { FocusLogEntry, computeFocusStats, saveFocusLog, saveBestFlameMins, bestSingleDayMinutes } from './focusLog';
+import { withLockInCredit, splitRestoredLog } from './lockInCredit';
 import { saveDistractionLog } from './distractionLog';
 
 // ── Types for the user_data row ──────────────────────────────────────────────
@@ -170,7 +171,8 @@ export async function loadUserFromSupabase(userId: string, resetLocalLogs = fals
       // never merged/appended, since a previous account's leftover entries
       // must not survive into this login. No remote copy of the
       // distraction log exists (it's on-device only), so it just resets.
-      const restoredLog = Array.isArray(row.focus_log) ? row.focus_log : [];
+      // The 7 Day Lock In credit inside it is kept apart (see lockInCredit.ts).
+      const restoredLog = await splitRestoredLog(Array.isArray(row.focus_log) ? row.focus_log : []);
       await saveFocusLog(restoredLog);
       await saveDistractionLog([]);
       // Re-derived from the account's own restored history rather than
@@ -241,10 +243,14 @@ export async function syncAppStateToSupabase(
 // common transient case.
 export async function syncFocusLog(
   userId: string,
-  focusLog: { date: string; mins: number }[],
+  ownLog: FocusLogEntry[],
   attempt = 1
 ): Promise<void> {
   try {
+    // The leaderboard also gets the 7 Day Lock In credit (12 hours a day while
+    // one runs, for regular accounts). It is added here, at send time, so the
+    // person's own log stays exactly what they focused.
+    const focusLog = await withLockInCredit(ownLog);
     // Rollups for the public leaderboard (see focus_today/week/alltime_mins
     // in schema.sql) — recomputed here rather than trusted from elsewhere
     // since this is the one place the full log is already at hand.
@@ -263,14 +269,14 @@ export async function syncFocusLog(
       console.error('[supabaseStorage] syncFocusLog error:', error.message);
       if (attempt < 3) {
         await new Promise(r => setTimeout(r, 1500 * attempt));
-        return syncFocusLog(userId, focusLog, attempt + 1);
+        return syncFocusLog(userId, ownLog, attempt + 1);
       }
     }
   } catch (err) {
     console.error('[supabaseStorage] syncFocusLog exception:', err);
     if (attempt < 3) {
       await new Promise(r => setTimeout(r, 1500 * attempt));
-      return syncFocusLog(userId, focusLog, attempt + 1);
+      return syncFocusLog(userId, ownLog, attempt + 1);
     }
   }
 }
