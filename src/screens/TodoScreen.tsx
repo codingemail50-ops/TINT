@@ -15,7 +15,7 @@ import { PixelFlame } from '../components/PixelFlame';
 import { Bonfire } from '../components/Bonfire';
 import { Confetti } from '../components/Confetti';
 import { FocusScreen } from './FocusScreen';
-import { UCEEDCountdown, NIDCountdown, NIFTCountdown } from '../components/ExamCountdowns';
+import { ExamCountdowns } from '../components/ExamCountdowns';
 import { useHaptics } from '../hooks/useHaptics';
 import { countIncomingRequests } from '../utils/supabaseStorage';
 import { FocusLogEntry, loadFocusLog, computeFocusStats, subscribeFocusLog, loadBestFlameMins, saveBestFlameMins } from '../utils/focusLog';
@@ -558,7 +558,6 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
             <Text style={styles.tagline}>NO TOMORROW</Text>
           </View>
           <FlameBadge
-            streak={appState.streak}
             size={46}
             onPress={onNavigateProfile}
             avatar={appState.user?.avatar}
@@ -625,9 +624,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
             {/* Exam countdown, right under the pills — leads to Analytics */}
             {examTypes.length > 0 && (
               <TouchableOpacity style={styles.countdownStack} onPress={onNavigateAnalytics} activeOpacity={0.85}>
-                <UCEEDCountdown examTypes={examTypes} />
-                <NIDCountdown examTypes={examTypes} />
-                <NIFTCountdown examTypes={examTypes} />
+                <ExamCountdowns examTypes={examTypes} />
               </TouchableOpacity>
             )}
           </>

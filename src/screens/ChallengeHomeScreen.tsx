@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal,
-  AppState as RNAppState, ActivityIndicator,
+  AppState as RNAppState, ActivityIndicator, BackHandler,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { captureRef } from 'react-native-view-shot';
@@ -33,6 +33,10 @@ interface Props {
   /** Finished (or left) and wants regular TINT for studying. */
   onUpgrade: () => void;
   onAccountDeleted: () => void;
+  /** Set when someone with a regular TINT account opened this from the Focus
+   *  tab. They get "Back to TINT" instead of "Use TINT for studying" (they
+   *  already do), and the phone's Back button returns to TINT too. */
+  onExit?: () => void;
 }
 
 const MEMBER_POLL_MS = 15_000;
@@ -87,7 +91,12 @@ const FooterLinks: React.FC<{ onDelete: () => void }> = ({ onDelete }) => (
   </>
 );
 
-export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onAccountDeleted }) => {
+export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onAccountDeleted, onExit }) => {
+  useEffect(() => {
+    if (!onExit) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { onExit(); return true; });
+    return () => sub.remove();
+  }, [onExit]);
   const [local, setLocal] = useState<LocalChallenge | null>(null);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [baseline, setBaseline] = useState<UsageSnapshot | null>(null);
@@ -355,7 +364,7 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
           </View>
           <PrimaryButton label="SHARE YOUR WIN" onPress={() => void share()} loading={sharing} />
           <Text style={[cs.sub, styles.momentum]}>Turn this momentum into something more.</Text>
-          <SecondaryButton label="KEEP THE MOMENTUM" onPress={onUpgrade} />
+          <SecondaryButton label={onExit ? 'BACK TO TINT' : 'KEEP THE MOMENTUM'} onPress={onExit ?? onUpgrade} />
           <TouchableOpacity onPress={() => void goAgain()} hitSlop={8}>
             <Text style={cs.link}>Do another 7 days</Text>
           </TouchableOpacity>
@@ -375,7 +384,7 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
           <Text style={cs.title}>You made it to day {local.quitDay ?? day}.</Text>
           <Text style={cs.sub}>Every hour you held counts. You resisted {total} urge{total === 1 ? '' : 's'}. Try again when you're ready.</Text>
           <PrimaryButton label="Start again" onPress={() => void goAgain()} />
-          <SecondaryButton label="Use TINT for studying" onPress={onUpgrade} />
+          <SecondaryButton label={onExit ? 'Back to TINT' : 'Use TINT for studying'} onPress={onExit ?? onUpgrade} />
           <FooterLinks onDelete={() => confirmDeleteAccount(onAccountDeleted)} />
         </ScrollView>
       </View>
@@ -463,6 +472,9 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
           />
         )}
 
+        {onExit && (
+          <SecondaryButton label="Back to TINT" onPress={onExit} />
+        )}
         <TouchableOpacity onPress={pressLeave} hitSlop={8}>
           <Text style={[cs.link, styles.leaveLink]}>Leave challenge</Text>
         </TouchableOpacity>

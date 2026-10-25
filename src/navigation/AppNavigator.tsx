@@ -28,7 +28,8 @@ import { loadDevOffset, subscribeDevClock } from '../utils/devClock';
 import { saveFocusLog, loadFocusLog, saveBestFlameMins } from '../utils/focusLog';
 import { saveDistractionLog } from '../utils/distractionLog';
 import { clearActiveSession } from '../utils/activeFocusSession';
-import { stopAppBlocking } from '../utils/appBlocking';
+import { stopAppBlocking, syncExamCountdowns } from '../utils/appBlocking';
+import { examCountdownItems } from '../data/examDates';
 import { buildYesterdayRecap, hasShownRecapFor, markRecapShown, DailyRecapData } from '../utils/dailyRecap';
 import { DailyRecapCard } from '../components/DailyRecapCard';
 import { getTodaysMotivationalMessage } from '../utils/motivation';
@@ -200,6 +201,14 @@ const AppNavigatorInner: React.FC = () => {
   // Waiting for the app's own daily pop-ups (today's message, the recap) to be
   // closed first, so two pop-ups never sit on top of each other.
   const [avatarPending, setAvatarPending] = useState(false);
+
+  // The block screen counts down to the person's exams ("UCEED in 83 days").
+  // It runs in the blocking service, so the dates are saved on the phone
+  // whenever the person's exams change (and cleared on log out).
+  useEffect(() => {
+    const u = appState.user;
+    syncExamCountdowns(u ? examCountdownItems(u.examTypes, u.customExam) : []);
+  }, [appState.user?.examTypes, appState.user?.customExam]);
 
   // Once per app-open (guarded by the ref, same pattern as the recap check
   // below), pops today's motivational postcard if it hasn't been shown yet.
@@ -396,6 +405,18 @@ const AppNavigatorInner: React.FC = () => {
   }), []);
 
   const navigateTo = (s: Screen) => setScreen(s);
+
+  // Someone with a regular TINT account (not one made through the 7 Day Lock
+  // In button) trying the Lock In from the Focus tab. Same screens as the
+  // Lock In accounts, but with a way back to TINT instead of log out.
+  const regularAccount = !!appState.user && !isChallengeOnly(appState.user);
+  const openLockInFromFocus = async () => {
+    const local = await loadLocalChallenge().catch(() => null);
+    if (local && local.status !== 'lobby') setScreen('challengeHome');   // running, finished or left
+    else if (local) setScreen('challengeSetup');                          // an unfinished squad lobby
+    else setScreen('challengeIntro');                                     // first time: intro slides, then permissions
+  };
+  const leaveLockIn = () => setScreen('focus');
 
   // Best-effort, quiet save of onboarding progress so far — called after
   // every remaining onboarding step (not just the last one). Before this,
@@ -807,6 +828,7 @@ const AppNavigatorInner: React.FC = () => {
             <ChallengeIntroScreen
               avatar={appState.user?.avatar ?? draftRef.current.avatar}
               onDone={() => setScreen('challengeSetup')}
+              onClose={regularAccount ? leaveLockIn : undefined}
             />
           )}
           {screen === 'challengeSetup' && (
@@ -814,6 +836,7 @@ const AppNavigatorInner: React.FC = () => {
               onStarted={() => setScreen('challengeHome')}
               onLogout={() => void handleChallengeLogout()}
               onAccountDeleted={handleLogout}
+              onExit={regularAccount ? leaveLockIn : undefined}
             />
           )}
           {screen === 'challengeHome' && (
@@ -821,6 +844,7 @@ const AppNavigatorInner: React.FC = () => {
               onRestart={() => setScreen('challengeSetup')}
               onUpgrade={handleUpgradeFromChallenge}
               onAccountDeleted={handleLogout}
+              onExit={regularAccount ? leaveLockIn : undefined}
             />
           )}
           {screen === 'createAccount' && (
@@ -871,6 +895,7 @@ const AppNavigatorInner: React.FC = () => {
                 visible={screen === 'focus'}
                 sessionSource="tab"
                 onMinimize={() => navigateTo('todo')}
+                onOpenLockIn={() => void openLockInFromFocus()}
               />
             </View>
           )}

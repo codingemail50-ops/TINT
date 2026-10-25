@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors, Spacing, BorderRadius, Typography, Fonts } from '../constants/theme';
+import { eventsFor, ExamEvent } from '../data/examDates';
 
 interface RemainingTime {
   days: number;
@@ -26,17 +27,12 @@ function pad(n: number): string {
   return n.toString().padStart(2, '0');
 }
 
-function formatDateStamp(d: Date): string {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[d.getMonth()]} ${d.getDate()} / ${d.getFullYear()}`;
-}
-
 interface CountdownCardProps {
-  examName: string;
-  target: Date;
+  event: ExamEvent;
 }
 
-const CountdownCard: React.FC<CountdownCardProps> = ({ examName, target }) => {
+const CountdownCard: React.FC<CountdownCardProps> = ({ event }) => {
+  const target = event.start!;
   const [remaining, setRemaining] = useState<RemainingTime>(() => getRemaining(target));
 
   useEffect(() => {
@@ -48,23 +44,30 @@ const CountdownCard: React.FC<CountdownCardProps> = ({ examName, target }) => {
     return (
       <View style={[styles.card, { borderColor: Colors.success }]}>
         <Text style={styles.passedText}>Exam day is here!</Text>
-        <Text style={styles.examLabel}>{examName}</Text>
+        <Text style={styles.examLabel}>{event.label}</Text>
+        <Text style={styles.dateStamp}>{event.dateText}</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.card}>
-      <Text style={styles.examLabel}>{examName} Countdown</Text>
-      <View style={styles.bottomRow}>
-        <Text style={styles.countdownText}>
-          {remaining.days}d  {pad(remaining.hours)}:{pad(remaining.mins)}:{pad(remaining.secs)}
-        </Text>
-        <Text style={styles.dateStamp}>{formatDateStamp(target)}</Text>
-      </View>
+      <Text style={styles.examLabel}>{event.label}</Text>
+      <Text style={styles.countdownText}>
+        {remaining.days}d  {pad(remaining.hours)}:{pad(remaining.mins)}:{pad(remaining.secs)}
+      </Text>
+      <Text style={styles.dateStamp}>{event.dateText}</Text>
     </View>
   );
 };
+
+// An exam whose date has not been published yet.
+const PendingCard: React.FC<CountdownCardProps> = ({ event }) => (
+  <View style={styles.card}>
+    <Text style={styles.examLabel}>{event.label}</Text>
+    <Text style={styles.pendingText}>{event.dateText}</Text>
+  </View>
+);
 
 const styles = StyleSheet.create({
   card: {
@@ -79,9 +82,9 @@ const styles = StyleSheet.create({
     ...Typography.labelSmall, fontFamily: Fonts.bold, color: Colors.gray[300],
     textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6,
   },
-  bottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   countdownText: { fontFamily: Fonts.pixel, fontSize: 32, color: Colors.textPrimary, letterSpacing: 0 },
-  dateStamp: { ...Typography.bodySmall, color: Colors.textMuted },
+  dateStamp: { ...Typography.bodySmall, color: Colors.textMuted, marginTop: 2 },
+  pendingText: { ...Typography.bodyMedium, color: Colors.textSecondary },
   passedText: { ...Typography.headlineSmall, color: Colors.success },
 });
 
@@ -89,17 +92,10 @@ interface CountdownProps {
   examTypes: string[];
 }
 
-export const UCEEDCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
-  if (!examTypes.includes('UCEED')) return null;
-  return <CountdownCard examName="UCEED" target={new Date('2027-01-17T09:00:00+05:30')} />;
-};
-
-export const NIDCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
-  if (!examTypes.includes('NID')) return null;
-  return <CountdownCard examName="NID" target={new Date('2026-12-21T09:00:00+05:30')} />;
-};
-
-export const NIFTCountdown: React.FC<CountdownProps> = ({ examTypes }) => {
-  if (!examTypes.includes('NIFT')) return null;
-  return <CountdownCard examName="NIFT" target={new Date('2027-02-08T09:00:00+05:30')} />;
-};
+/** One card per exam the person picked: a live countdown when the date is
+ *  known, "Not announced" until it is. Dates live in data/examDates.ts. */
+export const ExamCountdowns: React.FC<CountdownProps> = ({ examTypes }) => (
+  <>
+    {eventsFor(examTypes).map(e => (e.start ? <CountdownCard key={e.id} event={e} /> : <PendingCard key={e.id} event={e} />))}
+  </>
+);

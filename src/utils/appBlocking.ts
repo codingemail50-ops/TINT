@@ -153,6 +153,11 @@ export function stopAppBlocking(): void {
   TintAppBlocker.stopBlocking();
 }
 
+/** Tells the block screen which exams to count down to (see data/examDates). */
+export function syncExamCountdowns(items: { name: string; atMs: number; note?: string }[]): void {
+  try { TintAppBlocker.setExamCountdowns(items); } catch {}
+}
+
 /** A focus session ended (finished, ended early, left). Use this, not
  *  stopAppBlocking(), for anything to do with a focus session: it never ends a
  *  running 7 Day Lock In. stopAppBlocking() is for what really ends

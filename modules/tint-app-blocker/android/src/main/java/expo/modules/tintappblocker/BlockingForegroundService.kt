@@ -102,6 +102,9 @@ class BlockingForegroundService : Service() {
     // challenge stops, but the per-day "blocked app opened" counts are what
     // the end-of-challenge report is built from, so they must outlive it.
     const val STATS_PREFS_NAME = "tint_challenge_stats"
+    // The person's exam dates, saved by the app (JS) so the block screen can
+    // say "UCEED in 83 days". Its own file, so ending a challenge never wipes it.
+    const val EXAM_PREFS_NAME = "tint_exam_countdowns"
     const val STATS_KEY_PREFIX = "opens_"
 
     /** True if a 7-day challenge is saved and hasn't ended yet. */
@@ -1137,6 +1140,36 @@ class BlockingForegroundService : Service() {
     }
   }
 
+  // One line per exam the person picked ("UCEED in 83 days"), nearest first,
+  // then the ones with no date yet ("NEET UG: not announced"), at most four. Counted now, when the block screen appears, from the dates
+  // the app saved on the phone, so it stays right through a 7 Day Lock In
+  // even if TINT itself is closed. Empty when there is nothing to show.
+  private fun examCountdownText(): String {
+    return try {
+      val raw = getSharedPreferences(EXAM_PREFS_NAME, Context.MODE_PRIVATE).getString("items", null) ?: return ""
+      val arr = org.json.JSONArray(raw)
+      val now = System.currentTimeMillis()
+      val lines = ArrayList<String>()
+      for (i in 0 until arr.length()) {
+        val o = arr.getJSONObject(i)
+        val name = o.optString("name", "")
+        val at = o.optLong("atMs", 0L)
+        val note = o.optString("note", "")
+        if (name.isEmpty()) continue
+        if (at > now) {
+          val days = ((at - now + 86_399_999L) / 86_400_000L).toInt()
+          lines.add(if (days == 1) "$name in 1 day" else "$name in $days days")
+        } else if (at == 0L && note.isNotEmpty()) {
+          lines.add("$name: $note")
+        }
+        if (lines.size == 4) break
+      }
+      lines.joinToString("\n")
+    } catch (e: Exception) {
+      ""
+    }
+  }
+
   private fun showOverlay() {
     overlayView?.let { existing ->
       if (existing.isAttachedToWindow) return
@@ -1183,6 +1216,17 @@ class BlockingForegroundService : Service() {
       gravity = Gravity.CENTER
       setPadding(0, 24, 0, 48)
     })
+    val examText = examCountdownText()
+    if (examText.isNotEmpty()) {
+      layout.addView(TextView(this).apply {
+        text = examText
+        textSize = 18f
+        setTextColor(0xFFFF6A00.toInt())
+        gravity = Gravity.CENTER
+        setLineSpacing(0f, 1.2f)
+        setPadding(0, 0, 0, 48)
+      })
+    }
     layout.addView(Button(this).apply {
       text = "Return to TINT"
       setOnClickListener {

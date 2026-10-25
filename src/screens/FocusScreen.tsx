@@ -26,6 +26,7 @@ import {
 import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY, packageNamesFor } from '../data/blockableApps';
 import { ensureNotificationPermission, notifySessionComplete } from '../utils/sessionNotifications';
 import { usePermissionConsentGate } from '../components/PermissionDisclosure';
+import { loadLocalChallenge } from '../utils/challenge';
 import { tintAlert } from '../utils/dialog';
 
 const DEFAULT_DURATION = 25;
@@ -114,13 +115,25 @@ interface Props {
    *  topBar next to the close button, so the Today task list stays
    *  reachable while the session keeps running underneath. */
   onMinimize?: () => void;
+  /** Focus tab only: opens the 7 Day Lock In (intro, permissions, solo or
+   *  squad) for someone who already has a regular account. The white button
+   *  under the stats. Left out for the task-linked instance. */
+  onOpenLockIn?: () => void;
 }
 
 type Phase = 'setup' | 'active' | 'done';
 
 export const FocusScreen: React.FC<Props> = ({
-  userId, externalTask, onExternalFinish, onExternalExit, visible = true, sessionSource = 'tab', onMinimize,
+  userId, externalTask, onExternalFinish, onExternalExit, visible = true, sessionSource = 'tab', onMinimize, onOpenLockIn,
 }) => {
+  // Is a 7 Day Lock In running on this phone? Changes the button's wording.
+  const [lockInRunning, setLockInRunning] = useState(false);
+  useEffect(() => {
+    if (!onOpenLockIn || !visible) return;
+    let alive = true;
+    void loadLocalChallenge().then(c => { if (alive) setLockInRunning(c?.status === 'active'); }).catch(() => {});
+    return () => { alive = false; };
+  }, [onOpenLockIn, visible]);
   const [phase, setPhase] = useState<Phase>(externalTask ? 'active' : 'setup');
   const [duration, setDuration] = useState(externalTask?.durationMins ?? DEFAULT_DURATION);
   const [timeLeft, setTimeLeft] = useState((externalTask?.durationMins ?? DEFAULT_DURATION) * 60);
@@ -752,6 +765,17 @@ export const FocusScreen: React.FC<Props> = ({
                 </View>
               </View>
 
+              {onOpenLockIn && (
+                <TouchableOpacity style={styles.lockInBtn} onPress={onOpenLockIn} activeOpacity={0.85}>
+                  <Text style={styles.lockInBtnText}>
+                    {lockInRunning ? 'Your 7 Day Lock In is running' : 'Try the 7 Day Lock In challenge'}
+                  </Text>
+                  <Text style={styles.lockInBtnSub}>
+                    {lockInRunning ? 'Tap to see how it is going.' : 'No reels. No shorts. 7 days.'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
               {/* Managed here, before a session starts, instead of a
                   swipe-up sheet mid-session — deciding what to block is a
                   setup decision, not something to fumble with while
@@ -934,6 +958,20 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   startBtnText: { ...Typography.headlineSmall, color: Colors.background, fontSize: 16 },
+
+  // The one white block in the app, so it stands out from the orange start
+  // button and the grey stats above it.
+  lockInBtn: {
+    backgroundColor: Colors.gray[100],
+    borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    alignItems: 'center',
+    gap: 2,
+    marginTop: Spacing.md,
+  },
+  lockInBtnText: { ...Typography.headlineSmall, color: Colors.ink, fontSize: 16, textAlign: 'center' },
+  lockInBtnSub: { fontFamily: Fonts.medium, fontSize: 12, color: Colors.gray[600], textAlign: 'center' },
 
   statsRow: { flexDirection: 'row', gap: Spacing.sm },
   statCard: {

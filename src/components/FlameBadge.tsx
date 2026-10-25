@@ -1,11 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, ViewStyle, StyleProp, TouchableOpacity } from 'react-native';
-import { Colors, Fonts } from '../constants/theme';
+import { View, StyleSheet, ViewStyle, StyleProp, TouchableOpacity } from 'react-native';
+import { Colors } from '../constants/theme';
 import { PixelFlame } from './PixelFlame';
 import { PixelIcon } from './PixelIcon';
 
 interface Props {
-  streak: number;
   size?: number;
   style?: StyleProp<ViewStyle>;
   onPress?: () => void;
@@ -17,15 +16,17 @@ interface Props {
   showNotificationDot?: boolean;
 }
 
-export const FlameBadge: React.FC<Props> = ({ streak, size = 38, style, onPress, avatar, showNotificationDot }) => {
+export const FlameBadge: React.FC<Props> = ({ size = 38, style, onPress, avatar, showNotificationDot }) => {
   const content = (
     <View style={[styles.badge, { width: size, height: size, borderRadius: size / 2 }, style]}>
       {avatar ? (
-        <PixelIcon name={avatar} size={size * 0.62} />
+        // Sized to sit fully inside the circle with room for the border
+        // (it used to share the circle with the streak number, which pushed
+        // it out of the ring).
+        <PixelIcon name={avatar} size={size * 0.58} />
       ) : (
         <PixelFlame size={size * 0.42} state="static" />
       )}
-      <Text style={[styles.n, { fontSize: size * 0.32 }]}>{streak}</Text>
       {showNotificationDot && <View style={styles.notificationDot} />}
     </View>
   );
@@ -46,9 +47,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.gray[800],
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 1,
   },
-  n: { fontFamily: Fonts.retro, color: Colors.gray[400] },
   notificationDot: {
     position: 'absolute',
     top: -1, right: -1,

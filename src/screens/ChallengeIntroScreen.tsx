@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, Dimensions, NativeSyntheticEvent, NativeScrollEvent, TouchableOpacity, BackHandler } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Colors, Spacing, Typography } from '../constants/theme';
 import { PixelIcon } from '../components/PixelIcon';
@@ -11,12 +11,20 @@ const { width: W } = Dimensions.get('window');
 interface Props {
   avatar: string;
   onDone: () => void;
+  /** Set when someone with a regular TINT account opened this from the Focus
+   *  tab: shows a "Not now" link and lets the phone's Back button return to TINT. */
+  onClose?: () => void;
 }
 
 // Three short slides for people who came in through the 7 Day Lock In
 // button, in place of the regular focus walkthrough.
-export const ChallengeIntroScreen: React.FC<Props> = ({ avatar, onDone }) => {
+export const ChallengeIntroScreen: React.FC<Props> = ({ avatar, onDone, onClose }) => {
   const [index, setIndex] = useState(0);
+  useEffect(() => {
+    if (!onClose) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { onClose(); return true; });
+    return () => sub.remove();
+  }, [onClose]);
   const scrollRef = useRef<ScrollView>(null);
   const { buttonPress } = useHaptics();
 
@@ -97,6 +105,11 @@ export const ChallengeIntroScreen: React.FC<Props> = ({ avatar, onDone }) => {
           ))}
         </View>
         <PrimaryButton label={last ? "Let's lock in" : 'Next'} onPress={next} />
+        {onClose && (
+          <TouchableOpacity onPress={onClose} hitSlop={8}>
+            <Text style={styles.notNow}>Not now</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -117,6 +130,7 @@ const styles = StyleSheet.create({
   },
   squadAvatarYou: { borderColor: Colors.pop, zIndex: 1 },
   footer: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xl, gap: Spacing.lg },
+  notNow: { textAlign: 'center', color: Colors.textSecondary, fontSize: 13 },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
   dot: { width: 8, height: 8, borderRadius: 2, backgroundColor: Colors.surfaceElevated },
   dotActive: { backgroundColor: Colors.pop, width: 20 },

@@ -20,6 +20,8 @@ type TintAppBlockerNativeModule = {
   // Optional: not present in a native build made before it was added.
   stopSessionBlocking?(): void;
   setPaused(paused: boolean, endAtMs: number): void;
+  // Optional: not present in a native build made before it was added.
+  setExamCountdowns?(json: string): void;
   hasUsageAccess(): boolean;
   hasOverlayPermission(): boolean;
   addListener(eventName: 'onFocusNotificationAction', listener: (event: FocusNotificationActionEvent) => void): EventSubscription;
@@ -96,6 +98,14 @@ export function stopSessionBlocking(): void {
  *  chronometer state) — does not itself start/stop polling or overlays. */
 export function setPaused(paused: boolean, endAtMs: number): void {
   NativeModule?.setPaused(paused, endAtMs);
+}
+
+/** Saves the person's exam dates on the phone so the block screen can say
+ *  "UCEED in 83 days". The days are counted when the block screen appears, so
+ *  they stay right through a 7 Day Lock In even if TINT is closed. Nothing
+ *  leaves the phone. An older native build without it just ignores the call. */
+export function setExamCountdowns(items: { name: string; atMs: number; note?: string }[]): void {
+  NativeModule?.setExamCountdowns?.(JSON.stringify(items));
 }
 
 /** Fires when the user taps Pause/Resume/End on the persistent notification.

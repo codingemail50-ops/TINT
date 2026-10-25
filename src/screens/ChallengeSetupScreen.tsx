@@ -28,6 +28,10 @@ interface Props {
   onStarted: (local: LocalChallenge) => void;
   onLogout: () => void;
   onAccountDeleted: () => void;
+  /** Set when someone with a regular TINT account opened this from the Focus
+   *  tab. "Not now" and the phone's Back button then return to TINT instead of
+   *  asking to log out. Left out for accounts made through the Lock In. */
+  onExit?: () => void;
 }
 
 const LOBBY_POLL_MS = 3000;
@@ -56,7 +60,7 @@ function permissionsReady(): boolean {
 // Everything between the intro slides and the running challenge: the two
 // permissions blocking needs, solo vs squad, picking apps, and the squad
 // lobby (code, live member list, Start).
-export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onAccountDeleted }) => {
+export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onAccountDeleted, onExit }) => {
   const [step, setStep] = useState<Step>('loading');
   const [apps, setApps] = useState<string[]>(DEFAULT_CHALLENGE_APPS);
   const [startChoice, setStartChoice] = useState<StartChoice>('now');
@@ -350,12 +354,16 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
     };
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       const to = previous[step];
-      if (!to) return false;
+      if (!to) {
+        // First step of a regular account's visit: Back returns to TINT.
+        if (onExit) { onExit(); return true; }
+        return false;
+      }
       setStep(to);
       return true;
     });
     return () => sub.remove();
-  }, [step, notifGranted]);
+  }, [step, notifGranted, onExit]);
 
   const back = (to: Step) => (
     <TouchableOpacity onPress={() => setStep(to)} style={styles.back} hitSlop={12}>
@@ -410,7 +418,7 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
             <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
               <Text style={cs.link}>Read the privacy policy</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={confirmLogout} hitSlop={8}>
+            <TouchableOpacity onPress={onExit ?? confirmLogout} hitSlop={8}>
               <Text style={cs.link}>Not now</Text>
             </TouchableOpacity>
           </>
@@ -433,15 +441,23 @@ export const ChallengeSetupScreen: React.FC<Props> = ({ onStarted, onLogout, onA
               onPress={() => { void buttonPress(); setStep('squad'); }}
             />
             <View style={styles.footerLinks}>
-              <TouchableOpacity onPress={confirmLogout} hitSlop={8}>
-                <Text style={cs.link}>Log out</Text>
-              </TouchableOpacity>
+              {onExit ? (
+                <TouchableOpacity onPress={onExit} hitSlop={8}>
+                  <Text style={cs.link}>Back to TINT</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={confirmLogout} hitSlop={8}>
+                  <Text style={cs.link}>Log out</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity onPress={openPrivacyPolicy} hitSlop={8}>
                 <Text style={cs.link}>Privacy policy</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => confirmDeleteAccount(onAccountDeleted)} hitSlop={8}>
-                <Text style={[cs.link, styles.danger]}>Delete account</Text>
-              </TouchableOpacity>
+              {!onExit && (
+                <TouchableOpacity onPress={() => confirmDeleteAccount(onAccountDeleted)} hitSlop={8}>
+                  <Text style={[cs.link, styles.danger]}>Delete account</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </>
         )}
