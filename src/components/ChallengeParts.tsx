@@ -34,6 +34,14 @@ export const SecondaryButton: React.FC<{ label: string; onPress: () => void; dis
   </TouchableOpacity>
 );
 
+/** Solid white button with black text. Used for "Back to TINT" so it doesn't
+ *  look like the outlined buttons around it (Emergency unlock and the like). */
+export const LightButton: React.FC<{ label: string; onPress: () => void }> = ({ label, onPress }) => (
+  <TouchableOpacity style={ps.light} onPress={onPress} activeOpacity={0.85}>
+    <Text style={ps.lightText}>{label}</Text>
+  </TouchableOpacity>
+);
+
 export const Eyebrow: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Text style={ps.eyebrow}>{children}</Text>
 );
@@ -292,6 +300,11 @@ const ps = StyleSheet.create({
     paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
   },
   secondaryText: { fontSize: 15, fontFamily: Fonts.semibold, color: Colors.textPrimary },
+  light: {
+    backgroundColor: '#FFFFFF', borderRadius: BorderRadius.md,
+    paddingVertical: 14, alignItems: 'center', justifyContent: 'center',
+  },
+  lightText: { fontSize: 15, fontFamily: Fonts.bold, color: '#000' },
   eyebrow: {
     fontFamily: Fonts.pixel, fontSize: 18, color: Colors.pop,
     letterSpacing: 1.5, textTransform: 'uppercase',

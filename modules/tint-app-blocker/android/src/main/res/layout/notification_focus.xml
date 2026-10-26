@@ -5,6 +5,12 @@
     and (focus sessions only) one pause/resume control. The longer explanation
     line is in notification_focus_big.xml, shown when the notification is
     expanded.
+
+    Android gives a collapsed custom notification only about 48dp of height
+    under the OS header, and clips whatever goes past it. This used to be
+    ~68dp tall (44dp logo + 12dp padding top and bottom), so the bottom of the
+    countdown was cut off. Everything here is sized in dp (not sp) so a large
+    system font setting can't push it past the limit again.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -13,12 +19,12 @@
     android:gravity="center_vertical"
     android:background="@drawable/tint_notification_bg"
     android:paddingHorizontal="16dp"
-    android:paddingVertical="12dp">
+    android:paddingVertical="4dp">
 
     <ImageView
         android:id="@+id/notif_flame_icon"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
         android:scaleType="fitCenter"
         android:contentDescription="@null" />
 
@@ -26,32 +32,35 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_marginStart="16dp"
+        android:layout_marginStart="12dp"
         android:orientation="vertical">
 
         <TextView
             android:id="@+id/notif_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:includeFontPadding="false"
             android:singleLine="true"
             android:ellipsize="end"
             android:textColor="#FCC268"
-            android:textSize="13sp"
+            android:textSize="12dp"
             android:textStyle="bold" />
 
         <Chronometer
             android:id="@+id/notif_timer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:singleLine="true"
             android:textColor="#FFFFFF"
-            android:textSize="24sp"
+            android:textSize="20dp"
             android:textStyle="bold" />
     </LinearLayout>
 
     <ImageView
         android:id="@+id/notif_toggle"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
         android:padding="6dp"
         android:scaleType="fitCenter"
         android:contentDescription="Pause or resume" />

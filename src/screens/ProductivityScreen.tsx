@@ -23,6 +23,13 @@ function formatMinsShort(mins: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+// Under an hour reads as "12.0 M" (and "0.0 M" at the start) -- a bare "0m"
+// in the big number looked like the letters O and M.
+function formatLifetime(mins: number): string {
+  if (mins < 60) return `${mins.toFixed(1)} M`;
+  return formatMinsShort(mins);
+}
+
 // ── Focus-vs-distracted bar chart, orange over white ─────────────────────────
 const CHART_H = 190;
 const YAXIS_W = 30;
@@ -384,7 +391,7 @@ export const ProductivityScreen: React.FC<Props> = ({ appState }) => {
         <View style={styles.lifetimeCard}>
           <Ionicons name="flame" size={22} color={Colors.pop} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.lifetimeValue}>{formatMinsShort(lifetimeMins)}</Text>
+            <Text style={styles.lifetimeValue}>{formatLifetime(lifetimeMins)}</Text>
             <Text style={styles.lifetimeLabel}>Total focus time since you started with TINT</Text>
           </View>
         </View>

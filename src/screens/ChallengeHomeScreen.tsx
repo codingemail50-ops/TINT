@@ -9,7 +9,7 @@ import * as Sharing from 'expo-sharing';
 import { Colors, Spacing, BorderRadius, Fonts } from '../constants/theme';
 import { PixelIcon } from '../components/PixelIcon';
 import {
-  DayFlame, DayProgressBar, Eyebrow, HoldToConfirm, LogoFlame, PrimaryButton, SecondaryButton, useNow, challengeStyles as cs,
+  DayFlame, DayProgressBar, Eyebrow, HoldToConfirm, LightButton, LogoFlame, PrimaryButton, SecondaryButton, useNow, challengeStyles as cs,
 } from '../components/ChallengeParts';
 import { BLOCKABLE_APPS, packageNamesFor } from '../data/blockableApps';
 import { quoteFor, progressLine, WIN_VARIANTS } from '../data/challengeMessages';
@@ -364,7 +364,9 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
           </View>
           <PrimaryButton label="SHARE YOUR WIN" onPress={() => void share()} loading={sharing} />
           <Text style={[cs.sub, styles.momentum]}>Turn this momentum into something more.</Text>
-          <SecondaryButton label={onExit ? 'BACK TO TINT' : 'KEEP THE MOMENTUM'} onPress={onExit ?? onUpgrade} />
+          {onExit
+            ? <LightButton label="BACK TO TINT" onPress={onExit} />
+            : <SecondaryButton label="KEEP THE MOMENTUM" onPress={onUpgrade} />}
           <TouchableOpacity onPress={() => void goAgain()} hitSlop={8}>
             <Text style={cs.link}>Do another 7 days</Text>
           </TouchableOpacity>
@@ -384,7 +386,9 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
           <Text style={cs.title}>You made it to day {local.quitDay ?? day}.</Text>
           <Text style={cs.sub}>Every hour you held counts. You resisted {total} urge{total === 1 ? '' : 's'}. Try again when you're ready.</Text>
           <PrimaryButton label="Start again" onPress={() => void goAgain()} />
-          <SecondaryButton label={onExit ? 'Back to TINT' : 'Use TINT for studying'} onPress={onExit ?? onUpgrade} />
+          {onExit
+            ? <LightButton label="Back to TINT" onPress={onExit} />
+            : <SecondaryButton label="Use TINT for studying" onPress={onUpgrade} />}
           <FooterLinks onDelete={() => confirmDeleteAccount(onAccountDeleted)} />
         </ScrollView>
       </View>
@@ -473,7 +477,7 @@ export const ChallengeHomeScreen: React.FC<Props> = ({ onRestart, onUpgrade, onA
         )}
 
         {onExit && (
-          <SecondaryButton label="Back to TINT" onPress={onExit} />
+          <LightButton label="Back to TINT" onPress={onExit} />
         )}
         <TouchableOpacity onPress={pressLeave} hitSlop={8}>
           <Text style={[cs.link, styles.leaveLink]}>Leave challenge</Text>
