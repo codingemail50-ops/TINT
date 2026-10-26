@@ -14,7 +14,6 @@ import { FlameBadge } from '../components/FlameBadge';
 import { PixelFlame } from '../components/PixelFlame';
 import { Bonfire } from '../components/Bonfire';
 import { Confetti } from '../components/Confetti';
-import { FocusScreen } from './FocusScreen';
 import { ExamCountdowns } from '../components/ExamCountdowns';
 import { useHaptics } from '../hooks/useHaptics';
 import { countIncomingRequests } from '../utils/supabaseStorage';
@@ -24,7 +23,6 @@ import { loadActiveSession } from '../utils/activeFocusSession';
 import { isLockInRunning, loadLocalChallenge, LOCK_IN_ON_MESSAGE } from '../utils/challenge';
 import { tintAlert } from '../utils/dialog';
 import { now as devNow, subscribeDevClock } from '../utils/devClock';
-import { useFocusSessionStatus } from '../context/FocusSessionContext';
 
 const CATEGORIES = [
   'Study', 'Practice', 'Revision', 'Reading', 'Writing',
@@ -187,9 +185,27 @@ interface Props {
   onNavigateFocus: () => void;
   onNavigateProfile: () => void;
   onNavigateAnalytics: () => void;
+  /** Whether Today is the tab on screen. It stays mounted when hidden, so
+   *  this is how it knows when to play a celebration it was owed. */
+  visible?: boolean;
+  /** The task whose focus timer is running on the Focus tab: kept out of the
+   *  lists and locked while it runs. */
+  runningTaskId?: string | null;
+  /** Tapping an unfinished task: AppNavigator starts its timer on the Focus tab. */
+  onStartTask: (task: RunningTask) => void;
+  /** The app was reopened while a task's timer was still running: put that
+   *  task's timer back on the Focus tab (no navigation). */
+  onResumeTask: (task: RunningTask) => void;
+  /** Set by AppNavigator when a task's timer ran to the end: mark it done. */
+  taskDone?: { id: string; n: number } | null;
 }
 
-export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, onNavigateFocus, onNavigateProfile, onNavigateAnalytics }) => {
+export interface RunningTask { id: string; title: string; durationMins: number }
+
+export const TodoScreen: React.FC<Props> = ({
+  appState, onStateChange, userId, onNavigateFocus, onNavigateProfile, onNavigateAnalytics,
+  visible = true, runningTaskId = null, onStartTask, onResumeTask, taskDone = null,
+}) => {
   const [tasks, setTasks]           = useState<Task[]>([]);
   const [todayStr, setTodayStr]     = useState(() => devNow().toDateString());
   const [selectedDate, setSelectedDate] = useState(() => devNow().toDateString());
@@ -214,22 +230,11 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     return () => { cancelled = true; clearInterval(interval); };
   }, [userId]);
 
-  // Tapping an incomplete task pops up the Focus screen (same squiggly-circle
-  // UI as the Focus tab) pre-loaded with that task and running — this just
-  // tracks which task, if any, is currently running that way.
-  const [timerTaskId, setTimerTaskId] = useState<string | null>(null);
-  // Whether that overlay's full UI is showing right now, vs minimized back
-  // to this task list while the session keeps running underneath (it stays
-  // mounted either way, just hidden — see the `visible` prop below).
-  const [taskOverlayVisible, setTaskOverlayVisible] = useState(true);
-  const { expandSignal } = useFocusSessionStatus();
-
-  // A brand-new task session always opens full-screen.
-  useEffect(() => { if (timerTaskId) setTaskOverlayVisible(true); }, [timerTaskId]);
-  // Tapping the mini-player while minimized re-expands it (navigating to
-  // 'todo' alone wouldn't signal anything, since it's already the screen
-  // that's on screen).
-  useEffect(() => { if (timerTaskId) setTaskOverlayVisible(true); }, [expandSignal]);
+  // Tapping an incomplete task starts its timer on the Focus tab (the same
+  // squiggly-circle UI, pre-loaded with that task), while this list stays here
+  // as an ordinary tab. AppNavigator owns that session; this screen only gets
+  // told which task is running (runningTaskId) and when it finished (taskDone).
+  const timerTaskId = runningTaskId;
 
   // Add task modal
   const [showAddModal, setShowAddModal]     = useState(false);
@@ -253,6 +258,8 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   const [confettiVisible, setConfettiVisible] = useState(false);
   const [trophyVisible, setTrophyVisible]   = useState(false);
   const trophyAnim = useRef(new Animated.Value(0)).current;
+  // A finished task's celebration that is waiting for this tab to be on screen.
+  const [owedCelebration, setOwedCelebration] = useState<{ allDone: boolean } | null>(null);
 
   const headerGlow = useRef(new Animated.Value(0)).current;
   const { taskComplete, allComplete, buttonPress } = useHaptics();
@@ -288,12 +295,13 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
     setTasks(loadedTasks);
 
     // A task-linked session was still running when the app process got
-    // killed — re-open its overlay so FocusScreen's own boot-resume logic
-    // (see activeFocusSession.ts) can pick the timing back up.
+    // killed — hand it back to AppNavigator so the Focus tab gets its timer
+    // again and FocusScreen's own boot-resume logic (see
+    // activeFocusSession.ts) can pick the timing back up.
     const active = await loadActiveSession();
     if (active?.source === 'task' && active.taskId) {
       const stillPending = loadedTasks.find(t => t.id === active.taskId && !t.completed);
-      if (stillPending) setTimerTaskId(active.taskId);
+      if (stillPending) onResumeTask({ id: stillPending.id, title: stillPending.title, durationMins: stillPending.duration });
     }
 
     setFocusLog(await loadFocusLog());
@@ -385,7 +393,10 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   }, [progress, viewingPast]);
 
   // ── Task completion (shared by instant un-toggle and timer completion) ───────
-  const applyCompletion = useCallback(async (id: string, completed: boolean) => {
+  // `celebrateLater`: the task was finished while this tab was hidden (its
+  // timer ran out on the Focus tab), so the confetti and the "Day Complete!"
+  // trophy wait until the person is back here instead of playing unseen.
+  const applyCompletion = useCallback(async (id: string, completed: boolean, celebrateLater = false) => {
     const updated = tasks.map(t =>
       t.id === id ? { ...t, completed, completedAt: completed ? devNow().toISOString() : undefined } : t
     );
@@ -394,11 +405,12 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
 
     if (completed) {
       await taskComplete();
-      setConfettiVisible(true);
-
-      const newDone = updated.filter(t => t.completed).length;
-      if (newDone === updated.length && updated.length > 0) {
-        setTimeout(() => triggerTrophy(), 1200);
+      const allDone = updated.length > 0 && updated.filter(t => t.completed).length === updated.length;
+      if (celebrateLater) {
+        setOwedCelebration({ allDone });
+      } else {
+        setConfettiVisible(true);
+        if (allDone) setTimeout(() => triggerTrophy(), 1200);
       }
     }
 
@@ -407,31 +419,18 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
   }, [tasks]);
 
   // ── Per-task countdown timer ──────────────────────────────────────────────────
-  // Natural completion of a task-linked Focus session — mark the task done.
-  // The focus minutes themselves are NOT logged here: FocusScreen's own
-  // finishSession() already appended this exact session to the focus log
-  // and synced it before calling onExternalFinish (this callback) — logging
-  // it again here was double-counting every task-linked session's time on
-  // the leaderboard (a session that ran twice as long as it should've).
-  // The overlay stays open (showing "Session Complete!") until the user
-  // actually leaves it, which fires handleTaskSessionExit below — that's
-  // what clears timerTaskId.
-  const handleTaskSessionFinish = (actualSeconds: number) => {
-    if (!timerTaskId) return;
-    void applyCompletion(timerTaskId, true);
-  };
-
-  // Leaving a task-linked Focus session: early abandon, or dismissing the
-  // "session complete" screen after a natural finish. Neither branch logs
-  // focus minutes here — FocusScreen's own exitSession()/finishSession()
-  // already banked this exact session (early-abandon and natural-completion
-  // cases alike) before calling this callback; logging it again here was
-  // the same double-counting bug handleTaskSessionFinish's comment above
-  // describes, just on the early-exit path instead of the natural one.
-  const handleTaskSessionExit = (actualSeconds: number, wasNaturalCompletion: boolean) => {
-    buttonPress();
-    setTimerTaskId(null);
-  };
+  // Natural completion of a task-linked Focus session (AppNavigator bumps
+  // `taskDone`) — mark the task done. The focus minutes themselves are NOT
+  // logged here: FocusScreen's own finishSession() already appended this exact
+  // session to the focus log and synced it before reporting the finish —
+  // logging it again here was double-counting every task-linked session's time
+  // on the leaderboard (a session that ran twice as long as it should've).
+  // The "Session Complete!" screen stays on the Focus tab until the person
+  // leaves it; the task shows as done here straight away.
+  useEffect(() => {
+    if (taskDone) void applyCompletion(taskDone.id, true, !visible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskDone]);
 
   const handleTaskPress = useCallback((id: string) => {
     const task = tasks.find(t => t.id === id);
@@ -441,15 +440,16 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
       void applyCompletion(id, false);
       return;
     }
-    if (timerTaskId && timerTaskId !== id) return; // one focus session at a time
     buttonPress();
     // One blocker at a time: no task timer while a 7 Day Lock In is running.
+    // (AppNavigator does the other checks: one focus session at a time, and
+    // the blocking permissions.)
     void (async () => {
       const local = await loadLocalChallenge().catch(() => null);
       if (isLockInRunning(local)) { tintAlert('7 Day Lock In is on', LOCK_IN_ON_MESSAGE); return; }
-      setTimerTaskId(id);
+      onStartTask({ id: task.id, title: task.title, durationMins: task.duration });
     })();
-  }, [tasks, timerTaskId, applyCompletion]);
+  }, [tasks, applyCompletion, onStartTask]);
 
   const triggerTrophy = async () => {
     await allComplete();
@@ -460,6 +460,15 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
       Animated.timing(trophyAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
     ]).start(() => setTrophyVisible(false));
   };
+
+  // A task finished while this tab was hidden: celebrate now that it is back.
+  useEffect(() => {
+    if (!owedCelebration || !visible) return;
+    setOwedCelebration(null);
+    setConfettiVisible(true);
+    if (owedCelebration.allDone) setTimeout(() => triggerTrophy(), 1200);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [owedCelebration, visible]);
 
   // ── Delete task ──────────────────────────────────────────────────────────────
   const handleDelete = useCallback(async (id: string) => {
@@ -760,27 +769,7 @@ export const TodoScreen: React.FC<Props> = ({ appState, onStateChange, userId, o
         <View style={{ height: 110 }} />
       </ScrollView>
 
-      {/* ── Task-linked Focus session — full-screen overlay, same UI as the
-           Focus tab, just pre-loaded with a task and auto-started ────────── */}
-      {timerTaskId && tasks.find(t => t.id === timerTaskId) && (
-        <View style={StyleSheet.absoluteFillObject} pointerEvents={taskOverlayVisible ? 'auto' : 'none'}>
-          <FocusScreen
-            userId={userId}
-            externalTask={{
-              title: tasks.find(t => t.id === timerTaskId)!.title,
-              durationMins: tasks.find(t => t.id === timerTaskId)!.duration,
-              id: timerTaskId,
-            }}
-            sessionSource="task"
-            visible={taskOverlayVisible}
-            onMinimize={() => setTaskOverlayVisible(false)}
-            onExternalFinish={handleTaskSessionFinish}
-            onExternalExit={handleTaskSessionExit}
-          />
-        </View>
-      )}
-
-      {/* ── Confetti (per task) ─────────────────────────────────────────────── */}
+      {/* ── Confetti (per task)─────────────────────────────────────────────── */}
       <Confetti visible={confettiVisible} onComplete={() => setConfettiVisible(false)} />
 
       {/* ── Trophy popup ────────────────────────────────────────────────────── */}

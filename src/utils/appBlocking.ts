@@ -106,6 +106,14 @@ export function checkPermission(permission: BlockingPermission): boolean | null 
   return permission === 'usageAccess' ? TintAppBlocker.hasUsageAccess() : TintAppBlocker.hasOverlayPermission();
 }
 
+/** The blocking permissions still switched off, asked of Android right now.
+ *  Empty when both are on, and also empty where there is nothing to grant
+ *  (web preview, Expo Go, iOS), so a focus session is never held back there. */
+export function missingBlockingPermissions(): BlockingPermission[] {
+  if (!isNativeBlockingAvailable()) return [];
+  return (['usageAccess', 'overlay'] as BlockingPermission[]).filter(p => checkPermission(p) !== true);
+}
+
 /** Starts (or re-arms, e.g. after an app-kill mid-session) the foreground
  *  service for the given Android package names — always shows the
  *  persistent, live-counting-down "focus session active" notification

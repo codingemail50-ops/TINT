@@ -20,7 +20,7 @@ import { BlobDial } from '../components/BlobDial';
 import { scallopPath } from '../utils/scallopPath';
 import {
   openPermissionSettings, getSelfReportedGrants, setSelfReportedGrant, checkPermission,
-  isNativeBlockingAvailable, startAppBlocking, stopSessionBlocking, setBlockingPaused,
+  isNativeBlockingAvailable, missingBlockingPermissions, startAppBlocking, stopSessionBlocking, setBlockingPaused,
   subscribeFocusNotificationAction, BlockingPermission,
 } from '../utils/appBlocking';
 import { BLOCKABLE_APPS, DEFAULT_BLOCKED_APPS, BLOCKED_APPS_STORAGE_KEY, packageNamesFor } from '../data/blockableApps';
@@ -66,10 +66,10 @@ const TRACE_LENGTH = TRACE_SCALLOP.length;
 
 // AppNavigator's bottom tab bar is always painted on top of whatever screen
 // is showing (it's a sibling rendered after the screen content, not part of
-// it), and FocusScreen is never shown without it — either as the Focus tab
-// itself, or as Today's task-linked overlay, both of which sit under the
-// same persistent tab bar. Anything anchored to the bottom of this screen
-// needs this much extra clearance or the tab bar paints over it.
+// it), and FocusScreen is never shown without it — a Focus tab session and a
+// session started from a Today task both live in the Focus tab. Anything
+// anchored to the bottom of this screen needs this much extra clearance or
+// the tab bar paints over it.
 const TAB_BAR_CLEARANCE = 100;
 
 function formatMMSS(totalSeconds: number): string {
@@ -94,7 +94,8 @@ interface Props {
   userId?: string;
   /** When set, the screen skips the setup phase entirely and auto-starts a
    *  session for this task (used by the Today screen's "tap a task" flow —
-   *  the same squiggly-circle Focus UI, just pre-loaded and running). */
+   *  the same squiggly-circle Focus UI, just pre-loaded and running; read once
+   *  when the screen mounts, so AppNavigator gives each task its own instance). */
   externalTask?: ExternalTask;
   /** Natural completion of an externalTask session — parent marks the task done. */
   onExternalFinish?: (actualSeconds: number) => void;
@@ -108,13 +109,13 @@ interface Props {
    *  AppNavigator shows the mini-player instead. Defaults to true so
    *  existing single-instance usage is unaffected. */
   visible?: boolean;
-  /** Which shared-status slot this instance reports to, so the mini-player
-   *  can tell whether the full UI for the active session is already
-   *  showing elsewhere. */
+  /** Which shared-status slot this instance reports to: 'tab' for a session
+   *  started from the Focus tab's own dial, 'task' for one started by tapping
+   *  a task on Today. */
   sessionSource?: 'tab' | 'task';
-  /** Task-linked sessions only — renders a minimize chevron in the active
-   *  topBar next to the close button, so the Today task list stays
-   *  reachable while the session keeps running underneath. */
+  /** Renders the white minimize chevron in the active topBar next to the
+   *  close button (and enables swipe-down), which takes the person back to
+   *  the Today list while the session keeps running underneath. */
   onMinimize?: () => void;
   /** Focus tab only: opens the 7 Day Lock In (intro, permissions, solo or
    *  squad) for someone who already has a regular account. The white button
@@ -279,8 +280,9 @@ export const FocusScreen: React.FC<Props> = ({
 
   // Runs once on mount: resume a session that was still running when the
   // app got killed (matching this instance's source — 'tab' for the Focus
-  // tab, 'task' for Today's task-linked overlay), fall back to starting a
-  // fresh externalTask session, or do nothing (plain setup screen).
+  // tab's own dial, 'task' for a session started from a Today task), fall
+  // back to starting a fresh externalTask session, or do nothing (plain
+  // setup screen).
   useEffect(() => {
     if (bootstrappedRef.current) return;
     bootstrappedRef.current = true;
@@ -346,32 +348,20 @@ export const FocusScreen: React.FC<Props> = ({
       timeLeft,
       title: externalTask?.title ?? 'Focus Session',
       source: phase === 'active' ? sessionSource : null,
-      // Only task sessions have a real "minimized" concept (the parent
-      // flips this same `visible` prop to false while keeping the
-      // instance mounted/ticking underneath, via the chevron in topBar).
-      // The tab instance's own `visible` toggles false/true on every
-      // ordinary tab switch too, but AppNavigator's mini-player check
-      // already derives "is the full UI on screen" for a tab session from
-      // `screen === 'focus'` directly — it never needed this flag. Setting
-      // it here anyway meant that switching *back* into the Focus tab
-      // showed a stale `minimized: true` from context for one render
-      // (this effect runs after commit, a tick behind the prop change),
-      // making the mini-player flash back on before disappearing again.
-      minimized: sessionSource === 'task' ? !visible : false,
     };
     setStatus(prev => {
-      // Both FocusScreen instances (tab + task) are mounted simultaneously
-      // and each runs this effect independently. The tab instance's
-      // `visible` prop (screen === 'focus') flips on every ordinary screen
-      // switch, which re-fires ITS OWN copy of this effect even while it
-      // has no active session -- without this guard, that idle instance's
-      // "I'm not active" update was unconditionally overwriting the OTHER
-      // instance's genuinely active session in the shared context the
-      // moment the user changed screens, hiding the mini-player, until the
-      // real active instance's own next tick (up to ~1s later) reported
-      // itself active again and it flashed back in. Only let an "inactive"
-      // update through when it's coming from whichever source currently
-      // owns the reported status (or nothing does yet).
+      // Both FocusScreen instances (tab + task) can be mounted at the same
+      // time and each runs this effect independently. The tab instance's
+      // `visible` prop flips on every ordinary screen switch, which re-fires
+      // ITS OWN copy of this effect even while it has no active session --
+      // without this guard, that idle instance's "I'm not active" update was
+      // unconditionally overwriting the OTHER instance's genuinely active
+      // session in the shared context the moment the user changed screens,
+      // hiding the mini-player, until the real active instance's own next
+      // tick (up to ~1s later) reported itself active again and it flashed
+      // back in. Only let an "inactive" update through when it's coming from
+      // whichever source currently owns the reported status (or nothing does
+      // yet).
       if (!next.active && prev.source !== null && prev.source !== sessionSource) return prev;
       return next;
     });
@@ -387,7 +377,7 @@ export const FocusScreen: React.FC<Props> = ({
   // must not wipe out the OTHER instance's genuinely active session.
   useEffect(() => () => setStatus(prev => (
     prev.source === sessionSource
-      ? { active: false, paused: false, timeLeft: 0, title: '', source: null, minimized: false }
+      ? { active: false, paused: false, timeLeft: 0, title: '', source: null }
       : prev
   )), [setStatus, sessionSource]);
 
@@ -506,6 +496,15 @@ export const FocusScreen: React.FC<Props> = ({
   // "transforming" into the timer rather than a plain screen swap.
   const handleStart = async () => {
     if (lockInRunning) { tintAlert('7 Day Lock In is on', LOCK_IN_ON_MESSAGE); return; }
+    // No session without the two blocking permissions. Someone who logged in
+    // on a new phone never saw the sign-up screen that asks for them, so the
+    // check lives here: Start takes them through the missing one instead.
+    const missing = missingBlockingPermissions();
+    if (missing.length > 0) {
+      await refreshGrants();
+      await handleGrantPermission(missing[0]);
+      return;
+    }
     await buttonPress();
     dialFadeAnim.setValue(1);
     Animated.sequence([
@@ -609,6 +608,10 @@ export const FocusScreen: React.FC<Props> = ({
   // no need to branch on which label native sent.
   useEffect(() => {
     return subscribeFocusNotificationAction((action) => {
+      // Two instances can be mounted (the dial's and a Today task's): only the
+      // one actually running a session reacts, so the idle one never pauses,
+      // ends or clears anything.
+      if (phaseRef.current !== 'active') return;
       if (action === 'end') {
         void exitSessionRef.current('early');
       } else {
@@ -714,6 +717,10 @@ export const FocusScreen: React.FC<Props> = ({
       if (e.translationY > 70 && onMinimize) runOnJS(onMinimize)();
     });
 
+  // Read from Android on every render of the setup screen (cheap, and
+  // refreshGrants re-renders it when the person comes back from Settings).
+  const accessNeeded = phase === 'setup' && !lockInRunning && missingBlockingPermissions().length > 0;
+
   const totalSeconds = duration * 60;
   const pct = totalSeconds > 0 ? (totalSeconds - timeLeft) / totalSeconds : 0;
   const traceDashoffset = TRACE_LENGTH * (1 - pct);
@@ -767,9 +774,14 @@ export const FocusScreen: React.FC<Props> = ({
                 disabled={lockInRunning}
               >
                 <Text style={[styles.startBtnText, lockInRunning && styles.startBtnTextOff]}>
-                  {lockInRunning ? 'Off during your 7 Day Lock In' : 'Start Focus Session'}
+                  {lockInRunning ? 'Off during your 7 Day Lock In' : accessNeeded ? 'Allow access to start' : 'Start Focus Session'}
                 </Text>
               </TouchableOpacity>
+              {accessNeeded && (
+                <Text style={styles.accessHint}>
+                  TINT needs Usage access and Display over other apps to block distracting apps. Allow both, then start.
+                </Text>
+              )}
 
               <View style={styles.statsRow}>
                 <View style={styles.statCard}>
@@ -871,8 +883,8 @@ export const FocusScreen: React.FC<Props> = ({
             <Text style={styles.wordmark}>There is no tomorrow</Text>
             <View style={styles.topBarActions}>
               {onMinimize && (
-                <TouchableOpacity style={styles.closeBtn} onPress={onMinimize} activeOpacity={0.7}>
-                  <Ionicons name="chevron-down" size={16} color={Colors.textSecondary} />
+                <TouchableOpacity style={[styles.closeBtn, styles.minimizeBtn]} onPress={onMinimize} activeOpacity={0.8}>
+                  <Ionicons name="chevron-down" size={18} color={Colors.ink} />
                 </TouchableOpacity>
               )}
               <TouchableOpacity style={styles.closeBtn} onPress={openConfirm} activeOpacity={0.7}>
@@ -985,6 +997,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   startBtnText: { ...Typography.headlineSmall, color: Colors.background, fontSize: 16 },
+  // Sits just under the Start button: pulled up into the gap that button's own
+  // bottom margin leaves, then given the same gap below.
+  accessHint: {
+    fontFamily: Fonts.medium, fontSize: 12.5, color: Colors.pop, textAlign: 'center',
+    marginTop: -Spacing.lg, marginBottom: Spacing.xl,
+  },
 
   // The one white block in the app, so it stands out from the orange start
   // button and the grey stats above it.
@@ -1027,6 +1045,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.border,
     alignItems: 'center', justifyContent: 'center',
   },
+  // The minimise (down arrow) button is solid white so it reads as the way
+  // back to the task list; the close (X) next to it stays grey.
+  minimizeBtn: { backgroundColor: Colors.gray[100], borderColor: Colors.gray[100] },
 
   // Deliberately quiet — the timer below is the focal point, this is just
   // context for which task it's tied to.

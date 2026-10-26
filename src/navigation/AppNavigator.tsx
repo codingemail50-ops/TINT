@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, AppState as RNAppState } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -9,7 +9,7 @@ import { AvatarExamScreen } from '../screens/AvatarExamScreen';
 import { FocusGoalScreen } from '../screens/FocusGoalScreen';
 import { AvatarPrompt } from '../components/AvatarPrompt';
 import { CreateAccountScreen } from '../screens/CreateAccountScreen';
-import { TodoScreen } from '../screens/TodoScreen';
+import { TodoScreen, RunningTask } from '../screens/TodoScreen';
 import { FocusScreen } from '../screens/FocusScreen';
 import { ProductivityScreen } from '../screens/ProductivityScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
@@ -28,7 +28,7 @@ import { loadDevOffset, subscribeDevClock } from '../utils/devClock';
 import { saveFocusLog, loadFocusLog, saveBestFlameMins } from '../utils/focusLog';
 import { saveDistractionLog } from '../utils/distractionLog';
 import { clearActiveSession, loadActiveSession } from '../utils/activeFocusSession';
-import { stopAppBlocking, syncExamCountdowns } from '../utils/appBlocking';
+import { stopAppBlocking, syncExamCountdowns, missingBlockingPermissions } from '../utils/appBlocking';
 import { examCountdownItems } from '../data/examDates';
 import { updateLockInCredit } from '../utils/lockInCredit';
 import { buildYesterdayRecap, hasShownRecapFor, markRecapShown, DailyRecapData } from '../utils/dailyRecap';
@@ -194,7 +194,14 @@ const AppNavigatorInner: React.FC = () => {
   const motivationCheckedRef = useRef(false);
   const tabFadeAnim = useRef(new Animated.Value(0)).current;
   const userIdRef = useRef<string | null>(null);
-  const { status: focusStatus, requestExpand } = useFocusSessionStatus();
+  const { status: focusStatus } = useFocusSessionStatus();
+  // The task whose focus timer is running on the Focus tab (started by tapping
+  // it on Today), and a bump that tells Today its timer ran out so it can mark
+  // the task done.
+  const [taskSession, setTaskSession] = useState<RunningTask | null>(null);
+  const [taskDone, setTaskDone] = useState<{ id: string; n: number } | null>(null);
+  const taskSessionRef = useRef<RunningTask | null>(null);
+  taskSessionRef.current = taskSession;
   const draftRef = useRef<OnboardingDraft>({ avatar: 'star', examTypes: [], dailyFocusGoalMins: 60, name: '', email: '' });
   // A challenge user, already signed in, picking exams to use regular TINT.
   const upgradingFromChallengeRef = useRef(false);
@@ -408,6 +415,42 @@ const AppNavigatorInner: React.FC = () => {
 
   const navigateTo = (s: Screen) => setScreen(s);
 
+  // Tapping a task on Today starts its timer on the Focus tab, the same place
+  // a session started from the dial runs, so Today stays an ordinary tab with
+  // the other tasks still reachable. One session at a time, and (on a phone
+  // build) only once Usage access and Display over other apps are allowed.
+  const startTaskSession = (task: RunningTask) => {
+    if (focusStatus.active) {
+      tintAlert('A focus session is already running', 'Finish or end it first, then start this task.');
+      navigateTo('focus');
+      return;
+    }
+    if (missingBlockingPermissions().length > 0) {
+      tintAlert(
+        'Allow access first',
+        'TINT needs Usage access and Display over other apps to block distracting apps during a focus session. Allow them on the Focus tab, then tap your task again.',
+      );
+      navigateTo('focus');
+      return;
+    }
+    setTaskSession(task);
+    navigateTo('focus');
+  };
+  // The app reopened mid-task-session: bring its timer back, no navigation.
+  const resumeTaskSession = useCallback((task: RunningTask) => {
+    setTaskSession(prev => (prev?.id === task.id ? prev : task));
+  }, []);
+  const handleTaskFinish = useCallback(() => {
+    const t = taskSessionRef.current;
+    if (t) setTaskDone({ id: t.id, n: Date.now() });
+  }, []);
+  // Left the task's timer: ended early, or dismissed "Session Complete!"
+  // (which goes back to Today).
+  const handleTaskExit = useCallback((_seconds: number, wasNaturalCompletion: boolean) => {
+    setTaskSession(null);
+    if (wasNaturalCompletion) setScreen('todo');
+  }, []);
+
   // Someone with a regular TINT account (not one made through the 7 Day Lock
   // In button) trying the Lock In from the Focus tab. Same screens as the
   // Lock In accounts, but with a way back to TINT instead of log out.
@@ -560,6 +603,8 @@ const AppNavigatorInner: React.FC = () => {
     // apps after the account that started it has logged out.
     stopAppBlocking();
     userIdRef.current = null;
+    setTaskSession(null);
+    setTaskDone(null);
     setShowTabs(false);
     setLoginShortcut(false);
     upgradingFromChallengeRef.current = false;
@@ -814,25 +859,12 @@ const AppNavigatorInner: React.FC = () => {
       runOnJS(goRelative)(event.translationX < 0 ? 1 : -1);
     });
 
-  // Mini-player shows whenever a session is actively running and its own
-  // full-screen UI isn't the thing currently on screen (Focus tab for a
-  // standalone session, Today's task-linked overlay for a task session) —
-  // or the task session's overlay has been explicitly minimized back to
-  // the task list while still running underneath.
-  const focusUIOnScreen = !focusStatus.minimized && (
-    (focusStatus.source === 'tab' && screen === 'focus')
-    || (focusStatus.source === 'task' && screen === 'todo')
-  );
-  const miniPlayerVisible = focusStatus.active && !focusUIOnScreen;
+  // Mini-player shows whenever a session is actively running and the Focus
+  // tab, where every session (from the dial or from a Today task) runs, isn't
+  // the screen showing.
+  const miniPlayerVisible = focusStatus.active && screen !== 'focus';
 
-  const handleMiniPlayerPress = () => {
-    if (focusStatus.source === 'task') {
-      navigateTo('todo');
-      requestExpand();
-    } else {
-      navigateTo('focus');
-    }
-  };
+  const handleMiniPlayerPress = () => navigateTo('focus');
 
   return (
     <View style={styles.root}>
@@ -910,6 +942,11 @@ const AppNavigatorInner: React.FC = () => {
                 onNavigateFocus={() => navigateTo('focus')}
                 onNavigateProfile={() => navigateTo('profile')}
                 onNavigateAnalytics={() => navigateTo('productivity')}
+                visible={screen === 'todo'}
+                runningTaskId={taskSession?.id ?? null}
+                onStartTask={startTaskSession}
+                onResumeTask={resumeTaskSession}
+                taskDone={taskDone}
               />
             </View>
           )}
@@ -918,13 +955,28 @@ const AppNavigatorInner: React.FC = () => {
               was a second heavy screen competing with the animation. */}
           {showTabs && splashGone && !ONBOARDING_SCREENS.has(screen) && (
             <View style={[styles.tabScreenSlot, screen !== 'focus' && styles.hidden]}>
+              {/* While a Today task's timer runs, its own instance (one per
+                  task, so each starts fresh) takes the tab and the dial
+                  instance stays mounted but hidden. */}
               <FocusScreen
                 userId={userIdRef.current ?? undefined}
-                visible={screen === 'focus'}
+                visible={screen === 'focus' && !taskSession}
                 sessionSource="tab"
                 onMinimize={() => navigateTo('todo')}
                 onOpenLockIn={() => void openLockInFromFocus()}
               />
+              {taskSession && (
+                <FocusScreen
+                  key={taskSession.id}
+                  userId={userIdRef.current ?? undefined}
+                  externalTask={taskSession}
+                  visible={screen === 'focus'}
+                  sessionSource="task"
+                  onMinimize={() => navigateTo('todo')}
+                  onExternalFinish={handleTaskFinish}
+                  onExternalExit={handleTaskExit}
+                />
+              )}
             </View>
           )}
           {screen === 'productivity' && <ProductivityScreen appState={appState} />}

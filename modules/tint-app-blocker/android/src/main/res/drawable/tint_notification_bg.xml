@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Plain black background for the notification layouts (notification_focus*.xml). -->
+<!-- Black rounded rectangle behind the notification layouts (notification_focus*.xml). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
     <solid android:color="#000000" />
+    <corners android:radius="18dp" />
 </shape>
